@@ -33,6 +33,7 @@ test25.http
 test26.http
 test27.http
 test28.http
+test29.http
 ))
 
 (foreach ?file ?*files*
@@ -57,4 +58,4 @@ test28.http
 	         (println crlf "Failure: did not find HTTP-MESSAGE for " ?file))
 )
 (println)
-;(exit)
+(exit)
