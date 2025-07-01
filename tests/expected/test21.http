@@ -1,0 +1,4 @@
+GET http://example.com/path?q=1 HTTP/1.1
+Host: example.com
+Via: 1.0 proxy, 1.1 example.com (Apache/1.1)
+

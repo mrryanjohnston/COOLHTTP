@@ -1,0 +1,3 @@
+OPTIONS /api;version=2/resource?id=77&type=json HTTP/1.1
+Host: api.example.com
+

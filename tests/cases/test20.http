@@ -1,0 +1,3 @@
+GET /old HTTP/1.0
+User-Agent: OldBrowser/1.0
+

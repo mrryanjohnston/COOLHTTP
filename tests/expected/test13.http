@@ -1,0 +1,3 @@
+CONNECT secure.example.com:8443 HTTP/1.1
+Host: secure.example.com:8443
+

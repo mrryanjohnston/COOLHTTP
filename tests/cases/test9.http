@@ -1,0 +1,3 @@
+GET /search;lang=en;region=us?q=openai+chat&sort=recent HTTP/1.1
+Host: example.com
+

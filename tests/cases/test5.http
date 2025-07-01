@@ -1,0 +1,3 @@
+GET http://proxy.example.org/pub/WWW/TheProject.html HTTP/1.1
+Host: proxy.example.org
+

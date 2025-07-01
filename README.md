@@ -1,0 +1,7 @@
+# COOLHTTP
+
+## Tests
+
+```
+make test
+```
