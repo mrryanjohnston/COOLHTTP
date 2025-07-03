@@ -1,0 +1,4 @@
+GET /bws HTTP/1.1
+Host: example.com
+X-Test:  123
+

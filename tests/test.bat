@@ -48,6 +48,12 @@ test37.http
 test38.http
 test39.http
 test40.http
+test41.http
+test42.http
+test43.http
+test44.http
+test45.http
+test46.http
 ))
 
 (foreach ?file ?*files*
