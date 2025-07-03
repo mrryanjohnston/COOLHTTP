@@ -1,5 +1,5 @@
 GET /search?q=test HTTP/1.1
 Host: example.com
 User-Agent: TestAgent/1.0
-Accept: text/html, application/json
+Accept: text/html,application/json
 

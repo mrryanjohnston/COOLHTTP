@@ -1486,8 +1486,9 @@
   (printout ?t ?self:value))
 
 (defmessage-handler PARAMETER pprint primary (?t)
-  (printout ?t ?self:parameter-name)
-  (printout ?t ?self:parameter-value))
+  (if (eq "charset" (lowcase ?self:parameter-name))
+    then (printout ?t (lowcase ?self:parameter-name) "=" (lowcase ?self:parameter-value))
+    else (printout ?t ?self:parameter-name "=" ?self:parameter-value)))
 
 (defmessage-handler SEGMENT pprint primary (?t)
   (printout ?t ?self:value))
