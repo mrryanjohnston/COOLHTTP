@@ -1,0 +1,4 @@
+GET /path/file%20name%3Fwith%25percent%20and%20space?foo=bar&baz=qux HTTP/1.1
+Host: example.com
+Accept: */*
+

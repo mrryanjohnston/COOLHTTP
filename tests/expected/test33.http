@@ -1,0 +1,4 @@
+GET http://user:pass@[2001:db8::1]:8080/secure HTTP/1.1
+Host: [2001:db8::1]:8080
+Authorization: Basic dXNlcjpwYXNz
+

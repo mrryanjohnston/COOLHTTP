@@ -1,0 +1,5 @@
+GET /multi HTTP/1.1
+Host: example.com  
+Accept: text/plain 
+Accept: text/html
+

@@ -1,0 +1,4 @@
+GET /data HTTP/1.1
+Host: example.com
+TE: trailers,deflate;q=0.5
+
