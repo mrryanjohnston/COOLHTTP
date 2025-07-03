@@ -1,5 +1,8 @@
 ;(watch rules)
+;(watch facts)
+;(watch activations)
 (watch statistics)
+;(watch all)
 (load compline.clp)
 (load ../program.clp)
 (reset)
@@ -34,6 +37,7 @@ test26.http
 test27.http
 test28.http
 test29.http
+test30.http
 ))
 
 (foreach ?file ?*files*

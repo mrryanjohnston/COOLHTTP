@@ -6,15 +6,16 @@
 (defglobal ?*alphanum* = (create$ ?*alpha* ?*digit*))
 (defglobal ?*unreserved* = (create$ ?*alphanum* 45 46 95 126)) ; - . _ ~
 (defglobal ?*gen-delims* = (create$ 58 47 63 35 91 93 64)) ; ":" / "/" / "?" / "#" / "[" / "]" / "@"
-(defglobal ?*sub-delims* = (create$ 33 36 38 39 40 41 42 43 44  59 61)) ; "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+(defglobal ?*sub-delims* = (create$ 33 36 38 39 40 41 42 43 44 59 61)) ; "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
 (defglobal ?*reserved* = (create$ ?*gen-delims* ?*sub-delims*))
-(defglobal ?*hexdig* = (create$ ?*digit* 65 66 67 68 69 70 97 98 99 100 101 102)) ; 0-9 A-F a-f
-(defglobal ?*methods* = (create$ "OPTIONS" "GET" "HEAD" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
+(defglobal ?*hex-without-dig* = (create$ 65 66 67 68 69 70 97 98 99 100 101 102)) ; 0-9 A-F a-f
+(defglobal ?*hexdig* = (create$ ?*digit* ?*hex-without-dig*))
+(defglobal ?*methods* = (create$ "OPTIONS" "GET" "HEAD" "PATCH" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
 ;      pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
-(defglobal ?*pchar* = (create$ ?*unreserved* ?*sub-delims* 58 64)) ; : @ & = + $ ,
+(defglobal ?*pchar* = (create$ ?*unreserved* ?*sub-delims* 58 64)) ; : @
 ;      reg-name    = *( unreserved / pct-encoded / sub-delims )
 (defglobal ?*reg-name* = (create$ ?*unreserved* ?*sub-delims*))
-(defglobal ?*reg-name-no-digits* = (create$ ?*alpha* ?*sub-delims* 45 46 95 126)) ; - . _ ~
+(defglobal ?*reg-name-no-digits* = (create$ ?*alpha* ?*sub-delims* 45 95 126)) ; - _ ~
 ;     userinfo      = *( unreserved | escaped |
 ;                        ";" | ":" | "&" | "=" | "+" | "$" | "," )
 ;   userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
@@ -204,8 +205,7 @@
 
 (deftemplate segment
 	(slot name)
-	(slot value)
-	(multislot parameters))
+	(slot value))
 
 (deftemplate http-version
 	(slot name)
@@ -265,7 +265,7 @@
 
 (deftemplate token
 	(slot name)
-	(slot value))
+	(slot value (default "")))
 
 (deftemplate quoted-string
 	(slot name)
@@ -278,7 +278,7 @@
 
 (deftemplate octet-stream
 	(slot name)
-	(slot value))
+	(slot value (default "")))
 
 (deftemplate x-www-form-urlencoded
 	(slot name)
@@ -288,6 +288,10 @@
 	(slot name)
 	(slot name-string (default ""))
 	(slot value-string))
+
+(deffacts supported-content-types
+	(supported-content-type "application" "octet-stream")
+	(supported-content-type "application" "x-www-form-urlencoded"))
 
 (defclass HTTP (is-a USER) (slot filename))
 (defclass HTTP-MESSAGE (is-a HTTP) (slot start-line) (multislot field-lines) (slot message-body))
@@ -313,8 +317,8 @@
 (defclass PATH-ABEMPTY (is-a HTTP) (multislot segments))
 (defclass PATH-ABSOLUTE (is-a HTTP) (slot segment-nz) (multislot segments))
 (defclass PATH-ROOTLESS (is-a HTTP) (slot segment-nz) (multislot segments))
-(defclass SEGMENT (is-a HTTP) (slot value) (multislot parameters))
-(defclass PARAMETER (is-a HTTP) (slot value))
+(defclass SEGMENT (is-a HTTP) (slot value))
+(defclass PARAMETER (is-a HTTP) (slot parameter-name) (slot parameter-value))
 (defclass QUERY (is-a HTTP) (slot value))
 (defclass HTTP-VERSION (is-a HTTP) (slot H) (slot T) (slot TT) (slot P) (slot major) (slot minor))
 (defclass FIELD-LINE (is-a HTTP) (slot field-name) (slot field-value))
@@ -334,6 +338,7 @@
 
 (defrule pop-char
 	(filename ?name)
+	(http-message (name ?name))
 	(not (char ?name ?))
 	=>
 	(assert (char ?name (get-char ?name))))
@@ -495,7 +500,7 @@
 	(modify ?i (value (assert (ipv6address (name ?name) (parts ":"))))))
 
 (defrule ipv6address-detect-h16
-	(char ?name ?char&:(member$ ?char ?*hexdig*))
+	(char ?name ?char&:(member$ ?char ?*hex-without-dig*))
 	?i <- (ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(eq H16 (class (nth$ (length$ ?parts) ?parts))) ":"))
 	=>
 	(modify ?i (parts ?parts (assert (h16 (name ?name))))))
@@ -505,6 +510,27 @@
 	?i <- (ipv6address (name ?name) (parts $?parts&:(> 7 (length$ ?parts))&:(> 0 (length$ ?parts))&:(instancep (nth$ (length$ ?parts) ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts)) ":"))
 	=>
 	(modify ?i (parts ?parts (assert (ipv4address (name ?name) (octets (assert (dec-octet (name ?name)))))))))
+
+(defrule ipv6address-change-ipv4address-to-h16
+	?octet <- (dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+	?i4 <- (ipv4address (name ?name) (octets ?octet))
+	?i <- (ipv6address (name ?name) (parts $?parts ?i4))
+	(or
+		(char ?name ?char&:(member$ ?char ?*hex-without-dig*))
+		(char ?name 93) ; ]
+		(and
+			(neq nil ?third)
+			(char ?name ?char&:(member$ ?char ?*hexdig*))))
+	=>
+	(retract ?octet ?i4)
+	(bind ?value "")
+	(if (neq nil ?first)
+		then (bind ?value (str-cat ?value ?first)))
+	(if (neq nil ?second)
+		then (bind ?value (str-cat ?value ?second)))
+	(if (neq nil ?third)
+		then (bind ?value (str-cat ?value ?third)))
+	(modify ?i (parts ?parts (assert (h16 (name ?name) (value ?value))))))
 
 (defrule ipv6address-end-ipv4address
 	(char ?name 93) ; ]
@@ -620,13 +646,13 @@
 
 (defrule ipv4address-create-octet
 	?c <- (char ?name 46) ; .
-	?i <- (ipv4address (name ?name) (octets $?octets&:(< 4 (length$ ?octets))&:(instancep (nth$ (length$ ?octets) ?octets))))
+	?i <- (ipv4address (name ?name) (octets $?octets&:(> 4 (length$ ?octets))&:(instancep (nth$ (length$ ?octets) ?octets))))
 	=>
 	(retract ?c)
 	(modify ?i (octets ?octets (assert (dec-octet (name ?name))))))
 
 (defrule host-end-ipv4address
-	(char ?name 32|58) ; SP :
+	(char ?name 13|32|47|58) ; CR SP / :
 	?i <- (ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
 	?h <- (host (value ?i))
 	=>
@@ -634,20 +660,41 @@
 	(modify ?h (value (make-instance of IPV4ADDRESS (filename ?name) (value (format nil "%s%s%s%s" ?first ?second ?third ?fourth))))))
 
 (defrule host-ipv4address-change-to-reg-name
-	(char ?name ?char&:(member$ ?char (create$ ?*reg-name* 37))) ; %
 	?i <- (ipv4address (name ?name) (octets $?octets))
 	?h <- (host (value ?i))
+	(or
+		(char ?name ?char&:(member$ ?char (create$ ?*reg-name-no-digits* 37))) ; %
+		(and
+			(char ?name ~46) ; .
+			(test (< 0 (length$ ?octets)))
+			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
+			(test (neq "" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
+			(test (neq "1" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
+			(test (neq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
+		(and
+			(char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
+			(test (< 0 (length$ ?octets)))
+			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
+			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
+			(test (eq "5" (fact-slot-value (nth$ (length$ ?octets) ?octets) second-digit))))
+		(and
+			(char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
+			(test (< 0 (length$ ?octets)))
+			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
+			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
+		(and
+			(char ?name ~13&~32&~47&~58)
+			(test (= 4 (length$ ?octets)))
+			(test (instancep (nth$ 4 ?octets)))))
 	=>
-	(bind ?value "")
-	(foreach ?octet ?octets
-		(if (instancep ?octet)
-		then
-			(bind ?value (str-cat ?value (send get-value ?octet)))
-			(unmake-instance ?octet)
-		else
-			(bind ?value (str-cat ?value (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit))))
-			(retract ?octet))
 	(retract ?i)
+	(bind ?value "")
+	(do-for-all-instances ((?octet DEC-OCTET)) (member$ ?octet ?octets)
+		(bind ?value (str-cat ?value (send ?octet get-value)))
+		(unmake-instance ?octet))
+	(do-for-fact ((?octet dec-octet)) (member$ ?octet ?octets)
+		(bind ?value (str-cat ?value "." (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit)))
+		(retract ?octet))
 	(modify ?h (value (assert (reg-name (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*reg-name*) (sequence ?value)))))))))
 
 (defrule host-detect-reg-name
@@ -747,14 +794,6 @@
 	(retract ?e)
 	(modify ?a (query (make-instance of QUERY (filename ?name) (value ?sequence)))))
 
-(defrule request-line-end-absolute-uri
-	?c <- (char ?name 32)
-	?a <- (absolute-uri (scheme ?s) (hier-part ?h&nil|:(instancep ?h)) (query ?q&nil|:(instancep ?q)))
-	?r <- (request-line (name ?name) (request-target ?a))
-	=>
-	(retract ?c ?a)
-	(modify ?r (request-target (make-instance of ABSOLUTE-URI (filename ?name) (scheme ?s) (hier-part ?h) (query ?q)))))
-
 (defrule start-request-target-asterisk-form
 	?c <- (char ?name 42) ; *
 	?m <- (object (is-a METHOD) (value "OPTIONS"))
@@ -774,38 +813,38 @@
 (defrule origin-form-end-of-segment
 	(char ?name 32|47|63) ; SP / ?
 	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?s <- (segment (value ?es))
 	?o <- (origin-form (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?o (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value) (parameters ?parameters)))))
+	(modify ?o (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
 
 (defrule path-abempty-end-of-segment
 	(char ?name 32|47|63) ; SP / ?
 	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?s <- (segment (value ?es))
 	?p <- (path-abempty (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value) (parameters ?parameters)))))
+	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
 
 (defrule path-absolute-end-of-segment
 	(char ?name 32|47|63) ; SP / ?
 	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?s <- (segment (value ?es))
 	?p <- (path-absolute (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value) (parameters ?parameters)))))
+	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
 
 (defrule path-rootless-end-of-segment
 	(char ?name 32|47|63) ; SP / ?
 	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?s <- (segment (value ?es))
 	?p <- (path-rootless (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value) (parameters ?parameters)))))
+	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
 
 (defrule origin-form-find-next-segment
 	?c <- (char ?name 47) ; /
@@ -866,52 +905,6 @@
 	(retract ?c ?a)
 	(modify ?r (request-target (make-instance of ABSOLUTE-URI (filename ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query)))))
 
-;       segment       = *pchar
-;       segment-nz    = 1*pchar
-;       segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
-                    ; non-zero-length segment without any colon ":"
-;   Aside from dot-segments in hierarchical paths, a path segment is
-;   considered opaque by the generic syntax.  URI producing applications
-;   often use the reserved characters allowed in a segment to delimit
-;   scheme-specific or dereference-handler-specific subcomponents.  For
-;   example, the semicolon (";") and equals ("=") reserved characters are
-;   often used to delimit parameters and parameter values applicable to
-;   that segment.  The comma (",") reserved character is often used for
-;   similar purposes.  For example, one URI producer might use a segment
-;   such as "name;v=1.1" to indicate a reference to version 1.1 of
-;   "name", whereas another might use a segment such as "name,1.1" to
-;   indicate the same.  Parameter types may be defined by scheme-specific
-;   semantics, but in most cases the syntax of a parameter is specific to
-;   the implementation of the URI's dereferencing algorithm.
-;
-;  parameters      = *( OWS ";" OWS [ parameter ] )
-;  parameter       = parameter-name "=" parameter-value
-;  parameter-name  = token
-;  parameter-value = ( token / quoted-string )
-(defrule segment-find-first-parameter
-	?c <- (char ?name 59) ; ;
-	?es <- (escapable-sequence (sequence ?sequence) (pct-encoded nil))
-	?s <- (segment (name ?name) (value ?es) (parameters))
-	=>
-	(retract ?c ?es)
-	(modify ?s (value ?sequence) (parameters (assert (escapable-sequence (name ?name) (sequence "") (allowed-chars ?*pchar*))))))
-
-(defrule segment-next-parameter
-	?c <- (char ?name 59) ; ;
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
-	?s <- (segment (name ?name) (parameters $?parameters ?e))
-	=>
-	(retract ?c ?e)
-	(modify ?s (parameters ?parameters (make-instance of PARAMETER (filename ?name) (value ?sequence)) (assert (escapable-sequence (name ?name) (sequence "") (allowed-chars ?*pchar*))))))
-
-(defrule segment-last-parameter
-	(char ?name 32|47) ; SP /
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
-	?s <- (segment (parameters $?parameters ?e))
-	=>
-	(retract ?e)
-	(modify ?s (parameters ?parameters (make-instance of PARAMETER (filename ?name) (value ?sequence)))))
-
 (defrule char-is-allowed-char-in-escapable-sequence
 	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (allowed-chars $?allowed-chars) (pct-encoded nil))
 	?c <- (char ?name ?char&:(member$ ?char ?allowed-chars))
@@ -935,7 +928,7 @@
 
 (defrule pct-encoded-find-second
 	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?p <- (pct-encoded (name ?name) (first ?first))
+	?p <- (pct-encoded (name ?name) (first ?first&~nil))
 	?es <- (escapable-sequence (pct-encoded ?p) (sequence ?sequence))
 	=>
 	(retract ?p ?c)
@@ -1137,14 +1130,14 @@
 
 (defrule content-type-detect-parameter
 	?c <- (char ?name 59) ; ;
-	?cth <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))&:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?cth <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c)
 	(modify ?cth (parameters ?parameters (assert (parameter (name ?name))))))
 
 (defrule content-type-detect-ows
 	?c <- (char ?name 32) ; SP
-	(content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))&:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	(content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c))
 
@@ -1182,11 +1175,11 @@
 	(modify ?p (parameter-value (assert (token (name ?name))))))
 
 (defrule parameter-end-parameter-value-token
-	?c <- (char ?name 61) ; =
+	(char ?name 9|13|32|59) ; HTAB CR SP ;
 	?t <- (token (name ?name) (value ?value&~""))
 	?p <- (parameter (parameter-value ?t))
 	=>
-	(retract ?c ?t)
+	(retract ?t)
 	(modify ?p (parameter-value ?value)))
 
 (defrule parameter-detect-parameter-value-quoted-string
@@ -1213,7 +1206,7 @@
 	(modify ?p (parameter-value (make-instance of QUOTED-STRING (filename ?name) (value ?value)))))
 
 (defrule content-type-header-end-parameter
-	(char ?name 9|13|32) ; HTAB CR SP
+	(char ?name 9|13|32|59) ; HTAB CR SP ;
 	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
 	?c <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
 	=>
@@ -1227,7 +1220,7 @@
 	(modify ?p (parameter-value (assert (token (name ?name))))))
 
 (defrule host-header-end-host
-	(char ?name 13|58)
+	(char ?name 13|32|58) ; CR SP :
 	?h <- (host (value ?value&:(instancep ?value)))
 	?hh <- (host-header (name ?name) (uri-host ?h))
 	=>
@@ -1242,10 +1235,11 @@
 	(modify ?hh (port (assert (port (name ?name))))))
 
 (defrule host-header-end-port
-	(char ?name 13)
+	(char ?name 13|32) ; CR SP
 	?p <- (port (value ?value))
 	?hh <- (host-header (name ?name) (port ?p))
 	=>
+	(retract ?p)
 	(modify ?hh (port (make-instance of PORT (filename ?name) (value ?value)))))
 
 (defrule build-content-length-header
@@ -1321,12 +1315,18 @@
 	(modify ?f (value (make-instance of CONTENT-TYPE-HEADER (filename ?name) (type ?type) (subtype ?subtype) (parameters ?parameters)))))
 
 (defrule end-host-header
-	(char ?name 13)
+	(char ?name 13|32) ; CR SP
 	?hh <- (host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port ?p&nil|:(instancep ?p)))
 	?f <- (field-value (value ?hh))
 	=>
 	(retract ?hh)
 	(modify ?f (value (make-instance of HOST-HEADER (filename ?name) (uri-host ?h) (port ?p)))))
+
+(defrule ignore-ows-at-end-of-field-value
+	?c <- (char ?name 9|32) ; HTAB SP
+	(field-value (name ?name) (value ?v&:(instancep ?v)))
+	=>
+	(retract ?c))
 
 (defrule end-field-value
 	?c <- (char ?name 13) ; CR
@@ -1359,12 +1359,13 @@
 	(modify ?m (length-remaining (string-to-field ?value))))
 
 (defrule message-body-determine-empty
-	(char ?name 10) ; LF
+	?c <- (char ?name 10) ; LF
 	?m <- (message-body (name ?name) (length-remaining nil))
 	(or
 		(not (object (is-a CONTENT-LENGTH-HEADER) (filename ?name)))
 		(object (is-a CONTENT-LENGTH-HEADER) (filename ?name) (value "0")))
 	=>
+	(retract ?c)
 	(modify ?m (length-remaining 0)))
 
 (defrule message-body-detect-application-octet-stream
@@ -1374,7 +1375,11 @@
 		(not (object (is-a CONTENT-TYPE-HEADER) (filename ?name)))
 		(and
 			(object (is-a TYPE) (filename ?name) (value "application"))
-			(object (is-a SUBTYPE) (filename ?name) (value "octet-stream"))))
+			(object (is-a SUBTYPE) (filename ?name) (value "octet-stream")))
+		(and
+			(object (is-a TYPE) (filename ?name) (value ?type))
+			(object (is-a SUBTYPE) (filename ?name) (value ?subtype))
+			(not (supported-content-type ?type ?subtype))))
 	=>
 	(retract ?c)
 	(modify ?m (value (assert (octet-stream (name ?name))))))
@@ -1395,16 +1400,6 @@
 	=>
 	(retract ?c)
 	(modify ?o (value (format nil "%s%c" ?value ?char)))
-	(modify ?m (length-remaining (- ?length-remaining 1))))
-
-(defrule x-www-form-urlencoded-end-sequence-and-start-next-sequence
-	?c <- (char ?name 38) ; &
-	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
-	=>
-	(retract ?c ?sequence)
-	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)) (assert (sequence (name ?name)))))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
 (defrule x-www-form-urlencoded-build-name-string
@@ -1428,7 +1423,7 @@
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
 (defrule x-www-form-urlencoded-build-value-string
-	?c <- (char ?name ?char)
+	?c <- (char ?name ?char&~38) ; &
 	?sequence <- (sequence (name ?name) (value-string ?value-string&~nil))
 	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
@@ -1437,7 +1432,18 @@
 	(modify ?sequence (value-string (format nil "%s%c" ?value-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
+(defrule x-www-form-urlencoded-end-sequence-and-start-next-sequence
+	?c <- (char ?name 38) ; &
+	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
+	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+	=>
+	(retract ?c ?sequence)
+	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)) (assert (sequence (name ?name)))))
+	(modify ?m (length-remaining (- ?length-remaining 1))))
+
 (defrule end-octet-stream
+	(char ?name -1)
 	?o <- (octet-stream (name ?name) (value ?value))
 	?m <- (message-body (length-remaining 0) (value ?o))
 	=>
@@ -1445,6 +1451,7 @@
 	(modify ?m (value (make-instance of OCTET-STREAM (filename ?name) (value ?value)))))
 
 (defrule x-www-form-urlencoded-end-sequence
+	(char ?name -1)
 	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
 	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (message-body (length-remaining 0) (value ?x))
@@ -1453,6 +1460,7 @@
 	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)))))
 
 (defrule end-x-www-form-urlencoded
+	(char ?name -1)
 	?x <- (x-www-form-urlencoded (name ?name) (sequences $?sequences&:(= 0 (length$ ?sequences))|:(instancep (nth$ (length$ ?sequences) ?sequences))))
 	?m <- (message-body (length-remaining 0) (value ?x))
 	=>
@@ -1460,6 +1468,7 @@
 	(modify ?m (value (make-instance of X-WWW-FORM-URLENCODED (filename ?name) (sequences ?sequences)))))
 
 (defrule http-message-end-message-body
+	(char ?name -1)
 	?m <- (message-body (value ?value&nil|:(instancep ?value)) (length-remaining 0))
 	?h <- (http-message (name ?name) (message-body ?m))
 	=>
@@ -1467,6 +1476,7 @@
 	(modify ?h (message-body (make-instance of MESSAGE-BODY (filename ?name) (value ?value)))))
 
 (defrule end-http-message
+	(char ?name -1)
 	?h <- (http-message (name ?name) (start-line ?s) (field-lines $?f) (message-body ?m&:(instancep ?m)))
 	=>
 	(retract ?h)
@@ -1476,18 +1486,11 @@
   (printout ?t ?self:value))
 
 (defmessage-handler PARAMETER pprint primary (?t)
-  (printout ?t ?self:value))
+  (printout ?t ?self:parameter-name)
+  (printout ?t ?self:parameter-value))
 
 (defmessage-handler SEGMENT pprint primary (?t)
-  (printout ?t ?self:value)
-  (if (neq ?self:parameters nil) then
-    (bind ?parameters ?self:parameters)
-    (bind ?len (length$ ?parameters))
-    (bind ?i 0)
-    (foreach ?parameter ?parameters
-      (if (< ?i ?len) then (printout ?t ";"))
-      (bind ?i (+ ?i 1))
-      (send ?parameter pprint ?t))))
+  (printout ?t ?self:value))
 
 (defmessage-handler SCHEME pprint primary (?t)
   (printout ?t ?self:value))
