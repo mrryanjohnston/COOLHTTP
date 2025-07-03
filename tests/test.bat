@@ -72,4 +72,4 @@ test40.http
 	         (println crlf "Failure: did not find HTTP-MESSAGE for " ?file))
 )
 (println)
-;(exit)
+(exit)

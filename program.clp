@@ -336,23 +336,19 @@
 (defclass X-WWW-FORM-URLENCODED (is-a HTTP) (multislot sequences))
 (defclass SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
 
-(defrule pop-char
-	(filename ?name)
-	(http-message (name ?name))
-	(not (char ?name ?))
-	=>
-	(assert (char ?name (get-char ?name))))
-
 (defrule initialize-request
 	(filename ?name)
 	=>
-	(assert (http-message (name ?name) (start-line (assert (request-line (name ?name) (method (assert (method (name ?name))))))))))
+	(assert
+		(char ?name (get-char ?name))
+		(http-message (name ?name) (start-line (assert (request-line (name ?name) (method (assert (method (name ?name))))))))))
 
 (defrule build-method
 	?c <- (char ?name ?char&65|67|68|69|71|72|73|76|78|79|80|82|83|84|85) ; A|C|D|E|G|H|I|L|N|O|P|R|S|T|U
 	?m <- (method (name ?name) (value ?value&~"H"&:(> 7 (str-length ?value))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?m (value (format nil "%s%c" ?value ?char))))
 
 (defrule continue-method-when-head
@@ -360,6 +356,7 @@
 	?m <- (method (name ?name) (value "H"))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?m (value "HE")))
 
 (defrule find-http-version-instead-of-method
@@ -369,6 +366,7 @@
 	?h <- (http-message (start-line ?r))
 	=>
 	(retract ?c ?m ?r)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (start-line (assert (status-line (name ?name) (http-version (assert (http-version (name ?name) (H TRUE) (T TRUE)))))))))
 
 (defrule end-method
@@ -377,6 +375,7 @@
 	?r <- (request-line (method ?m))
 	=>
 	(retract ?c ?m)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (method (make-instance of METHOD (filename ?name) (value ?value)))))
  
 ;   request-target = origin-form
@@ -388,6 +387,7 @@
 	?r <- (request-line (name ?name) (method ?method&:(instancep ?method)) (request-target nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (assert (origin-form (name ?name) (segments (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))))))
 
 (defrule start-request-target-authority-form
@@ -403,6 +403,7 @@
 	?r <- (request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (assert (absolute-uri (name ?name) (scheme (assert (scheme (name ?name) (value (format nil "%c" ?char))))))))))
 
 (defrule continue-scheme
@@ -410,6 +411,7 @@
 	?s <- (scheme (name ?name) (value ?value&~nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?s (value (format nil "%s%c" ?value ?char))))
 
 (defrule absolute-uri-end-scheme
@@ -418,6 +420,7 @@
 	?a <- (absolute-uri (scheme ?s))
 	=>
 	(retract ?c ?s)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (scheme (make-instance of SCHEME (filename ?name) (value ?value))) (hier-part (assert (hier-part (name ?name))))))
 
 (defrule hier-part-find-path-absolute-first-slash
@@ -425,6 +428,7 @@
 	?h <- (hier-part (name ?name) (authority nil) (path nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (path (assert (path-absolute (name ?name) (segment-nz (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*)))))))))
 
 (defrule hier-part-find-second-slash-change-path-absolute-to-authority
@@ -434,6 +438,7 @@
 	?h <- (hier-part (path ?path))
 	=>
 	(retract ?c ?e ?path)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (path nil) (authority (assert (authority (name ?name) (host (assert (host (name ?name)))))))))
 
 (defrule authority-change-host-port-to-userinfo
@@ -461,6 +466,7 @@
 	?a <- (authority (name ?name) (userinfo ?e))
 	=>
 	(retract ?c ?e)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (userinfo (make-instance of USERINFO (filename ?name) (value ?sequence))) (host (assert (host (name ?name))))))
 
 (defrule authority-end-host
@@ -484,6 +490,7 @@
 	?h <- (host (name ?name) (value nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (value (assert (ip-literal (name ?name))))))
 
 (defrule ip-literal-detect-ipv6address
@@ -497,6 +504,7 @@
 	?i <- (ip-literal (name ?name) (value nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?i (value (assert (ipv6address (name ?name) (parts ":"))))))
 
 (defrule ipv6address-detect-h16
@@ -545,6 +553,7 @@
 	?h <- (h16 (name ?name) (value ?value&:(> 4 (str-length ?value))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (value (format nil "%s%c" ?value ?char))))
 
 (defrule end-h16-in-ipv6address
@@ -560,6 +569,7 @@
 	?i <- (ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))&~:(member$ "::" ?parts) ":"))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?i (parts ?parts "::" ":")))
 
 (defrule ipv6address-detect-next-part
@@ -567,6 +577,7 @@
 	?i6 <- (ipv6address (name ?name) (parts $?parts&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?i6 (parts ?parts ":")))
 
 (defrule end-ipv6address
@@ -583,6 +594,7 @@
 	?h <- (host (value ?i))
 	=>
 	(retract ?c ?i)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (value (make-instance of IP-LITERAL (filename ?name) (value ?i6)))))
 
 ;(defrule ip-literal-detect-ipvfuture
@@ -599,6 +611,7 @@
 	?o <- (dec-octet (name ?name) (first-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (first-digit (format nil "%c" ?char))))
 
 (defrule dec-octet-set-second-digit-when-first-digit-is-one
@@ -606,6 +619,7 @@
 	?o <- (dec-octet (name ?name) (first-digit "1") (second-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (second-digit (format nil "%c" ?char))))
 
 (defrule dec-octet-set-second-digit-when-first-digit-is-two
@@ -613,6 +627,7 @@
 	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (second-digit (format nil "%c" ?char))))
 
 (defrule dec-octet-set-third-digit-when-first-digit-is-one
@@ -620,6 +635,7 @@
 	?o <- (dec-octet (name ?name) (first-digit "1") (second-digit ~"") (third-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (third-digit (format nil "%c" ?char))))
 
 (defrule dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-5
@@ -627,6 +643,7 @@
 	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit "5") (third-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (third-digit (format nil "%c" ?char))))
 
 (defrule dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-not-5
@@ -634,6 +651,7 @@
 	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit ~"5") (third-digit ""))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (third-digit (format nil "%c" ?char))))
 
 (defrule end-dec-octet
@@ -649,6 +667,7 @@
 	?i <- (ipv4address (name ?name) (octets $?octets&:(> 4 (length$ ?octets))&:(instancep (nth$ (length$ ?octets) ?octets))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?i (octets ?octets (assert (dec-octet (name ?name))))))
 
 (defrule host-end-ipv4address
@@ -717,6 +736,7 @@
 	?a <- (authority-form (name ?name) (uri-host ?host&:(instancep ?host)) (port nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (port (assert (port (name ?name))))))
 
 (defrule authority-start-port
@@ -724,6 +744,7 @@
 	?a <- (authority (name ?name) (host ?host&:(instancep ?host)) (port nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (port (assert (port (name ?name))))))
 
 (defrule continue-port
@@ -731,6 +752,7 @@
 	?p <- (port (name ?name) (value ?start&:(> 5 (str-length ?start))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (value (format nil "%s%c" ?start ?char))))
 
 (defrule end-authority-form
@@ -739,6 +761,7 @@
 	?r <- (request-line (request-target ?a))
 	=>
 	(retract ?c ?a)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (make-instance of AUTHORITY-FORM (filename ?name) (uri-host ?host) (port ?p)))))
 
 (defrule authority-end-port
@@ -784,6 +807,7 @@
 	?a <- (absolute-uri (name ?name) (hier-part ?h&:(instancep ?h)))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (query (assert (escapable-sequence (name ?name) (allowed-chars ?*query*))))))
 
 (defrule absolute-uri-end-query
@@ -800,6 +824,7 @@
 	?r <- (request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target "*")))
 
 (defrule end-request-target-asterisk-form
@@ -807,6 +832,7 @@
 	?r <- (request-line (name ?name) (request-target "*"))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (make-instance of ASTERISK-FORM (filename ?name)))))
 
 	; the type of path this segment is for (origin-form, path-abempty, path-absolute, path-rootless)
@@ -851,6 +877,7 @@
 	?o <- (origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))) 
 
 (defrule path-abempty-find-next-segment
@@ -858,6 +885,7 @@
 	?p <- (path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (segments ?segments (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*)))))))))
 	
 (defrule path-absolute-find-next-segment
@@ -865,6 +893,7 @@
 	?p <- (path-absolute (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*)))))))))
 	
 (defrule path-rootless-find-next-segment
@@ -872,6 +901,7 @@
 	?p <- (path-rootless (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*)))))))))
 
 (defrule origin-form-start-query
@@ -879,6 +909,7 @@
 	?a <- (origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)) (query nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?a (query (assert (escapable-sequence (name ?name) (allowed-chars ?*query*))))))
 
 (defrule origin-form-end-query
@@ -895,6 +926,7 @@
 	?r <- (request-line (request-target ?o))
 	=>
 	(retract ?c ?o)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (make-instance of ORIGIN-FORM (filename ?name) (segments ?segments ?segment) (query ?query)))))
 
 (defrule end-of-absolute-uri
@@ -903,6 +935,7 @@
 	?r <- (request-line (request-target ?a))
 	=>
 	(retract ?c ?a)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (request-target (make-instance of ABSOLUTE-URI (filename ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query)))))
 
 (defrule char-is-allowed-char-in-escapable-sequence
@@ -910,6 +943,7 @@
 	?c <- (char ?name ?char&:(member$ ?char ?allowed-chars))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?e (sequence (format nil "%s%c" ?sequence ?char))))
 
 (defrule pct-encoded-sequence
@@ -917,6 +951,7 @@
 	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?e (pct-encoded (assert (pct-encoded (name ?name))))))
 
 (defrule pct-encoded-find-first
@@ -924,6 +959,7 @@
 	?p <- (pct-encoded (name ?name) (first nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (first ?char)))
 
 (defrule pct-encoded-find-second
@@ -932,6 +968,7 @@
 	?es <- (escapable-sequence (pct-encoded ?p) (sequence ?sequence))
 	=>
 	(retract ?p ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?es (sequence (format nil "%s%c%c%c" ?sequence 37 ?first ?char)) (pct-encoded nil)))
 
 (defrule find-http-version
@@ -939,6 +976,7 @@
 	?r <- (request-line (name ?name) (request-target ?request-target&:(instancep ?request-target)) (http-version nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (http-version (assert (http-version (name ?name) (H TRUE))))))
 
 (defrule find-http-version-first-T
@@ -947,6 +985,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (T TRUE)))
 
 (defrule find-http-version-second-T
@@ -955,6 +994,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (TT TRUE)))
 
 (defrule find-http-version-P
@@ -963,6 +1003,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (P TRUE)))
 
 (defrule find-http-version-slash
@@ -971,6 +1012,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (major "")))
 
 (defrule find-http-version-continue-major
@@ -979,6 +1021,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (major (format nil "%s%c" ?major ?char))))
 
 (defrule find-http-version-period
@@ -987,6 +1030,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (minor "")))
 
 (defrule find-http-version-continue-minor
@@ -995,6 +1039,7 @@
 	(request-line (http-version ?h))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (minor (format nil "%s%c" ?minor ?char))))
 
 (defrule http-version-end
@@ -1003,6 +1048,7 @@
 	?r <- (request-line (http-version ?h))
 	=>
 	(retract ?c ?h)
+	(assert (char ?name (get-char ?name)))
 	(modify ?r (http-version (make-instance of HTTP-VERSION (filename ?name) (major ?major) (minor ?minor)))))
 
 (defrule request-line-end
@@ -1011,6 +1057,7 @@
 	?h <- (http-message (name ?name) (start-line ?r))
 	=>
 	(retract ?c ?r)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (start-line (make-instance of REQUEST-LINE (filename ?name) (method ?method) (request-target ?request-target) (http-version ?http-version)))))
 
 (defrule detect-field-line
@@ -1024,6 +1071,7 @@
 	?f <- (field-name (name ?name) (value ?value))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?f (value (format nil "%s%c" ?value ?char))))
 
 (defrule end-field-name
@@ -1032,13 +1080,15 @@
 	?fl <- (field-line (field-name ?fn))
 	=>
 	(retract ?c ?fn)
+	(assert (char ?name (get-char ?name)))
 	(modify ?fl (field-name (make-instance of FIELD-NAME (filename ?name) (value ?value)))))
 
 (defrule ignore-ows-after-field-name
 	?c <- (char ?name 9|32) ; HTAB SP
 	(field-line (name ?name) (field-name ?f&:(instancep ?f)) (field-value nil))
 	=>
-	(retract ?c))
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
 
 (defrule detect-field-value
 	(char ?name ~9&~32) ; HTAB SP
@@ -1061,6 +1111,7 @@
 	(not (obs-text ?name $?))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows "")))
 
 (defrule detect-content-length-header
@@ -1097,6 +1148,7 @@
 	?t <- (type (name ?name) (value ?type))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?t (value (format nil "%s%c" ?type ?char))))
 
 (defrule content-type-end-type
@@ -1105,6 +1157,7 @@
 	?ct <- (content-type-header (type ?t))
 	=>
 	(retract ?c ?t)
+	(assert (char ?name (get-char ?name)))
 	(modify ?ct (type (make-instance of TYPE (filename ?name) (value ?value)))))
 
 (defrule content-type-detect-subtype
@@ -1118,6 +1171,7 @@
 	?s <- (subtype (name ?name) (value ?subtype))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?s (value (format nil "%s%c" ?subtype ?char))))
 
 (defrule content-type-end-subtype
@@ -1133,19 +1187,22 @@
 	?cth <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?cth (parameters ?parameters (assert (parameter (name ?name))))))
 
 (defrule content-type-detect-ows
 	?c <- (char ?name 32) ; SP
 	(content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
-	(retract ?c))
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
 
 (defrule parameter-detect-ows
 	?c <- (char ?name 32) ; SP
 	(parameter (name ?name) (parameter-name nil))
 	=>
-	(retract ?c))
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
 
 (defrule parameter-detect-parameter-name
 	(char ?name ?char&:(member$ ?char ?*tchar*))
@@ -1158,6 +1215,7 @@
 	?t <- (token (name ?name) (value ?value))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?t (value (format nil "%s%c" ?value ?char))))
 
 (defrule parameter-end-parameter-name
@@ -1166,6 +1224,7 @@
 	?p <- (parameter (parameter-name ?t))
 	=>
 	(retract ?c ?t)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (parameter-name ?value)))
 
 (defrule parameter-detect-parameter-value-token
@@ -1187,6 +1246,7 @@
 	?p <- (parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (parameter-value (assert (quoted-string (name ?name))))))
 
 (defrule quoted-string-detect-quoted-pair
@@ -1195,6 +1255,7 @@
 	(not (quoted-pair ?name))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(assert (quoted-pair ?name)))
 
 (defrule parameter-end-parameter-value-quoted-string
@@ -1203,6 +1264,7 @@
 	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?q))
 	=>
 	(retract ?c ?q)
+	(assert (char ?name (get-char ?name)))
 	(modify ?p (parameter-value (make-instance of QUOTED-STRING (filename ?name) (value ?value)))))
 
 (defrule content-type-header-end-parameter
@@ -1232,6 +1294,7 @@
 	?hh <- (host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?hh (port (assert (port (name ?name))))))
 
 (defrule host-header-end-port
@@ -1247,6 +1310,7 @@
 	?clh <- (content-length-header (name ?name) (value ?content-length-header))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?clh (value (format nil "%s%c" ?content-length-header ?char))))
 
 (defrule allow-ows-in-unknown-header
@@ -1256,6 +1320,7 @@
 	(not (obs-text ?name $?))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?f (possible-ows (format nil "%s%c" ?possible-ows ?char))))
 
 (defrule unknown-header-detect-obs-text
@@ -1265,21 +1330,24 @@
 	(not (obs-text ?name $?))
 	=>
 	(retract ?c)
-	(assert (obs-text ?name)))
+	(assert (obs-text ?name)
+		(char ?name (get-char ?name))))
 
 (defrule detect-obs-text-x
 	?c <- (char ?name 120) ; x
 	?o <- (obs-text ?name)
 	=>
 	(retract ?c ?o)
-	(assert (obs-text ?name x)))
+	(assert (obs-text ?name x)
+		(char ?name (get-char ?name))))
 
 (defrule detect-obs-text-x-first
 	?c <- (char ?name ?char&56|57|97|98|99|100|101|102|65|66|67|68|69|70) ; 8 9 a b c d e f A B C D E F
 	?o <- (obs-text ?name x)
 	=>
 	(retract ?c ?o)
-	(assert (obs-text ?name x ?char)))
+	(assert (obs-text ?name x ?char)
+		(char ?name (get-char ?name))))
 
 (defrule unknown-header-detect-obs-text-x-second
 	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
@@ -1287,6 +1355,7 @@
 	?o <- (obs-text ?name x ?first)
 	=>
 	(retract ?c ?o)
+	(assert (char ?name (get-char ?name)))
 	(modify ?u (value (format nil "%s\\x%c%c%s" ?value ?possible-ows ?first ?char)) (possible-ows "")))
 
 (defrule end-unknown-header
@@ -1326,7 +1395,8 @@
 	?c <- (char ?name 9|32) ; HTAB SP
 	(field-value (name ?name) (value ?v&:(instancep ?v)))
 	=>
-	(retract ?c))
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
 
 (defrule end-field-value
 	?c <- (char ?name 13) ; CR
@@ -1334,6 +1404,7 @@
 	?fl <- (field-line (field-value ?fv))
 	=>
 	(retract ?c ?fv)
+	(assert (char ?name (get-char ?name)))
 	(modify ?fl (field-value (make-instance of FIELD-VALUE (filename ?name) (value ?v)))))
 
 (defrule end-field-line
@@ -1342,6 +1413,7 @@
 	?h <- (http-message (name ?name) (field-lines $?field-lines ?f))
 	=>
 	(retract ?c ?f)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (field-lines ?field-lines (make-instance of FIELD-LINE (filename ?name) (field-name ?field-name) (field-value ?field-value)))))
 
 (defrule http-message-detect-message-body
@@ -1349,6 +1421,7 @@
 	?h <- (http-message (name ?name) (start-line ?start-line&:(instancep ?start-line)) (field-lines $?field-lines&:(= 0 (length$ ?field-lines))|:(instancep (nth$ (length$ ?field-lines) ?field-lines))) (message-body nil))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?h (message-body (assert (message-body (name ?name))))))
 
 (defrule message-body-set-length-remaining
@@ -1366,6 +1439,7 @@
 		(object (is-a CONTENT-LENGTH-HEADER) (filename ?name) (value "0")))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?m (length-remaining 0)))
 
 (defrule message-body-detect-application-octet-stream
@@ -1382,6 +1456,7 @@
 			(not (supported-content-type ?type ?subtype))))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?m (value (assert (octet-stream (name ?name))))))
 
 (defrule message-body-detect-application-x-www-form-urlencoded
@@ -1391,6 +1466,7 @@
 	(object (is-a SUBTYPE) (filename ?name) (value "x-www-form-urlencoded"))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?m (value (assert (x-www-form-urlencoded (name ?name) (sequences (assert (sequence (name ?name)))))))))
 
 (defrule build-octet-stream
@@ -1399,6 +1475,7 @@
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?o))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?o (value (format nil "%s%c" ?value ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
@@ -1409,6 +1486,7 @@
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?sequence (name-string (format nil "%s%c" ?name-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
@@ -1419,6 +1497,7 @@
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?sequence (value-string ""))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
@@ -1429,6 +1508,7 @@
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
+	(assert (char ?name (get-char ?name)))
 	(modify ?sequence (value-string (format nil "%s%c" ?value-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
@@ -1439,6 +1519,7 @@
 	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c ?sequence)
+	(assert (char ?name (get-char ?name)))
 	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)) (assert (sequence (name ?name)))))
 	(modify ?m (length-remaining (- ?length-remaining 1))))
 
