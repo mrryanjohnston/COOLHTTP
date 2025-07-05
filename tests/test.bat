@@ -1,3 +1,10 @@
+;(set-strategy depth) ; default
+;(set-strategy breadth)
+;(set-strategy simplicity)
+;(set-strategy complexity)
+;(set-strategy lex)
+;(set-strategy mea) ; fastest!!
+;(set-strategy random)
 ;(watch rules)
 ;(watch facts)
 ;(watch activations)
@@ -54,6 +61,16 @@ test43.http
 test44.http
 test45.http
 test46.http
+test47.http
+test48.http
+test49.http
+test50.http
+test51.http
+test52.http
+test53.http
+test54.http
+test55.http
+test56.http
 ))
 
 (foreach ?file ?*files*
