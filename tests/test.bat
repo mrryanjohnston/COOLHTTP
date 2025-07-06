@@ -81,6 +81,7 @@ test56.http
 (run)
 
 (defglobal ?*successes* = 0)
+(defglobal ?*did-not-complete* = 0)
 (foreach ?file ?*files*
 	(open actual actual "w")
 	(bind ?found FALSE)
@@ -93,10 +94,12 @@ test56.http
 	         (bind ?*successes* (+ ?*successes* (compare-files (sym-cat expected/ ?file) actual t)))
 	         (close ?file)
 	    else (close actual)
-	         (println crlf "Failure: did not find HTTP-MESSAGE for " ?file))
+	         (println crlf "Failure: did not find HTTP-MESSAGE for " ?file)
+                 (bind ?*did-not-complete* (+ ?*did-not-complete* 1)))
 )
 (println)
 (println)
 (println "Successful tests: " ?*successes* "/" (length$ ?*files*))
+(println "Did not complete: " ?*did-not-complete* "/" (length$ ?*files*))
 (println)
 (exit)

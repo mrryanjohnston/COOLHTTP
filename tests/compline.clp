@@ -11,8 +11,8 @@
       (if (neq ?base-line ?test-line) then
           (bind ?difference TRUE)
           (format ?output "%nFailure: Difference detected in %s%n" ?base-file)
-          (format ?output "   %3d: %s%n" ?i ?base-line)
-          (format ?output "   %3d: %s%n" ?i ?test-line))
+          (format ?output "   Expected line %3d: %s%n" ?i ?base-line)
+          (format ?output "     Actual line %3d: %s%n" ?i ?test-line))
       (bind ?base-line (readline base))
       (bind ?test-line (readline test)))
    (if (or (neq ?base-line EOF) (neq ?test-line EOF)) then
