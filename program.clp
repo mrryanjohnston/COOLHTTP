@@ -28,6 +28,7 @@
 ; tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 ;         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 (defglobal ?*tchar* = (create$ ?*alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
+(defglobal ?*ctext* = (create$ ?*alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
 
 ;    pct-encoded   = "%" HEXDIG HEXDIG
 (deftemplate pct-encoded
@@ -293,6 +294,40 @@
 	(slot name)
 	(slot value (default "")))
 
+;  Via = #( received-protocol RWS received-by [ RWS comment ] )
+(deftemplate via-header
+	(slot name)
+	(slot received-protocol)
+	(slot received-by)
+;comment = "(" *( ctext / quoted-pair / comment ) ")"
+;ctext = HTAB / SP / %x21-27 ; '!'-'''
+; / %x2A-5B ; '*'-'['
+; / %x5D-7E ; ']'-'~'
+; / obs-text
+	(slot comment)
+	(slot rws))
+
+;   received-protocol = [ protocol-name "/" ] protocol-version
+(deftemplate received-protocol
+	(slot name)
+	(slot protocol-name)
+	(slot protocol-version))
+;  received-protocol = [ protocol-name "/" ] protocol-version
+;                    ; see Section 7.8
+
+;  received-by       = pseudonym [ ":" port ]
+(deftemplate received-by
+	(slot name)
+;  pseudonym         = token
+	(slot pseudonym)
+	(slot port))
+
+(deftemplate comment
+	(slot name)
+	(multislot values))
+	
+;  received-by       = pseudonym [ ":" port ]
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -333,6 +368,7 @@
 (defclass UNKNOWN-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
+(defclass VIA-HEADER (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
 (defclass HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
 (defclass QUOTED-STRING (is-a HTTP) (slot value))
 (defclass MESSAGE-BODY (is-a HTTP) (slot value))
@@ -341,6 +377,9 @@
 (defclass SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
 (defclass STATUS-LINE (is-a HTTP) (slot http-version) (slot status-code) (slot reason-phrase))
 (defclass REASON-PHRASE (is-a HTTP) (slot value))
+(defclass RECEIVED-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
+(defclass RECEIVED-BY (is-a HTTP) (slot pseudonym) (slot port))
+(defclass COMMENT (is-a HTTP) (multislot values))
 
 (defrule initialize-request
 	(filename ?name)
@@ -401,30 +440,16 @@
 	(assert (char ?name (get-char ?name))))
 
 (defrule build-reason-phrase
-	?c <- (char ?name ?char&9|:(>= ?char 32)&:(< ?char 127)) ; HTAB SP VCHAR
+	?c <- (char ?name ?char)
 	?r <- (reason-phrase (name ?name) (value ?value))
-	(not (obs-text ?name $?))
+	(test (or
+		(= 9 ?char)
+		(= 32 ?char)
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
 	(retract ?c)
 	(modify ?r (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
-
-(defrule reason-phrase-detect-obs-text
-	?c <- (char ?name 92) ; \
-	?u <- (reason-phrase (name ?name))
-	(not (obs-text ?name $?))
-	=>
-	(retract ?c)
-	(assert (obs-text ?name)
-		(char ?name (get-char ?name))))
-
-(defrule reason-phrase-detect-obs-text-x-second
-	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?r <- (reason-phrase (name ?name) (value ?value))
-	?o <- (obs-text ?name x ?first)
-	=>
-	(retract ?c ?o)
-	(modify ?r (value (format nil "%s\\x%c%c%s" ?value ?first ?char)))
 	(assert (char ?name (get-char ?name))))
 
 (defrule status-line-end-reason-phrase
@@ -1167,21 +1192,204 @@
 	(modify ?fl (field-value (assert (field-value (name ?name))))))
 
 (defrule detect-unknown-header
-	(char ?name ?char&:(> ?char 32)&:(< ?char 127))
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Content-Length"&~"Content-Type"&~"Host"))
+	(char ?name ?char)
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	(test (or
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
 	(modify ?fv (value (assert (unknown-header (name ?name))))))
 
 (defrule build-unknown-header
-	?c <- (char ?name ?char&~92&:(> ?char 32)&:(< ?char 127)) ; \
+	?c <- (char ?name ?char)
 	?u <- (unknown-header (name ?name) (value ?value) (possible-ows ?possible-ows))
-	(not (obs-text ?name $?))
+	(test (or
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+;  Via = #( received-protocol RWS received-by [ RWS comment ] )
+(defrule detect-via-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Via"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (via-header (name ?name) (received-protocol (assert (received-protocol (name ?name) (protocol-name (assert (token (name ?name))))))))))))
+
+;  received-protocol = [ protocol-name "/" ] protocol-version
+(defrule received-protocol-end-protocol-name-start-protocol-version
+	?c <- (char ?name 47) ; /
+	?t <- (token (value ?value))
+	?r <- (received-protocol (name ?name) (protocol-name ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?r (protocol-name ?value) (protocol-version (assert (token (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule received-protocol-change-protocol-name-to-protocol-version
+	(char ?token 9|32) ; HTAB SP
+	?t <- (token)
+	?r <- (received-protocol (name ?name) (protocol-name ?t))
+	=>
+	(modify ?r (protocol-name nil) (protocol-version ?t)))
+
+(defrule via-header-end-received-protocol
+	?c <- (char ?token 9|32) ; HTAB SP
+	?t <- (token (value ?value))
+	?r <- (received-protocol (protocol-name ?protocol-name) (protocol-version ?t))
+	?v <- (via-header (name ?name) (received-protocol ?r))
+	=>
+	(retract ?c ?t ?r)
+	(modify ?v (received-protocol (make-instance of RECEIVED-PROTOCOL (filename ?name) (protocol-name ?protocol-name) (protocol-version ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule via-header-skip-RWS-after-received-protocol
+	?c <- (char ?token 9|32) ; HTAB SP
+	(via-header (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule via-header-detect-received-by
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?v <- (via-header (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
+	=>
+	(modify ?v (received-by (assert (received-by (name ?name) (pseudonym (assert (token (name ?name)))))))))
+
+(defrule received-by-end-pseudonym
+	(char ?name 9|13|32|58) ; HTAB CR SP :
+	?t <- (token (name ?name) (value ?value))
+	?r <- (received-by (name ?name) (pseudonym ?t))
+	=>
+	(modify ?r (pseudonym ?value)))
+
+(defrule received-by-detect-port
+	?c <- (char ?name 58) ; :
+	?r <- (received-by (name ?name) (pseudonym ?p&:(stringp ?p)) (port nil))
+	=>
+	(modify ?r (port (assert (port (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule received-by-end-port
+	(char ?name 9|13|32) ; HTAB CR SP
+	?p <- (port (value ?value))
+	?r <- (received-by (name ?name) (pseudonym ?pseudonym) (port ?p))
+	=>
+	(retract ?p)
+	(modify ?r (port (make-instance of PORT (filename ?name) (value ?value)))))
+
+(defrule via-header-end-received-by
+	(char ?name 9|13|32) ; HTAB CR SP
+	?r <- (received-by (name ?name) (pseudonym ?pseudonym&:(stringp ?pseudonym)) (port ?port&nil|:(instancep ?port)))
+	?v <- (via-header (received-by ?r))
+	=>
+	(retract ?r)
+	(modify ?v (received-by (make-instance of RECEIVED-BY (filename ?name) (pseudonym ?pseudonym) (port ?port)))))
+
+(defrule via-header-detect-RWS-before-comment
+	?c <- (char ?name 9|32) ; HTAB SP
+	?v <- (via-header (received-by ?r&:(instancep ?r)) (comment nil))
+	=>
+	(retract ?c)
+	(modify ?v (rws TRUE))
+	(assert (char ?name (get-char ?name))))
+
+;   comment        = "(" *( ctext / quoted-pair / comment ) ")"
+(defrule via-header-detect-comment
+	?c <- (char ?name 40) ; (
+	?v <- (via-header (received-by ?r&:(instancep ?r)) (comment nil) (rws TRUE))
+	=>
+	(retract ?c)
+	(modify ?v (comment (assert (comment (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule add-ctext-to-comment
+	?ch <- (char ?name ?char&:(member$ ?char ?*ctext*))
+	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?ch)
+	(modify ?co (values ?values (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule comment-end-comment
+	?c <- (char ?name 41) ; )
+	?c-inner <- (comment (name ?name) (values $?values-inner ?value&:(instancep ?value)|:(stringp ?value)))
+	?c-outer <- (comment (name ?name) (values $?values ?c-inner))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?c ?c-inner)
+	(modify ?c-outer (values ?values (make-instance of COMMENT (filename ?name) (values ?values-inner ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule comment-start-new-string
+	(char ?name 92) ; \
+	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)))
+	(not (quoted-pair ?name))
+	=>
+	(modify ?co (values ?values ?value "")))
+
+(defrule comment-detect-quoted-pair
+	?ch <- (char ?name 92) ; \
+	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?ch)
+	(assert (quoted-pair ?name)
+		(char ?name (get-char ?name))))
+
+(defrule comment-add-quoted-pair
+	?ch <- (char ?name ?char)
+	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	?q <- (quoted-pair ?name)
+	(test (or
+		(= 9 ?char)
+		(= 32 ?char)
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(retract ?ch ?q)
+	(modify ?co (values ?values (format nil "%s%c%c" ?value "\\" ?char))))
+
+(defrule add-comment-to-comment
+	?ch <- (char ?name 40) ; (
+	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?ch)
+	(modify ?co (values ?values ?value (assert (comment (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule via-header-end-comment
+	?ch <- (char ?name 41) ; )
+	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	?v <- (via-header (comment ?co))
+	=>
+	(retract ?ch ?co)
+	(modify ?v (comment (make-instance of COMMENT (filename ?name) (values ?values ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-via-header
+	(char ?name 13) ; CR
+	?v <- (via-header (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by ?received-by&:(instancep ?received-by)) (comment ?comment&nil|:(instancep ?comment)))
+	?f <- (field-value (value ?v))
+	=>
+	(retract ?v)
+	(modify ?f (value (make-instance of VIA-HEADER (filename ?name) (received-protocol ?received-protocol) (received-by ?received-by) (comment ?comment)))))
+
+;RWS = 1*( SP / HTAB )
+;  Via = #( received-protocol RWS received-by [ RWS comment ] )
+;
+;  received-protocol = [ protocol-name "/" ] protocol-version
+;                    ; see Section 7.8
+;  received-by       = pseudonym [ ":" port ]
+;  pseudonym         = token
 
 (defrule detect-content-length-header
 	(char ?name ?char&:(member$ ?char ?*digit*))
@@ -1382,56 +1590,19 @@
 	(modify ?clh (value (format nil "%s%c" ?content-length-header ?char)))
 	(assert (char ?name (get-char ?name))))
 
-(defrule allow-ows-in-unknown-header
+(defrule unknown-header-allow-ows
 	?c <- (char ?name ?char&9|32) ; HTAB SP
 	?u <- (unknown-header (name ?name) (value ?unknown-header&~"") (possible-ows ?possible-ows))
 	?f <- (field-value (value ?u))
-	(not (obs-text ?name $?))
 	=>
 	(retract ?c)
-	(modify ?f (possible-ows (format nil "%s%c" ?possible-ows ?char)))
-	(assert (char ?name (get-char ?name))))
-
-(defrule unknown-header-detect-obs-text
-	?c <- (char ?name 92) ; \
-	?u <- (unknown-header (name ?name))
-	?f <- (field-value (value ?u))
-	(not (obs-text ?name $?))
-	=>
-	(retract ?c)
-	(assert (obs-text ?name)
-		(char ?name (get-char ?name))))
-
-(defrule detect-obs-text-x
-	?c <- (char ?name 120) ; x
-	?o <- (obs-text ?name)
-	=>
-	(retract ?c ?o)
-	(assert (obs-text ?name x)
-		(char ?name (get-char ?name))))
-
-(defrule detect-obs-text-x-first
-	?c <- (char ?name ?char&56|57|97|98|99|100|101|102|65|66|67|68|69|70) ; 8 9 a b c d e f A B C D E F
-	?o <- (obs-text ?name x)
-	=>
-	(retract ?c ?o)
-	(assert (obs-text ?name x ?char)
-		(char ?name (get-char ?name))))
-
-(defrule unknown-header-detect-obs-text-x-second
-	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?u <- (unknown-header (name ?name) (value ?value) (possible-ows ?possible-ows))
-	?o <- (obs-text ?name x ?first)
-	=>
-	(retract ?c ?o)
-	(modify ?u (value (format nil "%s\\x%c%c%s" ?value ?possible-ows ?first ?char)) (possible-ows ""))
+	(modify ?u (possible-ows (format nil "%s%c" ?possible-ows ?char)))
 	(assert (char ?name (get-char ?name))))
 
 (defrule end-unknown-header
 	(char ?name 13)
 	?u <- (unknown-header (name ?name) (value ?value))
 	?fv <- (field-value (value ?u))
-	(not (obs-text ?name $?))
 	=>
 	(retract ?u)
 	(modify ?fv (value (make-instance of UNKNOWN-HEADER (filename ?name) (value ?value)))))

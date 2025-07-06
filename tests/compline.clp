@@ -2,6 +2,7 @@
    (open ?base-file base)
    (open ?test-file test)
    (bind ?i 0)
+   (bind ?success 0)
    (bind ?difference FALSE)
    (bind ?base-line (readline base))
    (bind ?test-line (readline test))
@@ -20,6 +21,8 @@
       (format ?output "   expected last line %s%n" ?base-line)
       (format ?output "   actual last line %s%n" ?test-line))
    (if (not ?difference) then
-      (format ?output "."))
+      (format ?output ".")
+      (bind ?success 1))
    (close base)
-   (close test))
+   (close test)
+   (return ?success))
