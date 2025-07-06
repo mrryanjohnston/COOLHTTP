@@ -1259,8 +1259,8 @@
 	(assert (char ?name (get-char ?name))))
 
 (defrule coding-end-codings
-	(char ?name 13|44|59) ; CR , ;
-	?t <- (token (value ?value))
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (token (value ?value&~""))
 	?c <- (coding (name ?name) (codings ?t))
 	=>
 	(retract ?t)
