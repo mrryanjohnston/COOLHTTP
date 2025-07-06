@@ -236,6 +236,27 @@
 	(slot value (default ""))
 	(slot possible-ows (default "")))
 
+(deftemplate accept-encoding-header
+	(slot name)
+	(multislot codings))
+
+(deftemplate coding
+	(slot name)
+	(slot codings)
+	(slot weight))
+
+(deftemplate weight
+	(slot name)
+	(slot q)
+	(slot equals)
+	(slot qvalue))
+
+(deftemplate qvalue
+	(slot name)
+	(slot first)
+	(slot decimal)
+	(slot fraction (default "")))
+
 (deftemplate content-length-header
 	(slot name)
 	(slot value (default "")))
@@ -366,6 +387,7 @@
 (defclass TYPE (is-a HTTP) (slot value))
 (defclass SUBTYPE (is-a HTTP) (slot value))
 (defclass UNKNOWN-HEADER (is-a HTTP) (slot value))
+(defclass ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
 (defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
 (defclass VIA-HEADER (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
@@ -380,6 +402,9 @@
 (defclass RECEIVED-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
 (defclass RECEIVED-BY (is-a HTTP) (slot pseudonym) (slot port))
 (defclass COMMENT (is-a HTTP) (multislot values))
+(defclass CODING (is-a HTTP) (slot codings) (slot weight))
+(defclass WEIGHT (is-a HTTP) (slot qvalue))
+(defclass QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1193,7 +1218,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept-Encoding"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1212,6 +1237,145 @@
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+;   Accept-Encoding  = #( codings [ weight ] )
+;   codings          = content-coding / "identity" / "*"
+;   content-coding = token
+;   weight = OWS ";" OWS "q=" qvalue
+(defrule detect-accept-encoding-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Accept-Encoding"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (accept-encoding-header (name ?name) (codings (assert (coding (name ?name) (codings (assert (token (name ?name))))))))))))
+
+(defrule accept-encoding-header-start-next-coding
+	?c <- (char ?name 44) ; ,
+	?a <- (accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
+	=>
+	(retract ?c)
+	(modify ?a (codings ?codings (assert (coding (name ?name) (codings (assert (token (name ?name))))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule coding-end-codings
+	(char ?name 13|44|59) ; CR , ;
+	?t <- (token (value ?value))
+	?c <- (coding (name ?name) (codings ?t))
+	=>
+	(retract ?t)
+	(modify ?c (codings ?value)))
+
+(defrule coding-skip-ows-before-codings
+	?c <- (char ?name 9|32) ; HTAB SP
+	?t <- (token (value ""))
+	(coding (name ?name) (codings ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule coding-skip-ows-before-weight
+	?c <- (char ?name 9|32) ; HTAB SP
+	(coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule coding-detect-weight
+	?ch <- (char ?name 59) ; ;
+	?co <- (coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
+	=>
+	(retract ?ch)
+	(modify ?co (weight (assert (weight (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule weight-detect-q
+	?c <- (char ?name 113) ; q
+	?w <- (weight (name ?name) (q nil))
+	=>
+	(retract ?c)
+	(modify ?w (q TRUE))
+	(assert (char ?name (get-char ?name))))
+	
+(defrule weight-detect-equals
+	?c <- (char ?name 61) ; =
+	?w <- (weight (name ?name) (q TRUE) (equals nil))
+	=>
+	(retract ?c)
+	(modify ?w (equals TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule weight-detect-qvalue
+	(char ?name ?char&48|49) ; 0 1
+	?w <- (weight (name ?name) (equals TRUE) (qvalue nil))
+	=>
+	(modify ?w (qvalue (assert (qvalue (name ?name))))))
+
+(defrule qvalue-detect-first-digit
+	?c <- (char ?name ?char&48|49) ; 0 1
+	?q <- (qvalue (name ?name) (first nil))
+	=>
+	(retract ?c)
+	(modify ?q (first (format nil "%c" ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule qvalue-detect-decimal
+	?c <- (char ?name 46) ; .
+	?q <- (qvalue (name ?name) (first "0"|"1") (decimal nil))
+	=>
+	(retract ?c)
+	(modify ?q (decimal TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule qvalue-detect-digit-after-0
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?q <- (qvalue (name ?name) (first "0") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
+	=>
+	(retract ?c)
+	(modify ?q (fraction (format nil "%s%c" ?fraction ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule qvalue-detect-0-after-1
+	?c <- (char ?name 48) ; 0
+	?q <- (qvalue (name ?name) (first "0"|"1") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
+	=>
+	(retract ?c)
+	(modify ?q (fraction (format nil "%s%c" ?fraction 48)))
+	(assert (char ?name (get-char ?name))))
+
+; qvalue = ( "0" [ "." *3DIGIT ] ) / ( "1" [ "." *3"0" ] )
+
+(defrule weight-end-qvalue
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?q <- (qvalue (first ?first) (decimal ?decimal) (fraction ?fraction))
+	?w <- (weight (name ?name) (qvalue ?q))
+	=>
+	(retract ?q)
+	(modify ?w (qvalue (make-instance of QVALUE (filename ?name) (first ?first) (decimal ?decimal) (fraction ?fraction)))))
+
+(defrule coding-end-weight
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?c <- (coding (name ?name) (weight ?w))
+	=>
+	(retract ?w)
+	(modify ?c (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+
+(defrule accept-encoding-header-end-coding
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?c <- (coding (codings ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?a <- (accept-encoding-header (name ?name) (codings $?codings ?c))
+	=>
+	(retract ?c)
+	(modify ?a (codings ?codings (make-instance of CODING (filename ?name) (codings ?value) (weight ?w)))))
+
+(defrule end-accept-encoding-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?clh <- (accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of ACCEPT-ENCODING-HEADER (filename ?name) (codings ?codings)))))
 
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 (defrule detect-via-header
@@ -1965,6 +2129,13 @@ then (send ?self:message-body pprint ?t)))
 (defmessage-handler UNKNOWN-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
+(defmessage-handler ACCEPT-ENCODING-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:codings
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:codings)) then (printout ?t ",") else (printout ?t))))
+
 (defmessage-handler CONTENT-LENGTH-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
@@ -2002,3 +2173,17 @@ then (bind ?len (length$ ?self:sequences))
 
 (defmessage-handler SEQUENCE pprint primary (?t)
 (printout ?t ?self:name-string "=" ?self:value-string))
+
+(defmessage-handler CODING pprint primary (?t)
+(printout ?t ?self:codings)
+(if (neq ?self:weight nil)
+then (printout ?t ";") (send ?self:weight pprint ?t)))
+
+(defmessage-handler WEIGHT pprint primary (?t)
+(printout ?t "q=")
+(send ?self:qvalue pprint ?t))
+
+(defmessage-handler QVALUE pprint primary (?t)
+(printout ?t ?self:first)
+(if (neq ?self:decimal nil)
+then (printout ?t "." ?self:fraction)))

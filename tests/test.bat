@@ -71,6 +71,7 @@ test53.http
 test54.http
 test55.http
 test56.http
+test57.http
 ))
 
 (foreach ?file ?*files*
@@ -102,4 +103,4 @@ test56.http
 (println "Successful tests: " ?*successes* "/" (length$ ?*files*))
 (println "Did not complete: " ?*did-not-complete* "/" (length$ ?*files*))
 (println)
-(exit)
+;(exit)
