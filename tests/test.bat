@@ -103,4 +103,4 @@ test57.http
 (println "Successful tests: " ?*successes* "/" (length$ ?*files*))
 (println "Did not complete: " ?*did-not-complete* "/" (length$ ?*files*))
 (println)
-;(exit)
+(exit)

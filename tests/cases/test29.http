@@ -1,4 +1,4 @@
 GET /some HTTP/1.1
 Host: example.com
-Accept: text/html , application/xhtml+xml ; q=0.8 ,  image/* ; q = 0.5
+Accept: text/html , application/xhtml+xml ; q=0.8 ,  image/* ; q=0.5
 
