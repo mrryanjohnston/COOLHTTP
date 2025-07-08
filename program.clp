@@ -318,13 +318,12 @@
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 (deftemplate via-header
 	(slot name)
+	(multislot values))
+
+(deftemplate via-header-value
+	(slot name)
 	(slot received-protocol)
 	(slot received-by)
-;comment = "(" *( ctext / quoted-pair / comment ) ")"
-;ctext = HTAB / SP / %x21-27 ; '!'-'''
-; / %x2A-5B ; '*'-'['
-; / %x5D-7E ; ']'-'~'
-; / obs-text
 	(slot comment)
 	(slot rws))
 
@@ -333,8 +332,6 @@
 	(slot name)
 	(slot protocol-name)
 	(slot protocol-version))
-;  received-protocol = [ protocol-name "/" ] protocol-version
-;                    ; see Section 7.8
 
 ;  received-by       = pseudonym [ ":" port ]
 (deftemplate received-by
@@ -343,11 +340,27 @@
 	(slot pseudonym)
 	(slot port))
 
+;comment = "(" *( ctext / quoted-pair / comment ) ")"
+;ctext = HTAB / SP / %x21-27 ; '!'-'''
+; / %x2A-5B ; '*'-'['
+; / %x5D-7E ; ']'-'~'
+; / obs-text
 (deftemplate comment
 	(slot name)
 	(multislot values))
 	
 ;  received-by       = pseudonym [ ":" port ]
+
+(deftemplate accept-header
+	(slot name)
+	(multislot media-ranges))
+
+(deftemplate media-range
+	(slot name)
+	(slot type)
+	(slot subtype)
+	(multislot parameters)
+	(slot weight))
 
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
@@ -390,7 +403,8 @@
 (defclass ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
 (defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
-(defclass VIA-HEADER (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
+(defclass VIA-HEADER (is-a HTTP) (multislot values))
+(defclass VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
 (defclass HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
 (defclass QUOTED-STRING (is-a HTTP) (slot value))
 (defclass MESSAGE-BODY (is-a HTTP) (slot value))
@@ -405,6 +419,8 @@
 (defclass CODING (is-a HTTP) (slot codings) (slot weight))
 (defclass WEIGHT (is-a HTTP) (slot qvalue))
 (defclass QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
+(defclass ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
+(defclass MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1218,7 +1234,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept-Encoding"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Encoding"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1237,6 +1253,106 @@
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+;   Accept = #( media-range [ weight ] )
+;   media-range    = ( "*/*"
+;                     / ( type "/" "*" )
+;                     / ( type "/" subtype )
+;                   ) parameters
+(defrule detect-accept-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Accept"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (accept-header (name ?name) (media-ranges (assert (media-range (name ?name)))))))))
+
+(defrule media-range-detect-type
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?m <- (media-range (name ?name) (type nil))
+	=>
+	(modify ?m (type (assert (type (name ?name))))))
+
+(defrule media-range-end-type
+	?c <- (char ?name 47) ; /
+	?t <- (type (name ?name) (value ?value))
+	?m <- (media-range (type ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?m (type (make-instance of TYPE (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule media-range-detect-subtype
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?m <- (media-range (name ?name) (type ?t&:(instancep ?t)) (subtype nil))
+	=>
+	(modify ?m (subtype (assert (subtype (name ?name))))))
+
+(defrule media-range-end-subtype
+	(char ?name 13|32|44|59) ; CR SP , ;
+	?s <- (subtype (name ?name) (value ?value))
+	?m <- (media-range (subtype ?s))
+	=>
+	(retract ?s)
+	(modify ?m (subtype (make-instance of SUBTYPE (filename ?name) (value ?value)))))
+
+(defrule media-range-detect-parameter
+	?c <- (char ?name 59) ; ;
+	?cth <- (media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight nil))
+	=>
+	(retract ?c)
+	(modify ?cth (parameters ?parameters (assert (parameter (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule media-range-detect-ows
+	?c <- (char ?name 32) ; SP
+	(media-range (name ?name) (type ?t) (subtype ?s) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	(test (or
+		(and (eq ?t nil) (eq ?s nil))
+		(and (instancep ?t) (instancep ?s))))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule media-range-end-parameter
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?m <- (media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
+	=>
+	(retract ?p)
+	(modify ?m (parameters ?parameters (make-instance of PARAMETER (filename ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
+
+(defrule media-range-end-weight
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?m <- (media-range (name ?name) (weight ?w))
+	=>
+	(retract ?w)
+	(modify ?m (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+
+(defrule accept-header-end-media-range
+	(char ?name 13|44) ; CR ,
+	?m <- (media-range (name ?name) (type ?type) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight ?weight&nil|:(instancep ?weight)))
+	?a <- (accept-header (name ?name) (media-ranges $?media-ranges ?m))
+	=>
+	(retract ?m)
+	(modify ?a (media-ranges ?media-ranges (make-instance of MEDIA-RANGE (filename ?name) (type ?type) (subtype ?subtype) (parameters ?parameters) (weight ?weight)))))
+
+(defrule accept-header-start-next-media-range
+	?c <- (char ?name 44) ; ,
+	?a <- (accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
+	=>
+	(retract ?c)
+	(modify ?a (media-ranges ?media-ranges (assert (media-range (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-accept-header
+	(char ?name 13) ; CR
+	?clh <- (accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of ACCEPT-HEADER (filename ?name) (media-ranges ?media-ranges)))))
 
 ;   Accept-Encoding  = #( codings [ weight ] )
 ;   codings          = content-coding / "identity" / "*"
@@ -1384,12 +1500,37 @@
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (via-header (name ?name) (received-protocol (assert (received-protocol (name ?name) (protocol-name (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (via-header (name ?name))))))
+
+(defrule via-header-value-skip-ows-before-received-protocol
+	?c <- (char ?name 9|32) ; HTAB SP
+	(via-header-value (name ?name) (received-protocol nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule via-header-detect-value
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?v <- (via-header (name ?name) (values $?values&:(= 0 (length$ ?values))|:(instancep (nth$ (length$ ?values) ?values))))
+	=>
+	(modify ?v (values ?values (assert (via-header-value (name ?name))))))
+
+(defrule via-header-value-detect-received-protocol
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?v <- (via-header-value (name ?name) (received-protocol nil))
+	=>
+	(modify ?v (received-protocol (assert (received-protocol (name ?name))))))
 
 ;  received-protocol = [ protocol-name "/" ] protocol-version
+(defrule received-protocol-detect-protocol-name
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?r <- (received-protocol (name ?name) (protocol-name nil) (protocol-version nil))
+	=>
+	(modify ?r (protocol-name (assert (token (name ?name))))))
+
 (defrule received-protocol-end-protocol-name-start-protocol-version
 	?c <- (char ?name 47) ; /
-	?t <- (token (value ?value))
+	?t <- (token (value ?value&~""))
 	?r <- (received-protocol (name ?name) (protocol-name ?t))
 	=>
 	(retract ?c ?t)
@@ -1397,40 +1538,41 @@
 	(assert (char ?name (get-char ?name))))
 
 (defrule received-protocol-change-protocol-name-to-protocol-version
-	(char ?token 9|32) ; HTAB SP
+	(char ?name 9|32) ; HTAB SP
 	?t <- (token)
 	?r <- (received-protocol (name ?name) (protocol-name ?t))
 	=>
 	(modify ?r (protocol-name nil) (protocol-version ?t)))
 
-(defrule via-header-end-received-protocol
-	?c <- (char ?token 9|32) ; HTAB SP
+(defrule via-header-value-end-received-protocol
+	?c <- (char ?name 9|32) ; HTAB SP
 	?t <- (token (value ?value))
 	?r <- (received-protocol (protocol-name ?protocol-name) (protocol-version ?t))
-	?v <- (via-header (name ?name) (received-protocol ?r))
+	?v <- (via-header-value (name ?name) (received-protocol ?r))
 	=>
 	(retract ?c ?t ?r)
 	(modify ?v (received-protocol (make-instance of RECEIVED-PROTOCOL (filename ?name) (protocol-name ?protocol-name) (protocol-version ?value))))
 	(assert (char ?name (get-char ?name))))
 
-(defrule via-header-skip-RWS-after-received-protocol
-	?c <- (char ?token 9|32) ; HTAB SP
-	(via-header (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
+(defrule via-header-skip-extra-RWS-after-received-protocol
+	?c <- (char ?name 9|32) ; HTAB SP
+	?v <- (via-header-value (name ?name) (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by nil))
 	=>
 	(retract ?c)
 	(assert (char ?name (get-char ?name))))
 
-(defrule via-header-detect-received-by
+(defrule via-header-value-detect-received-by
 	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?v <- (via-header (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
+	?v <- (via-header-value (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
 	=>
 	(modify ?v (received-by (assert (received-by (name ?name) (pseudonym (assert (token (name ?name)))))))))
 
 (defrule received-by-end-pseudonym
-	(char ?name 9|13|32|58) ; HTAB CR SP :
+	(char ?name 9|13|32|44|58) ; HTAB CR SP , :
 	?t <- (token (name ?name) (value ?value))
 	?r <- (received-by (name ?name) (pseudonym ?t))
 	=>
+	(retract ?t)
 	(modify ?r (pseudonym ?value)))
 
 (defrule received-by-detect-port
@@ -1441,36 +1583,36 @@
 	(assert (char ?name (get-char ?name))))
 
 (defrule received-by-end-port
-	(char ?name 9|13|32) ; HTAB CR SP
+	(char ?name 9|13|32|44) ; HTAB CR SP
 	?p <- (port (value ?value))
 	?r <- (received-by (name ?name) (pseudonym ?pseudonym) (port ?p))
 	=>
 	(retract ?p)
 	(modify ?r (port (make-instance of PORT (filename ?name) (value ?value)))))
 
-(defrule via-header-end-received-by
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule via-header-value-end-received-by
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
 	?r <- (received-by (name ?name) (pseudonym ?pseudonym&:(stringp ?pseudonym)) (port ?port&nil|:(instancep ?port)))
-	?v <- (via-header (received-by ?r))
+	?v <- (via-header-value (received-by ?r))
 	=>
 	(retract ?r)
 	(modify ?v (received-by (make-instance of RECEIVED-BY (filename ?name) (pseudonym ?pseudonym) (port ?port)))))
 
-(defrule via-header-detect-RWS-before-comment
+(defrule via-header-value-detect-RWS-before-comment
 	?c <- (char ?name 9|32) ; HTAB SP
-	?v <- (via-header (received-by ?r&:(instancep ?r)) (comment nil))
+	?v <- (via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil))
 	=>
 	(retract ?c)
 	(modify ?v (rws TRUE))
 	(assert (char ?name (get-char ?name))))
 
 ;   comment        = "(" *( ctext / quoted-pair / comment ) ")"
-(defrule via-header-detect-comment
+(defrule via-header-value-detect-comment
 	?c <- (char ?name 40) ; (
-	?v <- (via-header (received-by ?r&:(instancep ?r)) (comment nil) (rws TRUE))
+	?v <- (via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil) (rws TRUE))
 	=>
 	(retract ?c)
-	(modify ?v (comment (assert (comment (name ?name)))))
+	(modify ?v (comment (assert (comment (name ?name) (values "")))))
 	(assert (char ?name (get-char ?name))))
 
 (defrule add-ctext-to-comment
@@ -1530,22 +1672,38 @@
 	(modify ?co (values ?values ?value (assert (comment (name ?name)))))
 	(assert (char ?name (get-char ?name))))
 
-(defrule via-header-end-comment
+(defrule via-header-value-end-comment
 	?ch <- (char ?name 41) ; )
 	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
-	?v <- (via-header (comment ?co))
+	?v <- (via-header-value (comment ?co))
 	=>
 	(retract ?ch ?co)
 	(modify ?v (comment (make-instance of COMMENT (filename ?name) (values ?values ?value))))
 	(assert (char ?name (get-char ?name))))
 
+(defrule via-header-end-via-header-value
+	(char ?name 13|44) ; CR ,
+	?vhv <- (via-header-value (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by ?received-by&:(instancep ?received-by)) (comment ?comment&nil|:(instancep ?comment)))
+	?vh <- (via-header (name ?name) (values $?values ?vhv))
+	=>
+	(retract ?vhv)
+	(modify ?vh (values ?values (make-instance of VIA-HEADER-VALUE (filename ?name) (received-protocol ?received-protocol) (received-by ?received-by) (comment ?comment)))))
+
+(defrule via-header-start-next-via-header-value
+	?c <- (char ?name 44) ; ,
+	?v <- (via-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	=>
+	(retract ?c)
+	(modify ?v (values ?values (assert (via-header-value (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
 (defrule end-via-header
 	(char ?name 13) ; CR
-	?v <- (via-header (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by ?received-by&:(instancep ?received-by)) (comment ?comment&nil|:(instancep ?comment)))
-	?f <- (field-value (value ?v))
+	?v <- (via-header (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?f <- (field-value (name ?name) (value ?v))
 	=>
 	(retract ?v)
-	(modify ?f (value (make-instance of VIA-HEADER (filename ?name) (received-protocol ?received-protocol) (received-by ?received-by) (comment ?comment)))))
+	(modify ?f (value (make-instance of VIA-HEADER (filename ?name) (values ?values)))))
 
 ;RWS = 1*( SP / HTAB )
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
@@ -1661,11 +1819,21 @@
 
 (defrule parameter-end-parameter-name
 	?c <- (char ?name 61) ; =
-	?t <- (token (name ?name) (value ?value&~""))
+	?t <- (token (name ?name) (value ?value&~""&~"q"))
 	?p <- (parameter (parameter-name ?t))
 	=>
 	(retract ?c ?t)
 	(modify ?p (parameter-name ?value))
+	(assert (char ?name (get-char ?name))))
+
+(defrule media-range-parameter-change-to-weight
+	?c <- (char ?name 61) ; =
+	?t <- (token (name ?name) (value "q"))
+	?p <- (parameter (parameter-name ?t))
+	?m <- (media-range (parameters $?parameters ?p))
+	=>
+	(retract ?c ?t ?p)
+	(modify ?m (parameters ?parameters) (weight (assert (weight (name ?name) (q TRUE) (equals TRUE)))))
 	(assert (char ?name (get-char ?name))))
 
 (defrule parameter-detect-parameter-value-token
@@ -1675,7 +1843,7 @@
 	(modify ?p (parameter-value (assert (token (name ?name))))))
 
 (defrule parameter-end-parameter-value-token
-	(char ?name 9|13|32|59) ; HTAB CR SP ;
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
 	?t <- (token (name ?name) (value ?value&~""))
 	?p <- (parameter (parameter-value ?t))
 	=>
@@ -2153,6 +2321,39 @@ then (foreach ?f ?self:parameters
 (if (neq ?self:port nil)
 then (printout ?t ":") (send ?self:port pprint ?t)))
 
+(defmessage-handler VIA-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:values
+     (bind ?i (+ ?i 1))
+	(send ?f pprint ?t)
+        (if (< ?i (length$ ?self:values)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler VIA-HEADER-VALUE pprint primary (?t)
+	(send ?self:received-protocol pprint ?t)
+	(printout ?t " ")
+	(send ?self:received-by pprint ?t)
+	(if (neq ?self:comment nil) then
+		(printout ?t " ")
+		(send ?self:comment pprint ?t)))
+
+(defmessage-handler RECEIVED-PROTOCOL pprint primary (?t)
+	(if (neq ?self:protocol-name nil)
+		then (printout ?t ?self:protocol-name "/"))
+	(printout ?t ?self:protocol-version))
+
+(defmessage-handler RECEIVED-BY pprint primary (?t)
+	(printout ?t ?self:pseudonym)
+	(if (neq ?self:port nil)
+		then (printout ?t ":" ?self:port)))
+
+(defmessage-handler COMMENT pprint primary (?t)
+	(printout ?t "(")
+	(foreach ?f ?self:values
+		(if (stringp ?f)
+			then (printout ?t ?f)
+			else (send ?f pprint ?t)))
+	(printout ?t ")"))
+
 (defmessage-handler TYPE pprint primary (?t)
 (printout ?t ?self:value))
 
@@ -2187,3 +2388,23 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (printout ?t ?self:first)
 (if (neq ?self:decimal nil)
 then (printout ?t "." ?self:fraction)))
+
+(defmessage-handler ACCEPT-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:media-ranges
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:media-ranges)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler MEDIA-RANGE pprint primary (?t)
+	(send ?self:type pprint ?t)
+	(printout ?t "/")
+	(send ?self:subtype pprint ?t)
+	(if (neq ?self:parameters nil)
+	then (foreach ?f ?self:parameters
+	     (printout ?t ";")
+	     (send ?f pprint ?t)))
+	(if (neq ?self:weight nil)
+	then
+	     (printout ?t ";")
+	     (send ?self:weight pprint ?t)))

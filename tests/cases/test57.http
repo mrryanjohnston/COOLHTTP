@@ -1,4 +1,5 @@
 GET /resource HTTP/1.1
 Host: example.com
 Accept-Encoding: gzip, br;q=1.0, compress;q=0.8, identity;q=0.5, *;q=0.1
+Accept: text/*;q=0.3, text/plain;q=0.7, text/plain;format=flowed, text/plain;format=fixed;q=0.4, */*;q=0.5
 
