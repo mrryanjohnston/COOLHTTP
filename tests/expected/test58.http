@@ -1,0 +1,4 @@
+GET /localized-content HTTP/1.1
+Host: example.com
+Accept-Language: en-US,fr-CA;q=0.9,fr;q=0.8,de;q=0.7,zh-Hant;q=0.6,*;q=0.1
+

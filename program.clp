@@ -362,6 +362,20 @@
 	(multislot parameters)
 	(slot weight))
 
+(deftemplate accept-language-header
+	(slot name)
+	(multislot language-ranges))
+
+(deftemplate language-range
+	(slot name)
+	(slot first-language)
+	(multislot languages)
+	(slot weight))
+
+(deftemplate language
+	(slot name)
+	(slot value (default "")))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -421,6 +435,9 @@
 (defclass QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
 (defclass ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
 (defclass MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
+(defclass ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
+(defclass LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
+(defclass LANGUAGE (is-a HTTP) (slot value))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1234,7 +1251,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Encoding"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1704,6 +1721,138 @@
 	=>
 	(retract ?v)
 	(modify ?f (value (make-instance of VIA-HEADER (filename ?name) (values ?values)))))
+
+;   Accept-Language = #( language-range [ weight ] )
+;   language-range   = (1*8ALPHA *("-" 1*8alphanum)) / "*"
+(defrule detect-accept-language-header
+	(char ?name ?char&:(member$ ?char (create$ ?*alpha* 42))) ; *
+	?o <- (object (is-a FIELD-NAME) (value "Accept-Language"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (accept-language-header (name ?name) (language-ranges (assert (language-range (name ?name) (first-language (assert (language (name ?name))))))))))))
+
+(defrule language-range-detect-first-language
+	(char ?name ?char&:(member$ ?char (create$ ?*alpha* 42))) ; *
+	?lr <- (language-range (name ?name) (first-language nil))
+	=>
+	(modify ?lr (first-language (assert (language (name ?name))))))
+
+(defrule language-range-detect-asterisk
+	?c <- (char ?name 42) ; *
+	?l <- (language (value ""))
+	?lr <- (language-range (name ?name) (first-language ?l))
+	=>
+	(retract ?c)
+	(modify ?l (value "*"))
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-build-first-language
+	?c <- (char ?name ?char&:(member$ ?char ?*alpha*))
+	?l <- (language (value ?value&~"*"))
+	?lr <- (language-range (name ?name) (first-language ?l))
+	=>
+	(retract ?c)
+	(modify ?l (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-end-first-language
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?l <- (language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (language-range (name ?name) (first-language ?l))
+	=>
+	(retract ?l)
+	(modify ?lr (first-language (make-instance of LANGUAGE (filename ?name) (value ?value)))))
+
+(defrule language-range-end-first-language-and-detect-next-language
+	?c <- (char ?name 45) ; -
+	?l <- (language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (language-range (name ?name) (first-language ?l))
+	=>
+	(retract ?c ?l)
+	(modify ?lr (first-language (make-instance of LANGUAGE (filename ?name) (value ?value))) (languages (assert (language (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-end-weight
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?l <- (language-range (name ?name) (weight ?w))
+	=>
+	(retract ?w)
+	(modify ?l (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+
+(defrule language-range-end-language
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?l <- (language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (language-range (name ?name) (languages $?languages ?l))
+	=>
+	(retract ?l)
+	(modify ?lr (languages ?languages (make-instance of LANGUAGE (filename ?name) (value ?value)))))
+
+(defrule language-range-end-language-and-detect-next-language
+	?c <- (char ?name 45) ; -
+	?l <- (language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (language-range (name ?name) (languages $?languages ?l))
+	=>
+	(retract ?c)
+	(modify ?lr (languages ?languages (make-instance of LANGUAGE (filename ?name) (value ?value)) (assert (language (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-build-language
+	?c <- (char ?name ?char&:(member$ ?char ?*alphanum*))
+	?l <- (language (name ?name) (value ?value))
+	?lr <- (language-range (languages $? ?l))
+	=>
+	(retract ?c)
+	(modify ?l (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-ignore-ows-before-weight
+	?c <- (char ?name 9|32) ; HTAB SP
+	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule language-range-detect-weight
+	?c <- (char ?name 59) ; ;
+	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
+	=>
+	(retract ?c)
+	(modify ?l (weight (assert (weight (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule accept-language-header-end-language-range
+	(char ?name 13|44) ; CR ,
+	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&nil|:(instancep ?weight)))
+	?a <- (accept-language-header (language-ranges $?language-ranges ?l))
+	=>
+	(retract ?l)
+	(modify ?a (language-ranges ?language-ranges (make-instance of LANGUAGE-RANGE (filename ?name) (first-language ?first-language) (languages ?languages) (weight ?weight)))))
+
+(defrule accept-language-header-ignore-ows-between-language-ranges
+	?c <- (char ?name 9|32) ; HTAB SP
+	?l <- (language-range (first-language nil))
+	?a <- (accept-language-header (name ?name) (language-ranges $?language-ranges ?l))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule accept-language-header-start-next-language-range
+	?c <- (char ?name 44) ; ,
+	?a <- (accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
+	=>
+	(retract ?c)
+	(modify ?a (language-ranges ?language-ranges (assert (language-range (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-accept-language-header
+	(char ?name 13) ; CR
+	?clh <- (accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of ACCEPT-LANGUAGE-HEADER (filename ?name) (language-ranges ?language-ranges)))))
 
 ;RWS = 1*( SP / HTAB )
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
@@ -2408,3 +2557,28 @@ then (printout ?t "." ?self:fraction)))
 	then
 	     (printout ?t ";")
 	     (send ?self:weight pprint ?t)))
+
+(defmessage-handler ACCEPT-LANGUAGE-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:language-ranges
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:language-ranges)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler LANGUAGE-RANGE pprint primary (?t)
+	(send ?self:first-language pprint ?t)
+	(bind ?i 0)
+	(if (<> 0 (length$ ?self:languages))
+	then
+	     (printout ?t "-")
+	     (foreach ?f ?self:languages
+	     (bind ?i (+ ?i 1))
+	     (send ?f pprint ?t)
+	     (if (< ?i (length$ ?self:languages)) then (printout ?t "-") else (printout ?t))))
+	(if (neq ?self:weight nil)
+	then
+	     (printout ?t ";")
+	     (send ?self:weight pprint ?t)))
+
+(defmessage-handler LANGUAGE pprint primary (?t)
+(printout ?t ?self:value))
