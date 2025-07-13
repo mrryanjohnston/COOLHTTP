@@ -1,0 +1,4 @@
+GET /dashboard HTTP/1.1
+Host: example.com
+Cookie: sessionid=abc123; theme=light; lang=en-US; flag; empty=; spaced=value with spaces; quoted="some value"
+

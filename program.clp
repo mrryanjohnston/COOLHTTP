@@ -380,6 +380,15 @@
 	(slot name)
 	(multislot methods))
 
+(deftemplate te-header
+	(slot name)
+	(multislot t-codings))
+
+(deftemplate t-coding
+	(slot name)
+	(slot value)
+	(slot weight))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -443,6 +452,8 @@
 (defclass LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
 (defclass LANGUAGE (is-a HTTP) (slot value))
 (defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
+(defclass TE-HEADER (is-a HTTP) (multislot t-codings))
+(defclass T-CODING (is-a HTTP) (slot value) (slot weight))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1256,7 +1267,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"&~"TE"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1473,6 +1484,13 @@
 	=>
 	(retract ?ch)
 	(modify ?co (weight (assert (weight (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule weight-ignore-ows-before-q
+	?c <- (char ?name 9|32) ; HTAB SP
+	(weight (name ?name) (q nil))
+	=>
+	(retract ?c)
 	(assert (char ?name (get-char ?name))))
 
 (defrule weight-detect-q
@@ -2165,6 +2183,88 @@
 	(retract ?hh)
 	(modify ?f (value (make-instance of HOST-HEADER (filename ?name) (uri-host ?h) (port ?p)))))
 
+;   TE                 = #t-codings
+;  t-codings          = "trailers" / ( transfer-coding [ weight ] )
+;  transfer-coding    = token *( OWS ";" OWS transfer-parameter )
+;  transfer-parameter = token BWS "=" BWS ( token / quoted-string )
+
+(defrule detect-te-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "TE"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (te-header (name ?name) (t-codings (assert (t-coding (name ?name) (value (assert (token (name ?name))))))))))))
+
+(defrule t-coding-end-value
+	(char ?name 9|13|32|44|58) ; HTAB CR SP , :
+	?t <- (token (name ?name) (value ?value))
+	?t-coding <- (t-coding (name ?name) (value ?t))
+	=>
+	(retract ?t)
+	(modify ?t-coding (value ?value)))
+
+(defrule t-coding-ignore-ows-before-weight
+	?c <- (char ?name 9|32) ; HTAB SP
+	?l <- (t-coding (name ?name) (value ?value&:(stringp ?value)) (weight nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule t-coding-detect-weight
+	?c <- (char ?name 59) ; ;
+	?t <- (t-coding (name ?name) (value ?value&:(stringp ?value)&~"trailers") (weight nil))
+	=>
+	(retract ?c)
+	(modify ?t (weight (assert (weight (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule t-coding-end-weight
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?t <- (t-coding (name ?name) (weight ?w))
+	=>
+	(retract ?w)
+	(modify ?t (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+
+(defrule te-header-end-t-coding
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (t-coding (name ?name) (value ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?te <- (te-header (t-codings $?t-codings ?t))
+	=>
+	(retract ?t)
+	(modify ?te (t-codings ?t-codings (make-instance of T-CODING (filename ?name) (value ?value) (weight ?w)))))
+
+(defrule te-header-detect-next-t-coding
+	?c <- (char ?name 44) ; ,
+	?t <- (te-header (name ?name) (t-codings $?t-codings ?t-coding&:(instancep ?t-coding)))
+	=>
+	(retract ?c)
+	(modify ?t (t-codings ?t-codings ?t-coding (assert (t-coding (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule te-header-ignore-ows-before-text-t-coding
+	?c <- (char ?name 13|32) ; HTAB SP
+	?t <- (t-coding (name ?name) (value nil))
+	?te <- (te-header (t-codings $?t-codings ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule te-header-detect-next-t-coding-value
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?t <- (t-coding (name ?name) (value nil))
+	=>
+	(modify ?t (value (assert (token (name ?name))))))
+
+(defrule end-te-header
+	(char ?name 13) ; CR
+	?clh <- (te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of TE-HEADER (filename ?name) (t-codings ?t-codings)))))
+
 (defrule ignore-ows-at-end-of-field-value
 	?c <- (char ?name 9|32) ; HTAB SP
 	(field-value (name ?name) (value ?v&:(instancep ?v)))
@@ -2642,3 +2742,15 @@ then (printout ?t "." ?self:fraction)))
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:methods)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler TE-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:t-codings
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:t-codings)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler T-CODING pprint primary (?t)
+(printout ?t ?self:value)
+(if (neq ?self:weight nil)
+then (printout ?t ";") (send ?self:weight pprint ?t)))
