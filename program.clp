@@ -376,6 +376,10 @@
 	(slot name)
 	(slot value (default "")))
 
+(deftemplate allow-header
+	(slot name)
+	(multislot methods))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -438,6 +442,7 @@
 (defclass ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
 (defclass LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
 (defclass LANGUAGE (is-a HTTP) (slot value))
+(defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1251,7 +1256,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1270,6 +1275,54 @@
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+; Allow = #method
+(defrule detect-allow-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Allow"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (allow-header (name ?name) (methods (assert (method (name ?name)))))))))
+
+(defrule allow-header-detect-next-method
+	?c <- (char ?name 44) ; ,
+	?a <- (allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
+	=>
+	(retract ?c)
+	(modify ?a (methods ?methods ?method (assert (method (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule allow-header-skip-ows-before-method
+	?c <- (char ?name 9|13|32) ; HTAB CR SP
+	?method <- (method (name ?name) (value ""))
+	(allow-header (name ?name) (methods $?methods ?method))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule allow-header-end-method
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?method <- (method (name ?name) (value ?value&~""))
+	?a <- (allow-header (name ?name) (methods $?methods ?method))
+	=>
+	(retract ?method)
+	(modify ?a (methods ?methods (make-instance of METHOD (filename ?name) (value ?value)))))
+
+(defrule allow-header-skip-ows-after-method
+	?c <- (char ?name 9|32) ; HTAB CR SP
+	(allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-allow-header
+	(char ?name 13) ; CR
+	?clh <- (allow-header (name ?name) (methods $?methods&:(instancep (nth$ (length$ ?methods) ?methods))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of ALLOW-HEADER (filename ?name) (methods ?methods)))))
 
 ;   Accept = #( media-range [ weight ] )
 ;   media-range    = ( "*/*"
@@ -2582,3 +2635,10 @@ then (printout ?t "." ?self:fraction)))
 
 (defmessage-handler LANGUAGE pprint primary (?t)
 (printout ?t ?self:value))
+
+(defmessage-handler ALLOW-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:methods
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:methods)) then (printout ?t ",") else (printout ?t))))
