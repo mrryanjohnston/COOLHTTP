@@ -424,6 +424,15 @@
 	(slot name)
 	(slot value))
 
+(deftemplate upgrade-header
+	(slot name)
+	(multislot protocols))
+
+(deftemplate protocol
+	(slot name)
+	(slot protocol-name)
+	(slot protocol-version))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -497,6 +506,8 @@
 (defclass SUFFIX-RANGE (is-a HTTP) (slot suffix-length))
 (defclass OTHER-RANGE (is-a HTTP) (slot value))
 (defclass RANGE-SPEC (is-a HTTP) (slot value))
+(defclass UPGRADE-HEADER (is-a HTTP) (multislot protocols))
+(defclass PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1311,7 +1322,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Range"&~"TE"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1624,6 +1635,93 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of ACCEPT-ENCODING-HEADER (filename ?name) (codings ?codings)))))
+
+;   Upgrade          = #protocol
+;  protocol         = protocol-name ["/" protocol-version]
+;  protocol-name    = token
+;  protocol-version = token
+(defrule detect-upgrade-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Upgrade"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (upgrade-header (name ?name))))))
+
+(defrule upgrade-header-detect-protocol
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?u <- (upgrade-header (name ?name) (protocols))
+	=>
+	(modify ?u (protocols (assert (protocol (name ?name))))))
+
+(defrule protocol-detect-protocol-name
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?p <- (protocol (name ?name) (protocol-name nil))
+	=>
+	(modify ?p (protocol-name (assert (token (name ?name))))))
+
+(defrule protocol-end-protocol-name
+	(char ?name 9|13|32|44|47) ; HTAB CR SP , /
+	?t <- (token (value ?value&~""))
+	?p <- (protocol (name ?name) (protocol-name ?t))
+	=>
+	(retract ?t)
+	(modify ?p (protocol-name ?value)))
+
+(defrule protocol-start-protocol-version
+	?c <- (char ?name 47) ; /
+	?p <- (protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version nil))
+	=>
+	(retract ?c)
+	(modify ?p (protocol-version (assert (token (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule protocol-end-protocol-version
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (token (value ?value&~""))
+	?p <- (protocol (name ?name) (protocol-version ?t))
+	=>
+	(retract ?t)
+	(modify ?p (protocol-version ?value)))
+
+(defrule upgrade-header-end-protocol
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?p <- (protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version ?protocol-version&nil|:(stringp ?protocol-version)))
+	?u <- (upgrade-header (name ?name) (protocols $?protocols ?p))
+	=>
+	(retract ?p)
+	(modify ?u (protocols ?protocols (make-instance of PROTOCOL (filename ?name) (protocol-name ?protocol-name) (protocol-version ?protocol-version)))))
+
+(defrule upgrade-header-detect-next-protocol
+	?c <- (char ?name 44) ; ,
+	?u <- (upgrade-header (name ?name) (protocols $?protocols ?protocol&:(instancep ?protocol)))
+	=>
+	(retract ?c)
+	(modify ?u (protocols ?protocols ?protocol (assert (protocol (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule upgrade-header-skip-ows-after-protocol
+	?c <- (char ?name 9|32) ; HTAB SP
+	(upgrade-header (name ?name) (protocols $?protocols&:(= 0 (length$ ?protocols))|:(instancep (nth$ (length$ ?protocols) ?protocols))))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule upgrade-header-skip-ows-before-protocol
+	?c <- (char ?name 9|32) ; HTAB SP
+	?p <- (protocol (protocol-name nil))
+	(upgrade-header (name ?name) (protocols $?protocols ?p))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-upgrade-header
+	(char ?name 13) ; CR
+	?u <- (upgrade-header (protocols $?protocols&:(instancep (nth$ (length$ ?protocols) ?protocols))))
+	?f <- (field-value (name ?name) (value ?u))
+	=>
+	(retract ?u)
+	(modify ?f (value (make-instance of UPGRADE-HEADER (filename ?name) (protocols ?protocols)))))
 
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 (defrule detect-via-header
@@ -3031,3 +3129,15 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 
 (defmessage-handler OTHER-RANGE pprint primary (?t)
 (printout ?t ?self:value))
+
+(defmessage-handler UPGRADE-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:protocols
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:protocols)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler PROTOCOL pprint primary (?t)
+	(printout ?t ?self:protocol-name)
+	(if (neq ?self:protocol-version nil)
+		then (printout ?t "/" ?self:protocol-version)))
