@@ -1,4 +1,4 @@
 GET /file HTTP/1.1
 Host: example.com
-Range: bytes=0-499, 500-999
+Range: bytes=0-499,500-999
 

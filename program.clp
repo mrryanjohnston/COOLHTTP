@@ -29,6 +29,7 @@
 ;         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 (defglobal ?*tchar* = (create$ ?*alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
 (defglobal ?*ctext* = (create$ ?*alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
+(defglobal ?*other-range* = (create$ ?*alphanum* 33 34 35 36 37 38 39 40 41 42 43 45 46 47 58 59 60 61 62 63 64 91 92 93 94 95 96 123 124 125 126)) ; ! " # $ % & ' ( ) * + - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
 
 ;    pct-encoded   = "%" HEXDIG HEXDIG
 (deftemplate pct-encoded
@@ -389,6 +390,40 @@
 	(slot value)
 	(slot weight))
 
+(deftemplate range-header
+	(slot name)
+	(slot ranges-specifier))
+
+(deftemplate ranges-specifier
+	(slot name)
+	(slot range-unit)
+	(slot range-set))
+
+(deftemplate range-unit
+	(slot name)
+	(slot value))
+
+(deftemplate range-set
+	(slot name)
+	(multislot range-specs))
+
+(deftemplate range-spec
+	(slot name)
+	(slot value))
+
+(deftemplate int-range
+	(slot name)
+	(slot first-pos (default ""))
+	(slot last-pos))
+
+(deftemplate suffix-range
+	(slot name)
+	(slot suffix-length))
+
+(deftemplate other-range
+	(slot name)
+	(slot value))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -454,12 +489,21 @@
 (defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
 (defclass TE-HEADER (is-a HTTP) (multislot t-codings))
 (defclass T-CODING (is-a HTTP) (slot value) (slot weight))
+(defclass RANGE-HEADER (is-a HTTP) (slot ranges-specifier))
+(defclass RANGES-SPECIFIER (is-a HTTP) (slot range-unit) (slot range-set))
+(defclass RANGE-UNIT (is-a HTTP) (slot value))
+(defclass RANGE-SET (is-a HTTP) (multislot range-specs))
+(defclass INT-RANGE (is-a HTTP) (slot first-pos) (slot last-pos))
+(defclass SUFFIX-RANGE (is-a HTTP) (slot suffix-length))
+(defclass OTHER-RANGE (is-a HTTP) (slot value))
+(defclass RANGE-SPEC (is-a HTTP) (slot value))
 
 (defrule initialize-request
 	(filename ?name)
 	=>
 	(assert
 		(char ?name (get-char ?name))
+		;(start ?name (time))
 		(http-message (name ?name) (start-line (assert (request-line (name ?name) (method (assert (method (name ?name))))))))))
 
 (defrule build-method
@@ -1267,7 +1311,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Via"&~"TE"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Range"&~"TE"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2265,6 +2309,208 @@
 	(retract ?clh)
 	(modify ?fv (value (make-instance of TE-HEADER (filename ?name) (t-codings ?t-codings)))))
 
+; range-set = range-spec *( OWS "," OWS range-spec )
+; range-spec = int-range / suffix-range / other-range
+; range-unit = token
+; ranges-specifier = range-unit "=" range-set
+;  Range = ranges-specifier
+(defrule detect-range-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Range"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (range-header (name ?name) (ranges-specifier (assert (ranges-specifier (name ?name) (range-unit (assert (token (name ?name))))))))))))
+
+(defrule ranges-specifier-end-range-unit
+	?c <- (char ?name 61) ; =
+	?t <- (token (name ?name) (value ?value))
+	?r <- (ranges-specifier (name ?name) (range-unit ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?r (range-unit ?value) (range-set (assert (range-set (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+; int-range = first-pos "-" [ last-pos ]
+; other-range = 1*( %x21-2B ; '!'-'+'
+;                 / %x2D-7E ; '-'-'~'
+;                 )
+;suffix-range = "-" suffix-length
+; 
+; first-pos = 1*DIGIT
+; last-pos = 1*DIGIT
+; suffix-length = 1*DIGIT
+(defrule range-set-detect-first-range-spec
+	(char ?name ?char&:(member$ ?char ?*other-range*))
+	?r <- (range-set (name ?name) (range-specs))
+	=>
+	(modify ?r (range-specs (assert (range-spec (name ?name))))))
+
+(defrule range-spec-detect-int-range
+	(char ?name ?char&:(member$ ?char ?*digit*))
+	?r <- (range-spec (name ?name) (value nil))
+	=>
+	(modify ?r (value (assert (int-range (name ?name))))))
+
+(defrule range-spec-int-range-change-to-other-range-during-first-pos
+	(char ?name ?char&~45&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
+	?i <- (int-range (first-pos ?first-pos&~"") (last-pos nil))
+	?r <- (range-spec (name ?name) (value ?i))
+	=>
+	(retract ?i)
+	(modify ?r (value (assert (other-range (name ?name) (value ?first-pos))))))
+
+(defrule range-spec-int-range-change-to-other-range-during-last-pos
+	(char ?name ?char&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
+	?i <- (int-range (first-pos ?first-pos) (last-pos ?last-pos&~nil))
+	?r <- (range-spec (name ?name) (value ?i))
+	=>
+	(retract ?i)
+	(modify ?r (value (assert (other-range (name ?name) (value (format nil "%s-%s" ?first-pos ?last-pos)))))))
+
+(defrule range-spec-suffix-range-change-to-other-range
+	(char ?name ?char&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
+	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
+	?r <- (range-spec (value ?o))
+	=>
+	(retract ?s)
+	(modify ?r (value (assert (other-range (name ?name) (value (format nil "-%s" ?suffix-length)))))))
+
+(defrule range-spec-detect-suffix-range
+	?c <- (char ?name 45) ; -
+	?r <- (range-spec (name ?name) (value nil))
+	=>
+	(retract ?c)
+	(modify ?r (value (assert (suffix-range (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule range-spec-detect-other-range
+	?c <- (char ?name ?char&~45&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*)) ; -
+	?r <- (range-spec (name ?name) (value nil))
+	=>
+	(retract ?c)
+	(modify ?r (value (assert (other-range (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-other-range
+	?c <- (char ?name ?char&:(member$ ?char ?*other-range*))
+	?o <- (other-range (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?o (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-other-range
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?o <- (other-range (name ?name) (value ?value))
+	?r <- (range-spec (value ?o))
+	=>
+	(retract ?o)
+	(modify ?r (value (make-instance of OTHER-RANGE (filename ?name) (value ?value)))))
+
+(defrule build-suffix-range
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
+	=>
+	(retract ?c)
+	(modify ?s (suffix-length (format nil "%s%c" ?suffix-length ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-suffix-range
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
+	?r <- (range-spec (value ?s))
+	=>
+	(retract ?s)
+	(modify ?r (value (make-instance of SUFFIX-RANGE (filename ?name) (suffix-length ?suffix-length)))))
+
+(defrule int-range-build-first-pos
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?i <- (int-range (name ?name) (first-pos ?value) (last-pos nil))
+	=>
+	(retract ?c)
+	(modify ?i (first-pos (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule int-range-detect-last-pos
+	?c <- (char ?name 45) ; -
+	?i <- (int-range (name ?name) (first-pos ?value) (last-pos nil))
+	=>
+	(retract ?c)
+	(modify ?i (last-pos ""))
+	(assert (char ?name (get-char ?name))))
+
+(defrule int-range-build-last-pos
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?i <- (int-range (name ?name) (last-pos ?value&~nil))
+	=>
+	(retract ?c)
+	(modify ?i (last-pos (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-int-range
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?i <- (int-range (name ?name) (first-pos ?first-pos) (last-pos ?last-pos&~nil))
+	?r <- (range-spec (value ?i))
+	=>
+	(retract ?i)
+	(modify ?r (value (make-instance of INT-RANGE (filename ?name) (first-pos ?first-pos) (last-pos ?last-pos)))))
+
+(defrule end-range-spec
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?r <- (range-spec (value ?value&:(instancep ?value)))
+	?range-set <- (range-set (range-specs $?range-specs ?r))
+	=>
+	(retract ?r)
+	(modify ?range-set (range-specs ?range-specs (make-instance of RANGE-SPEC (filename ?name) (value ?value)))))
+
+(defrule range-set-skip-ows-after-range-spec
+	?c <- (char ?name 9|32) ; HTAB SP
+	(range-set (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule range-set-detect-next-range-spec
+	?c <- (char ?name 44)
+	?r <- (range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+	=>
+	(retract ?c)
+	(modify ?r (range-specs ?range-specs ?range-spec (assert (range-spec (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule range-set-skip-ows-before-next-range-spec
+	?c <- (char ?name 9|32) ; HTAB SP
+	?r <- (range-spec (value nil))
+	(range-set (range-specs $?range-specs ?r))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-range-set
+	(char ?name 13) ; CR
+	?r <- (range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+	?ranges-specifier <- (ranges-specifier (range-set ?r))
+	=>
+	(retract ?r)
+	(modify ?ranges-specifier (range-set (make-instance of RANGE-SET (filename ?name) (range-specs ?range-specs ?range-spec)))))
+
+(defrule end-ranges-specifier
+	(char ?name 13) ; CR
+	?ranges-specifier <- (ranges-specifier (range-unit ?u&:(stringp ?u)) (range-set ?r&:(instancep ?r)))
+	?range-header <- (range-header (name ?name) (ranges-specifier ?ranges-specifier))
+	=>
+	(retract ?ranges-specifier)
+	(modify ?range-header (ranges-specifier (make-instance of RANGES-SPECIFIER (filename ?name) (range-unit ?u) (range-set ?r)))))
+
+(defrule end-range-header
+	(char ?name 13) ; CR
+	?r <- (range-header (name ?name) (ranges-specifier ?ranges-specifier&:(instancep ?ranges-specifier)))
+	?fv <- (field-value (value ?r))
+	=>
+	(retract ?r)
+	(modify ?fv (value (make-instance of RANGE-HEADER (filename ?name) (ranges-specifier ?ranges-specifier)))))
+
 (defrule ignore-ows-at-end-of-field-value
 	?c <- (char ?name 9|32) ; HTAB SP
 	(field-value (name ?name) (value ?v&:(instancep ?v)))
@@ -2432,8 +2678,10 @@
 
 (defrule end-http-message
 	(char ?name -1)
+	;(start ?name ?start)
 	?h <- (http-message (name ?name) (start-line ?s) (field-lines $?f) (message-body ?m&:(instancep ?m)))
 =>
+;(println ?name ": " (- (time) ?start))
 (retract ?h)
 (make-instance of HTTP-MESSAGE (filename ?name) (start-line ?s) (field-lines $?f) (message-body ?m)))
 
@@ -2754,3 +3002,32 @@ then (printout ?t "." ?self:fraction)))
 (printout ?t ?self:value)
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
+
+(defmessage-handler RANGE-HEADER pprint primary (?t)
+(send ?self:ranges-specifier pprint ?t))
+
+(defmessage-handler RANGES-SPECIFIER pprint primary (?t)
+(printout ?t ?self:range-unit "=")
+(send ?self:range-set pprint ?t))
+
+(defmessage-handler RANGE-UNIT pprint primary (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler RANGE-SET pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:range-specs
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:range-specs)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler RANGE-SPEC pprint primary (?t)
+(send ?self:value pprint ?t))
+
+(defmessage-handler INT-RANGE pprint primary (?t)
+(printout ?t ?self:first-pos "-" ?self:last-pos))
+
+(defmessage-handler SUFFIX-RANGE pprint primary (?t)
+(printout ?t "-" ?self:suffix-length))
+
+(defmessage-handler OTHER-RANGE pprint primary (?t)
+(printout ?t ?self:value))
