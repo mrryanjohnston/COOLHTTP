@@ -2159,6 +2159,13 @@
 	(retract ?c)
 	(assert (char ?name (get-char ?name))))
 
+(defrule language-range-ignore-ows-after-weight
+	?c <- (char ?name 9|32) ; HTAB SP
+	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&:(instancep ?weight)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
 (defrule language-range-detect-weight
 	?c <- (char ?name 59) ; ;
 	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
