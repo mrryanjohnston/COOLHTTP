@@ -30,6 +30,7 @@
 (defglobal ?*tchar* = (create$ ?*alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
 (defglobal ?*ctext* = (create$ ?*alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
 (defglobal ?*other-range* = (create$ ?*alphanum* 33 34 35 36 37 38 39 40 41 42 43 45 46 47 58 59 60 61 62 63 64 91 92 93 94 95 96 123 124 125 126)) ; ! " # $ % & ' ( ) * + - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
+(defglobal ?*token68* = (create$ ?*alphanum* 43 45 46 47 95 126)) ;  ALPHA / DIGIT / "+" / "/" / "-" / "." / "_" / "~"
 
 ;    pct-encoded   = "%" HEXDIG HEXDIG
 (deftemplate pct-encoded
@@ -433,6 +434,21 @@
 	(slot protocol-name)
 	(slot protocol-version))
 
+(deftemplate proxy-authorization-header
+	(slot name)
+	(slot auth-scheme)
+	(multislot second-part))
+
+(deftemplate token68
+	(slot name)
+	(slot value (default ""))
+	(slot equals (default 0)))
+
+(deftemplate auth-param
+	(slot name)
+	(slot left-side)
+	(slot right-side))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -508,6 +524,9 @@
 (defclass RANGE-SPEC (is-a HTTP) (slot value))
 (defclass UPGRADE-HEADER (is-a HTTP) (multislot protocols))
 (defclass PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
+(defclass PROXY-AUTHORIZATION-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
+(defclass TOKEN68 (is-a HTTP) (slot value) (slot equals))
+(defclass AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1322,7 +1341,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Proxy-Authorization"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2325,6 +2344,126 @@
 	(retract ?hh)
 	(modify ?f (value (make-instance of HOST-HEADER (filename ?name) (uri-host ?h) (port ?p)))))
 
+;
+;  Proxy-Authorization = credentials
+;  credentials = auth-scheme [ 1*SP ( token68 / [ auth-param *( OWS "," OWS auth-param ) ] ) ]
+;  auth-scheme = token
+;  token68 = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"="
+;  auth-param = token BWS "=" BWS ( token / quoted-string )
+(defrule detect-proxy-authorization-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Proxy-Authorization"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (proxy-authorization-header (name ?name) (auth-scheme (assert (token (name ?name)))))))))
+
+(defrule proxy-authorization-header-end-auth-scheme
+	(char ?name 9|13|32) ; HTAB CR SP
+	?t <- (token (value ?value))
+	?p <- (proxy-authorization-header (name ?name) (auth-scheme ?t))
+	=>
+	(retract ?t)
+	(modify ?p (auth-scheme ?value))
+	(assert (char ?name (get-char ?name))))
+
+(defrule proxy-authorization-detect-second-part-after-auth-scheme
+	?c <- (char ?name 32) ; SP
+	?p <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
+	=>
+	(retract ?c)
+	(modify ?p (second-part (assert (token68 (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule proxy-authorization-skip-sp-after-auth-scheme
+	?c <- (char ?name 32) ; SP
+	?t <- (token68 (name ?name) (value ""))
+	(proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-token68
+	?c <- (char ?name ?char&:(member$ ?char ?*token68*))
+	?t <- (token68 (name ?name) (value ?value) (equals 0))
+	=>
+	(retract ?c)
+	(modify ?t (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule token68-detect-equals
+	?c <- (char ?name 61) ; =
+	?t <- (token68 (name ?name) (value ?value) (equals ?equals))
+	=>
+	(retract ?c)
+	(modify ?t (equals (+ 1 ?equals)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule proxy-authorization-end-token68
+	(char ?name 9|13|32) ; HTAB CR SP
+	?t <- (token68 (name ?name) (value ?value) (equals ?equals))
+	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?p (second-part (make-instance of TOKEN68 (filename ?name) (value ?value) (equals ?equals)))))
+
+(defrule proxy-authorization-change-token68-to-auth-param
+	(char ?name ?char&~:(member$ ?char ?*token68*)&:(member$ ?char ?*tchar*))
+	?t <- (token68 (name ?name) (value ?value) (equals 0))
+	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?p (second-part (assert (auth-param (name ?name) (left-side (assert (token (name ?name) (value ?value)))))))))
+
+(defrule proxy-authorization-change-token68-to-auth-param-after-equals
+	(char ?name ?char&~:(member$ ?char ?*token68*)&:(member$ ?char ?*tchar*))
+	?t <- (token68 (name ?name) (value ?value&~:(str-index "/" ?value)) (equals 1))
+	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?p (second-part (assert (auth-param (name ?name) (left-side ?value) (right-side (assert (token (name ?name)))))))))
+
+(defrule auth-param-end-left-side
+	?c <- (char ?name 61) ; =
+	?t <- (token (value ?value))
+	?a <- (auth-param (name ?name) (left-side ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?a (left-side ?value) (right-side (assert (token (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule auth-param-end-left-side
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (token (value ?value))
+	?a <- (auth-param (name ?name) (right-side ?t))
+	=>
+	(retract ?t)
+	(modify ?a (right-side ?value)))
+
+(defrule proxy-authorization-header-end-auth-param
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?a <- (auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)))
+	?p <- (proxy-authorization-header (name ?name) (second-part $?auth-params ?a))
+	=>
+	(retract ?a)
+	(modify ?p (second-part ?auth-params (make-instance of AUTH-PARAM (filename ?name) (left-side ?left-side) (right-side ?right-side)))))
+
+(defrule proxy-authorization-header-detext-next-auth-param
+	?c <- (char ?name 44) ; ,
+	?auth-param <- (object (is-a AUTH-PARAM))
+	?p <- (proxy-authorization-header (name ?name) (second-part $?auth-params ?auth-param))
+	=>
+	(retract ?c)
+	(modify ?p (second-part ?auth-params ?auth-param (assert (auth-param (name ?name) (left-side (assert (token (name ?name)))))))))
+
+(defrule end-proxy-authorization-header
+	(char ?name 13) ; CR
+	?clh <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of PROXY-AUTHORIZATION-HEADER (filename ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
+
 ;   TE                 = #t-codings
 ;  t-codings          = "trailers" / ( transfer-coding [ weight ] )
 ;  transfer-coding    = token *( OWS ";" OWS transfer-parameter )
@@ -3141,3 +3280,20 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 	(printout ?t ?self:protocol-name)
 	(if (neq ?self:protocol-version nil)
 		then (printout ?t "/" ?self:protocol-version)))
+(defmessage-handler PROXY-AUTHORIZATION-HEADER pprint primary (?t)
+	(printout ?t ?self:auth-scheme " ")
+	(bind ?i 0)
+	(foreach ?f ?self:second-part
+		(bind ?i (+ ?i 1))
+		(send ?f pprint ?t)
+		(if (< ?i (length$ ?self:second-part)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler TOKEN68 pprint primary (?t)
+	(printout ?t ?self:value)
+	(bind ?i 0)
+	(while (< ?i ?self:equals)
+		(bind ?i (+ 1 ?i))
+		(printout ?t "=")))
+
+(defmessage-handler AUTH-PARAM pprint primary (?t)
+	(printout ?t ?self:left-side "=" ?self:right-side))

@@ -1,6 +1,6 @@
 HTTP/1.1 200 OK
 Date: Mon, 30 Jun 2025 18:30:00 GMT
-Content-Type: text/html; charset=UTF-8
+Content-Type: text/html;charset=utf-8
 Set-Cookie: sessionid=abc123; Path=/; HttpOnly; Secure
 Set-Cookie: theme=light; Path=/dashboard
 Set-Cookie: lang=en-US; Max-Age=3600
@@ -8,6 +8,6 @@ Set-Cookie: flag; Path=/
 Set-Cookie: empty=; Path=/; Expires=Wed, 01 Jul 2025 18:30:00 GMT
 Set-Cookie: spaced="value with spaces"; Path=/
 Set-Cookie: quoted="some value"; Path=/
-Content-Length: 38
+Content-Length: 39
 
 <html><body>Welcome back!</body></html>
