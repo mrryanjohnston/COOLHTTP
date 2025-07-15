@@ -1437,7 +1437,7 @@
 
 (defrule cookie-header-end-cookie-pair
 	(char ?name 13|32|59) ; CR SP ;
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE))
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
 	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
 	=>
 	(retract ?cookie-pair)
