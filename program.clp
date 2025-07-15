@@ -31,6 +31,7 @@
 (defglobal ?*ctext* = (create$ ?*alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
 (defglobal ?*other-range* = (create$ ?*alphanum* 33 34 35 36 37 38 39 40 41 42 43 45 46 47 58 59 60 61 62 63 64 91 92 93 94 95 96 123 124 125 126)) ; ! " # $ % & ' ( ) * + - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
 (defglobal ?*token68* = (create$ ?*alphanum* 43 45 46 47 95 126)) ;  ALPHA / DIGIT / "+" / "/" / "-" / "." / "_" / "~"
+(defglobal ?*cookie-octet* = (create$ ?*alphanum* 33 35 36 37 38 39 40 41 42 43 45 46 47 58 60 61 62 63 64 91 93 94 95 96 123 124 125 126)) ; ! # $ % & ' ( ) * + - . / : < = > ? @ [ ] ^ _ ` { | } ~
 
 ;    pct-encoded   = "%" HEXDIG HEXDIG
 (deftemplate pct-encoded
@@ -449,6 +450,16 @@
 	(slot left-side)
 	(slot right-side))
 
+(deftemplate cookie-header
+	(slot name)
+	(multislot cookie-pairs))
+
+(deftemplate cookie-pair
+	(slot name)
+	(slot cookie-name)
+	(slot cookie-value (default ""))
+	(slot cookie-value-quoted))
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -527,6 +538,8 @@
 (defclass PROXY-AUTHORIZATION-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
 (defclass TOKEN68 (is-a HTTP) (slot value) (slot equals))
 (defclass AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
+(defclass COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
+(defclass COOKIE-PAIR (is-a HTTP) (slot cookie-name) (slot cookie-value) (slot cookie-value-quoted))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1341,7 +1354,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Host"&~"Proxy-Authorization"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Host"&~"Proxy-Authorization"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1360,6 +1373,106 @@
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+;   cookie-header     = "Cookie:" OWS cookie-string OWS
+;   cookie-string     = cookie-pair *( ";" SP cookie-pair )
+;   cookie-pair       = cookie-name "=" cookie-value
+;   cookie-name       = token
+;   cookie-value      = *cookie-octet / ( DQUOTE *cookie-octet DQUOTE )
+;   cookie-octet      = %x21 / %x23-2B / %x2D-3A / %x3C-5B / %x5D-7E
+;                         ; US-ASCII characters excluding CTLs,
+;                         ; whitespace DQUOTE, comma, semicolon,
+;                         ; and backslash
+(defrule detect-cookie-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Cookie"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (cookie-header (name ?name) (cookie-pairs (assert (cookie-pair (name ?name)))))))))
+
+(defrule cookie-pair-detect-cookie-name
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?c <- (cookie-pair (name ?name) (cookie-name nil))
+	=>
+	(modify ?c (cookie-name (assert (token (name ?name))))))
+
+(defrule cookie-pair-end-cookie-name
+	?c <- (char ?name 61) ; =
+	?t <- (token (value ?value))
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?cookie-pair (cookie-name ?value))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-pair-detect-cookie-value
+	(char ?name ?char&:(member$ ?char ?*cookie-octet*))
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
+	=>
+	(modify ?cookie-pair (cookie-value-quoted FALSE)))
+
+(defrule cookie-pair-detect-quoted-cookie-value
+	(char ?name 34) ; "
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
+	=>
+	(modify ?cookie-pair (cookie-value-quoted TRUE)))
+
+(defrule cookie-pair-build-cookie-value
+	?c <- (char ?name ?char&:(member$ ?char ?*cookie-octet*))
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?value) (cookie-value-quoted TRUE|FALSE))
+	=>
+	(retract ?c)
+	(modify ?cookie-pair (cookie-value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-header-end-quoted-cookie-pair
+	?c <- (char ?name 34) ; "
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
+	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+	=>
+	(retract ?c ?cookie-pair)
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-header-end-cookie-pair
+	(char ?name 13|32|59) ; CR SP ;
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE))
+	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+	=>
+	(retract ?cookie-pair)
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
+
+(defrule cookie-header-skip-ows-after-end-cookie-pair
+	?c <- (char ?name 32) ; SP
+	?cookie-header <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-header-detect-next-cookie-pair
+	?c <- (char ?name 59) ; ;
+	?cookie-header <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+	=>
+	(retract ?c)
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs ?cookie-pair (assert (cookie-pair (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-header-skip-ows-before-next-cookie-pair
+	?c <- (char ?name 32) ; SP
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name nil))
+	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-cookie-header
+	(char ?name 13) ; CR
+	?clh <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of COOKIE-HEADER (filename ?name) (cookie-pairs ?cookie-pairs ?cookie-pair)))))
 
 ; Allow = #method
 (defrule detect-allow-header
@@ -3280,6 +3393,7 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 	(printout ?t ?self:protocol-name)
 	(if (neq ?self:protocol-version nil)
 		then (printout ?t "/" ?self:protocol-version)))
+
 (defmessage-handler PROXY-AUTHORIZATION-HEADER pprint primary (?t)
 	(printout ?t ?self:auth-scheme " ")
 	(bind ?i 0)
@@ -3297,3 +3411,13 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 
 (defmessage-handler AUTH-PARAM pprint primary (?t)
 	(printout ?t ?self:left-side "=" ?self:right-side))
+
+(defmessage-handler COOKIE-HEADER pprint primary (?t)
+	(bind ?i 0)
+	(foreach ?f ?self:cookie-pairs
+		(bind ?i (+ ?i 1))
+		(send ?f pprint ?t)
+		(if (< ?i (length$ ?self:cookie-pairs)) then (printout ?t "; ") else (printout ?t))))
+
+(defmessage-handler COOKIE-PAIR pprint primary (?t)
+(printout ?t ?self:cookie-name "=" ?self:cookie-value))
