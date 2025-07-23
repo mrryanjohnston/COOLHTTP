@@ -460,6 +460,116 @@
 	(slot cookie-value (default ""))
 	(slot cookie-value-quoted))
 
+(deftemplate set-cookie-header
+	(slot name)
+	(slot cookie-pair)
+	(multislot cookie-avs))
+
+(deftemplate cookie-av
+	(slot name)
+	(slot string (default ""))
+	(slot value)
+	(slot required-sp))
+
+(deftemplate expires-av
+	(slot name)
+	(slot rfc1123-date))
+
+(deftemplate rfc1123-date
+	(slot name)
+	(slot wkday)
+	(slot date1)
+	(slot time)
+	(slot GMT (default "")))
+
+(deftemplate wkday
+	(slot name)
+	(slot value (default "")))
+
+(deftemplate date1
+	(slot name)
+	(slot first-2digit (default ""))
+	(slot month)
+	(slot last-4digit (default "")))
+
+(deftemplate month
+	(slot name)
+	(slot value (default "")))
+
+(deftemplate time
+	(slot name)
+	(slot first-2digit (default ""))
+	(slot first-colon)
+	(slot second-2digit (default ""))
+	(slot second-colon)
+	(slot third-2digit (default "")))
+
+;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
+
+(deftemplate max-age-av
+	(slot name)
+	(slot first-digit)
+	(slot rest (default ""))
+)
+
+(deftemplate domain-av
+	(slot name)
+	(slot subdomain)
+)
+
+(deftemplate path-av
+	(slot name)
+	(slot value (default "")))
+
+(deftemplate secure-av
+	(slot name)
+)
+
+(deftemplate httponly-av
+	(slot name)
+)
+
+(deftemplate samesite-av
+	(slot name)
+	(slot value)
+)
+
+(deftemplate lax
+	(slot name)
+	(slot a)
+	(slot x))
+
+(deftemplate strict
+	(slot name)
+	(slot t)
+	(slot r)
+	(slot i)
+	(slot c)
+	(slot last-t))
+
+(deftemplate none
+	(slot name)
+	(slot o)
+	(slot n)
+	(slot e))
+
+(deftemplate subdomain
+	(slot name)
+	(multislot ldh-labels)
+	(slot top-label))
+
+(deftemplate top-label
+	(slot name)
+	(slot value))
+
+(deftemplate ldh-label
+	(slot name)
+	(slot value))
+
+;cookie-av         = expires-av / max-age-av / domain-av /
+;                    path-av / secure-av / httponly-av /
+;                    samesite-av / extension-av
+
 (deffacts supported-content-types
 	(supported-content-type "application" "octet-stream")
 	(supported-content-type "application" "x-www-form-urlencoded"))
@@ -540,6 +650,27 @@
 (defclass AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
 (defclass COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
 (defclass COOKIE-PAIR (is-a HTTP) (slot cookie-name) (slot cookie-value) (slot cookie-value-quoted))
+(defclass SECURE-AV (is-a HTTP))
+(defclass MAX-AGE-AV (is-a HTTP) (slot value))
+(defclass PATH-AV (is-a HTTP) (slot value))
+(defclass HTTPONLY-AV (is-a HTTP))
+(defclass EXTENSION-AV (is-a HTTP) (slot value))
+(defclass EXPIRES-AV (is-a HTTP) (slot rfc1123-date))
+(defclass STRICT (is-a HTTP))
+(defclass LAX (is-a HTTP))
+(defclass NONE (is-a HTTP))
+(defclass WKDAY (is-a HTTP) (slot value))
+(defclass MONTH (is-a HTTP) (slot value))
+(defclass DATE1 (is-a HTTP) (slot first-2digit) (slot month) (slot last-4digit))
+(defclass TIME (is-a HTTP) (slot first-2digit) (slot second-2digit) (slot third-2digit))
+(defclass RFC1123-DATE (is-a HTTP) (slot wkday) (slot date1) (slot time))
+(defclass SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
+(defclass COOKIE-AV (is-a HTTP) (slot value))
+(defclass DOMAIN-AV (is-a HTTP) (slot subdomain))
+(defclass SUBDOMAIN (is-a HTTP) (multislot ldh-labels) (slot top-label))
+(defclass TOP-LABEL (is-a HTTP) (slot value))
+(defclass LDH-LABEL (is-a HTTP) (slot value))
+(defclass SAMESITE-AV (is-a HTTP) (slot value))
 
 (defrule initialize-request
 	(filename ?name)
@@ -1354,7 +1485,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Host"&~"Proxy-Authorization"&~"Range"&~"TE"&~"Upgrade"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -1373,6 +1504,610 @@
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
 	(assert (char ?name (get-char ?name))))
+
+;  set-cookie-header = "Set-Cookie:" SP set-cookie-string
+;  set-cookie-string = cookie-pair *( ";" SP cookie-av )
+(defrule detect-set-cookie-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Set-Cookie"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (set-cookie-header (name ?name) (cookie-pair (assert (cookie-pair (name ?name) (cookie-name (assert (token (name ?name))))))))))))
+
+(defrule end-set-cookie-header
+	(char ?name 13) ; CR
+	?clh <- (set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of SET-COOKIE-HEADER (filename ?name) (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs)))))
+
+(defrule set-cookie-header-end-quoted-cookie-pair
+	?c <- (char ?name 34) ; "
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
+	?set-cookie-header <- (set-cookie-header (cookie-pair ?cookie-pair))
+	=>
+	(retract ?c ?cookie-pair)
+	(modify ?set-cookie-header (cookie-pair (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule set-cookie-header-end-cookie-pair
+	(char ?name 13|32|59) ; CR SP ;
+	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
+	?set-cookie-header <- (set-cookie-header (cookie-pair ?cookie-pair))
+	=>
+	(retract ?cookie-pair)
+	(modify ?set-cookie-header (cookie-pair (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
+
+(defrule set-cookie-header-detect-next-cookie-pair
+	?c <- (char ?name 59) ; ;
+	?set-cookie-header <- (set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
+	=>
+	(retract ?c)
+	(modify ?set-cookie-header (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs (assert (cookie-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule set-cookie-header-end-cookie-av
+	(char ?name 13|59) ; CR ;
+	?c <- (cookie-av (value ?value&:(instancep ?value)))
+	?set-cookie-header <- (set-cookie-header (name ?name) (cookie-avs $?cookie-avs ?c))
+	=>
+	(retract ?c)
+	(modify ?set-cookie-header (cookie-avs ?cookie-avs (make-instance of COOKIE-AV (filename ?name) (value ?value)))))
+
+(defrule cookie-av-detect-required-sp
+	?c <- (char ?name 32) ; SP
+	?ca <- (cookie-av (name ?name) (required-sp nil))
+	=>
+	(retract ?c)
+	(modify ?ca (required-sp TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-cookie-av
+	?c <- (char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)&~61) ; SP : < ~ =
+	?ca <- (cookie-av (name ?name) (string ?string) (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (string (format nil "%s%c" ?string ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-av-continue-on-equals-if-unknown-attribute
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (string (format nil "%s%c" ?string 61)))
+	(assert (char ?name (get-char ?name))))
+
+;cookie-av         = expires-av / max-age-av / domain-av /
+;                    path-av / secure-av / httponly-av /
+;                    samesite-av / extension-av
+;  expires-av        = "Expires=" sane-cookie-date
+;  sane-cookie-date  = <rfc1123-date, defined in [RFC2616], Section 3.3.1>
+
+(defrule cookie-av-detect-expires-av
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string "Expires") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (value (assert (expires-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+	
+;  max-age-av        = "Max-Age=" non-zero-digit *DIGIT
+;                        ; In practice, both expires-av and max-age-av
+;                        ; are limited to dates representable by the
+;                        ; user agent.
+;  non-zero-digit    = %x31-39
+;                        ; digits 1 through 9
+(defrule cookie-av-detect-max-age-av
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string "Max-Age") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (value (assert (max-age-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule max-age-av-detect-first-digit
+	?c <- (char ?name ?char&49|50|51|52|53|54|55|56|57) ; 1-9
+	?m <- (max-age-av (name ?name) (first-digit nil))
+	=>
+	(retract ?c)
+	(modify ?m (first-digit (format nil "%c" ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule max-age-av-build-rest
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?m <- (max-age-av (name ?name) (first-digit ~nil) (rest ?rest))
+	=>
+	(retract ?c)
+	(modify ?m (rest (format nil "%s%c" ?rest ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-av-end-max-age-av
+	(char ?name 13|59) ; CR ;
+	?m <- (max-age-av (name ?name) (first-digit ?first&~nil) (rest ?rest))
+	?ca <- (cookie-av (value ?m))
+	=>
+	(retract ?m)
+	(modify ?ca (value (make-instance of MAX-AGE-AV (filename ?name) (value (format nil "%s%s" ?first ?rest))))))
+	
+;  domain-av         = "Domain=" domain-value
+;  domain-value      = <subdomain>
+;                        ; defined in [RFC1034], Section 3.5, as
+;                        ; enhanced by [RFC1123], Section 2.1
+(defrule cookie-av-detect-domain-av
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string "Domain") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (value (assert (domain-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+; derived, not actually defined formally in ABNF in an RFC
+; subdomain  = *( ldh-label "." ) top-label
+; ldh-label  = alphanum [ *( alphanum / "-" ) alphanum ]
+; top-label  = ALPHA [ *( alphanum / "-" ) alphanum ]
+
+(defrule domain-av-detect-subdomain
+	(char ?name ?char&:(member$ ?char ?*alphanum*))
+	?d <- (domain-av (name ?name) (subdomain nil))
+	=>
+	(modify ?d (subdomain (assert (subdomain (name ?name))))))
+
+(defrule subdomain-detect-ldh-label
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
+	=>
+	(retract ?c)
+	(modify ?s (ldh-labels (assert (ldh-label (name ?name) (value (format nil "%c" ?char))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule subdomain-detect-top-label
+	?c <- (char ?name ?char&:(member$ ?char ?*alpha*))
+	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
+	=>
+	(retract ?c)
+	(modify ?s (top-label (assert (top-label (name ?name) (value (format nil "%c" ?char))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule subdomain-change-top-label-to-ldh-label
+	(char ?name 46) ; .
+	?t <- (top-label (name ?name) (value ?value))
+	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels) (top-label ?t))
+	=>
+	(retract ?t)
+	(modify ?s (ldh-labels ?ldh-labels (assert (ldh-label (name ?name) (value ?value)))) (top-label nil)))
+
+(defrule build-top-label
+	?c <- (char ?name ?char&:(member$ ?char (create$ ?*alphanum* 45))) ; -
+	?t <- (top-label (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?t (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-ldh-label
+	?c <- (char ?name ?char&:(member$ ?char (create$ ?*alphanum* 45))) ; -
+	?l <- (ldh-label (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?l (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule subdomain-end-ldh-label
+	?c <- (char ?name 46) ; .
+	?l <- (ldh-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
+	?s <- (subdomain (ldh-labels $?ldh-labels ?l))
+	=>
+	(retract ?c ?l)
+	(modify ?s (ldh-labels ?ldh-labels (make-instance of LDH-LABEL (filename ?name) (value (format nil "%s." ?value)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule subdomain-end-top-label
+	(char ?name 13|59) ; CR ;
+	?t <- (top-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
+	?s <- (subdomain (top-label ?t))
+	=>
+	(retract ?t)
+	(modify ?s (top-label (make-instance of TOP-LABEL (filename ?name) (value ?value)))))
+
+(defrule domain-av-end-subdomain
+	(char ?name 13|59) ; CR ;
+	?s <- (subdomain (name ?name) (top-label ?t&:(instancep ?t)) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))))
+	?d <- (domain-av (name ?name) (subdomain ?s))
+	=>
+	(retract ?s)
+	(modify ?d (subdomain (make-instance of SUBDOMAIN (filename ?name) (top-label ?t) (ldh-labels ?ldh-labels)))))
+
+(defrule cookie-av-end-domain-av
+	(char ?name 13|59) ; CR ;
+	?d <- (domain-av (name ?name) (subdomain ?s&:(instancep ?s)))
+	?ca <- (cookie-av (name ?name) (value ?d))
+	=>
+	(retract ?d)
+	(modify ?ca (value (make-instance of DOMAIN-AV (filename ?name) (subdomain ?s)))))
+
+;  path-av           = "Path=" path-value
+;  path-value        = <any CHAR except CTLs or ";">
+(defrule cookie-av-detect-path-av
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string "Path") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (value (assert (path-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-path-av
+	?c <- (char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)) ; = SP : < ~
+	?ca <- (path-av (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?ca (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cookie-av-end-path-av
+	(char ?name 13|59) ; CR ;
+	?p <- (path-av (name ?name) (value ?value))
+	?ca <- (cookie-av (name ?name) (value ?p))
+	=>
+	(retract ?p)
+	(modify ?ca (value (make-instance of PATH-AV (filename ?name) (value ?value)))))
+
+;  secure-av         = "Secure"
+(defrule cookie-av-detect-secure-av
+	(char ?name 13|59) ; CR ;
+	?ca <- (cookie-av (name ?name) (string "Secure") (value nil) (required-sp TRUE))
+	=>
+	(modify ?ca (value (make-instance of SECURE-AV (filename ?name)))))
+
+;  httponly-av       = "HttpOnly"
+(defrule cookie-av-detect-httponly-av
+	(char ?name 13|59) ; CR ;
+	?ca <- (cookie-av (name ?name) (string "HttpOnly") (value nil) (required-sp TRUE))
+	=>
+	(modify ?ca (value (make-instance of HTTPONLY-AV (filename ?name)))))
+
+;samesite-av       = "SameSite" BWS "=" BWS samesite-value
+;samesite-value    = "Strict" / "Lax" / "None"
+(defrule cookie-av-detect-samesite-av
+	?c <- (char ?name 61) ; =
+	?ca <- (cookie-av (name ?name) (string "SameSite") (value nil) (required-sp TRUE))
+	=>
+	(retract ?c)
+	(modify ?ca (value (assert (samesite-av (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule samesite-av-detect-strict
+	?c <- (char ?name 83) ; S
+	?s <- (samesite-av (name ?name) (value nil))
+	=>
+	(retract ?c)
+	(modify ?s (value (assert (strict (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule strict-detect-t
+	?c <- (char ?name 116) ; t
+	?l <- (strict (name ?name) (t nil))
+	=>
+	(retract ?c)
+	(modify ?l (t TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule strict-detect-r
+	?c <- (char ?name 114) ; r
+	?l <- (strict (name ?name) (t TRUE) (r nil))
+	=>
+	(retract ?c)
+	(modify ?l (r TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule strict-detect-i
+	?c <- (char ?name 105) ; i
+	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i nil))
+	=>
+	(retract ?c)
+	(modify ?l (i TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule strict-detect-c
+	?c <- (char ?name 99) ; c
+	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c nil))
+	=>
+	(retract ?c)
+	(modify ?l (c TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule strict-detect-last-t
+	?c <- (char ?name 116) ; t
+	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t nil))
+	=>
+	(retract ?c)
+	(modify ?l (last-t TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule samesite-av-end-strict
+	(char ?name 13|59) ; CR ;
+	?st <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t TRUE))
+	?s <- (samesite-av (name ?name) (value ?st))
+	=>
+	(retract ?st)
+	(modify ?s (value (make-instance of STRICT (filename ?name)))))
+
+(defrule samesite-av-detect-lax
+	?c <- (char ?name 76) ; L
+	?s <- (samesite-av (name ?name) (value nil))
+	=>
+	(retract ?c)
+	(modify ?s (value (assert (lax (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule lax-detect-a
+	?c <- (char ?name 97) ; a
+	?l <- (lax (name ?name) (a nil))
+	=>
+	(retract ?c)
+	(modify ?l (a TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule lax-detect-x
+	?c <- (char ?name 120) ; x
+	?l <- (lax (name ?name) (a TRUE) (x nil))
+	=>
+	(retract ?c)
+	(modify ?l (x TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule samesite-av-end-lax
+	(char ?name 13|59) ; CR ;
+	?l <- (lax (name ?name) (a TRUE) (x TRUE))
+	?s <- (samesite-av (name ?name) (value ?l))
+	=>
+	(retract ?l)
+	(modify ?s (value (make-instance of LAX (filename ?name)))))
+
+(defrule samesite-av-detect-none
+	?c <- (char ?name 78) ; N
+	?s <- (samesite-av (name ?name) (value nil))
+	=>
+	(retract ?c)
+	(modify ?s (value (assert (none (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule none-detect-o
+	?c <- (char ?name 111) ; o
+	?l <- (none (name ?name) (o nil))
+	=>
+	(retract ?c)
+	(modify ?l (o TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule none-detect-n
+	?c <- (char ?name 110) ; n
+	?l <- (none (name ?name) (o TRUE) (n nil))
+	=>
+	(retract ?c)
+	(modify ?l (n TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule none-detect-e
+	?c <- (char ?name 101) ; e
+	?l <- (none (name ?name) (o TRUE) (n TRUE) (e nil))
+	=>
+	(retract ?c)
+	(modify ?l (e TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule samesite-av-end-none
+	(char ?name 13|59) ; CR ;
+	?n <- (none (name ?name) (o TRUE) (n TRUE) (e TRUE))
+	?s <- (samesite-av (name ?name) (value ?n))
+	=>
+	(retract ?n)
+	(modify ?s (value (make-instance of NONE (filename ?name)))))
+
+(defrule cookie-av-end-samesite-av
+	(char ?name 13|59) ; CR ;
+	?s <- (samesite-av (name ?name) (value ?v&:(instancep ?v)))
+	?ca <- (cookie-av (name ?name) (value ?s) (required-sp TRUE))
+	=>
+	(retract ?s)
+	(modify ?ca (value (make-instance of SAMESITE-AV (filename ?name) (value ?v)))))
+
+;extension-av      = *av-octet
+;av-octet          = %x20-3A / %x3C-7E
+                      ; any CHAR except CTLs or ";"
+(defrule cookie-av-end-extension-av
+	(char ?name 13|59) ; CR ;
+	?ca <- (cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite"&~"Secure"&~"HttpOnly") (value nil) (required-sp TRUE))
+	=>
+	(retract ?ca)
+	(modify ?ca (value (make-instance of EXTENSION-AV (filename ?name) (value ?string)))))
+
+;  expires-av        = "Expires=" sane-cookie-date
+;  sane-cookie-date  = <rfc1123-date, defined in [RFC2616], Section 3.3.1>
+;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
+;  date1        = 2DIGIT SP month SP 4DIGIT
+;                      ; day month year (e.g., 02 Jun 1982)
+;       time         = 2DIGIT ":" 2DIGIT ":" 2DIGIT
+;                      ; 00:00:00 - 23:59:59
+;       wkday        = "Mon" | "Tue" | "Wed"
+;                    | "Thu" | "Fri" | "Sat" | "Sun"
+;       month        = "Jan" | "Feb" | "Mar" | "Apr"
+;                    | "May" | "Jun" | "Jul" | "Aug"
+;                    | "Sep" | "Oct" | "Nov" | "Dec"
+(defrule expires-av-build-value
+	(char ?name 70|77|83|84|87) ; F M S T W
+	?e <- (expires-av (name ?name) (rfc1123-date nil))
+	=>
+	(modify ?e (rfc1123-date (assert (rfc1123-date (name ?name))))))
+
+(defrule rfc1123-date-detect-wkday
+	(char ?name 70|77|83|84|87) ; F M S T W
+	?r <- (rfc1123-date (name ?name) (wkday nil))
+	=>
+	(modify ?r (wkday (assert (wkday (name ?name))))))
+
+(defrule build-wkday
+	?c <- (char ?name ?char&70|77|83|84|87|114|105|111|110|97|116|117|101|104|100) ; F M S T W r i o n a t u e h d
+	?w <- (wkday (name ?name) (value ?value&:(> 3 (str-length ?value))))
+	=>
+	(retract ?c)
+	(modify ?w (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-wkday
+	?c <- (char ?name 44) ; ,
+	?w <- (wkday (value ?value&"Fri"|"Mon"|"Sat"|"Sun"|"Tue"|"Thu"|"Wed"))
+	?r <- (rfc1123-date (name ?name) (wkday ?w))
+	=>
+	(retract ?c ?w)
+	(modify ?r (wkday (make-instance of WKDAY (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+;  date1        = 2DIGIT SP month SP 4DIGIT
+;       month        = "Jan" | "Feb" | "Mar" | "Apr"
+;                    | "May" | "Jun" | "Jul" | "Aug"
+;                    | "Sep" | "Oct" | "Nov" | "Dec"
+(defrule rfc1123-date-start-date1
+	?c <- (char ?name 32) ; SP
+	?r <- (rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 nil))
+	=>
+	(retract ?c)
+	(modify ?r (date1 (assert (date1 (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date1-build-first-2digit
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date1 (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
+	=>
+	(retract ?c)
+	(modify ?d (first-2digit (format nil "%s%c" ?first ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date1-detect-end-first-2digit-start-month
+	?c <- (char ?name 32) ; SP
+	?d <- (date1 (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (month nil))
+	=>
+	(retract ?c)
+	(modify ?d (month (assert (month (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-month
+	?c <- (char ?name ?char&74|97|110|70|101|98|77|114|65|112|121|117|108|103|83|79|99|116|78|111|118|68) ; J a n F e b M r A p y u l g S O c t N o v D
+	?m <- (month (name ?name) (value ?value&:(> 3 (str-length ?value))))
+	=>
+	(retract ?c)
+	(modify ?m (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date1-end-month
+	?c <- (char ?name 32) ; SP
+	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (date1 (name ?name) (month ?m))
+	=>
+	(retract ?c ?m)
+	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date1-build-last-4digit
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date1 (name ?name) (month ?m&:(instancep ?m)) (last-4digit ?last&:(> 4 (str-length ?last))))
+	=>
+	(retract ?c)
+	(modify ?d (last-4digit (format nil "%s%c" ?last ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc1123-end-date1
+	(char ?name 32) ; SP
+	?d <- (date1 (first-2digit ?first) (month ?month) (last-4digit ?last&:(= 4 (str-length ?last))))
+	?r <- (rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 ?d))
+	=>
+	(retract ?d)
+	(modify ?r (date1 (make-instance of DATE1 (filename ?name) (first-2digit ?first) (month ?month) (last-4digit ?last)))))
+
+;       time         = 2DIGIT ":" 2DIGIT ":" 2DIGIT
+;                      ; 00:00:00 - 23:59:59
+(defrule rfc1123-date-start-time
+	?c <- (char ?name 32) ; SP
+	?r <- (rfc1123-date (name ?name) (date1 ?d&:(instancep ?d)) (time nil))
+	=>
+	(retract ?c)
+	(modify ?r (time (assert (time (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule time-build-first-2digit
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?t <- (time (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
+	=>
+	(retract ?c)
+	(modify ?t (first-2digit (format nil "%s%c" ?first ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule time-detect-first-colon
+	?c <- (char ?name 58) ; :
+	?t <- (time (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (first-colon nil))
+	=>
+	(retract ?c)
+	(modify ?t (first-colon TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule time-build-second-2digit
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?t <- (time (name ?name) (first-colon TRUE) (second-2digit ?second&:(> 2 (str-length ?second))))
+	=>
+	(retract ?c)
+	(modify ?t (second-2digit (format nil "%s%c" ?second ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule time-detect-second-colon
+	?c <- (char ?name 58) ; :
+	?t <- (time (name ?name) (second-2digit ?second&:(= 2 (str-length ?second))) (second-colon nil))
+	=>
+	(retract ?c)
+	(modify ?t (second-colon TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule time-build-third-2digit
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?t <- (time (name ?name) (second-colon TRUE) (third-2digit ?third&:(> 2 (str-length ?third))))
+	=>
+	(retract ?c)
+	(modify ?t (third-2digit (format nil "%s%c" ?third ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc1123-date-end-time
+	?c <- (char ?name 32) ; SP
+	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?r <- (rfc1123-date (name ?name) (time ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?r (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc1123-expect-GMT
+	?c <- (char ?name ?char&71|77|84) ; G M T
+	?r <- (rfc1123-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
+	=>
+	(retract ?c)
+	(modify ?r (GMT (format nil "%s%c" ?GMT ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule expires-av-end-rfc1123
+	(char ?name 13|59) ; CR ;
+	?r <- (rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
+	?e <- (expires-av (name ?name) (rfc1123-date ?r))
+	=>
+	(retract ?r)
+	(modify ?e (rfc1123-date (make-instance of RFC1123-DATE (filename ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
+
+(defrule cookie-av-end-expires-av
+	(char ?name 13|59) ; CR ;
+	?e <- (expires-av (name ?name) (rfc1123-date ?r&:(instancep ?r)))
+	?ca <- (cookie-av (name ?name) (value ?e) (required-sp TRUE))
+	=>
+	(retract ?e)
+	(modify ?ca (value (make-instance of EXPIRES-AV (filename ?name) (rfc1123-date ?r)))))
 
 ;   cookie-header     = "Cookie:" OWS cookie-string OWS
 ;   cookie-string     = cookie-pair *( ";" SP cookie-pair )
@@ -1413,10 +2148,12 @@
 	(modify ?cookie-pair (cookie-value-quoted FALSE)))
 
 (defrule cookie-pair-detect-quoted-cookie-value
-	(char ?name 34) ; "
+	?c <- (char ?name 34) ; "
 	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
 	=>
-	(modify ?cookie-pair (cookie-value-quoted TRUE)))
+	(retract ?c)
+	(modify ?cookie-pair (cookie-value-quoted TRUE))
+	(assert (char ?name (get-char ?name))))
 
 (defrule cookie-pair-build-cookie-value
 	?c <- (char ?name ?char&:(member$ ?char ?*cookie-octet*))
@@ -3427,4 +4164,86 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 		(if (< ?i (length$ ?self:cookie-pairs)) then (printout ?t "; ") else (printout ?t))))
 
 (defmessage-handler COOKIE-PAIR pprint primary (?t)
-(printout ?t ?self:cookie-name "=" ?self:cookie-value))
+(printout ?t ?self:cookie-name "=")
+(if ?self:cookie-value-quoted then (printout ?t "\""))
+(printout ?t ?self:cookie-value)
+(if ?self:cookie-value-quoted then (printout ?t "\"")))
+
+(defmessage-handler SET-COOKIE-HEADER pprint primary (?t)
+	(send ?self:cookie-pair pprint ?t)
+	(bind ?i 0)
+	(foreach ?f ?self:cookie-avs
+		(printout ?t "; ")
+		(send ?f pprint ?t)))
+
+(defmessage-handler COOKIE-AV pprint primary (?t)
+	(send ?self:value pprint ?t))
+
+(defmessage-handler SECURE-AV pprint primary (?t)
+(printout ?t "Secure"))
+
+(defmessage-handler MAX-AGE-AV pprint (?t)
+(printout ?t "Max-Age=" ?self:value))
+
+(defmessage-handler PATH-AV pprint (?t)
+(printout ?t "Path=" ?self:value))
+
+(defmessage-handler HTTPONLY-AV pprint (?t)
+(printout ?t "HttpOnly"))
+
+(defmessage-handler EXTENSION-AV pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler EXPIRES-AV pprint (?t)
+(printout ?t "Expires=")
+(send ?self:rfc1123-date pprint ?t))
+
+(defmessage-handler RFC1123-DATE pprint (?t)
+(send ?self:wkday pprint ?t)
+(printout ?t ", ")
+(send ?self:date1 pprint ?t)
+(printout ?t " ")
+(send ?self:time pprint ?t)
+(printout ?t " GMT"))
+
+(defmessage-handler WKDAY pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler DATE1 pprint (?t)
+(printout ?t ?self:first-2digit " ")
+(send ?self:month pprint ?t)
+(printout ?t " " ?self:last-4digit))
+
+(defmessage-handler MONTH pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler TIME pprint (?t)
+(printout ?t ?self:first-2digit ":" ?self:second-2digit ":" ?self:third-2digit))
+
+(defmessage-handler DOMAIN-AV pprint (?t)
+(printout ?t "Domain=")
+(send ?self:subdomain pprint ?t))
+
+(defmessage-handler SUBDOMAIN pprint (?t)
+	(foreach ?f ?self:ldh-labels
+		(send ?f pprint ?t))
+	(send ?self:top-label pprint ?t))
+
+(defmessage-handler TOP-LABEL pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler LDH-LABEL pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler SAMESITE-AV pprint (?t)
+(printout ?t "SameSite=")
+(send ?self:value pprint ?t))
+
+(defmessage-handler LAX pprint (?t)
+(printout ?t "Lax"))
+
+(defmessage-handler STRICT pprint (?t)
+(printout ?t "Strict"))
+
+(defmessage-handler NONE pprint (?t)
+(printout ?t "None"))

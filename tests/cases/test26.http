@@ -1,10 +1,15 @@
-POST /submit HTTP/1.1
-Host: example.com
-Content-Type: text/plain;   charset=US-ASCII
-Transfer-Encoding:  chunked
+HTTP/1.0 200 OK
+Date:  Mon, 01 Jul 2025 12:00:00 GMT  
+Server:  Apache/2.4.54 (Unix)  
+Content-Type:  text/html; charset=UTF-8  
+Content-Length:  48  
+Connection:  close  
+Cache-Control:  no-cache,  no-store  
+Pragma:  no-cache  
+Expires:  0  
+ETag:  "abc123"  
+Last-Modified:  Tue, 01 Jul 2025 10:00:00 GMT  
+Accept-Ranges:  bytes  
+Vary:  Accept-Encoding  
 
-4 ;  ext=1  
-Wiki  
-5;   ext2=someValue  
-pedia  
-0  
+<html><body>Hello world, HTTP/1.0!</body></html>

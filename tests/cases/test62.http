@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Date: Mon, 30 Jun 2025 20:00:00 GMT
+Content-Type: text/plain
+Content-Length: 2
+Set-Cookie: simple=abc123
+Set-Cookie: empty=
+Set-Cookie: quoted="abc123"
+Set-Cookie: special=abc!#$%&'()*+-./:<=>?@[]^_`{|}~
+Set-Cookie: pathonly=val; Path=/subdir
+Set-Cookie: domainonly=val; Domain=example.com
+Set-Cookie: expiresonly=val; Expires=Wed, 02 Jul 2025 20:00:00 GMT
+Set-Cookie: maxageonly=val; Max-Age=3600
+Set-Cookie: secureonly=val; Secure
+Set-Cookie: httponlyonly=val; HttpOnly
+Set-Cookie: samesitelax=val; SameSite=Lax
+Set-Cookie: samesitestrict=val; SameSite=Strict
+Set-Cookie: samesitenone=val; SameSite=None; Secure
+
+OK
