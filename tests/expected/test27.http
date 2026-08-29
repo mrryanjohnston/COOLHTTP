@@ -1,10 +1,29 @@
-POST /data HTTP/1.1
+GET /resource HTTP/1.1
 Host: example.com
-Content-Type: application/octet-stream
-Transfer-Encoding: chunked
-Trailer: X-Verification
+User-Agent: TestClient/1.0
+Accept: text/html,application/json;q=0.9
+Accept-Charset: utf-8,    iso-8859-1;   q=0.5
+Accept-Encoding: gzip,deflate,br
+Accept-Language: en-US,en;q=0.9
+Authorization: Basic    dXNlcjpwYXNz
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 0
+Content-Encoding: gzip
+Content-Language: en
+Date: Wed,  23 Jul 2025   04:02:33 GMT
+Expect: 100-continue
+From: user@example.com
+If-Match: "abc123etag"
+If-None-Match: "abc123etag"
+If-Modified-Since: Tue,   20 Jul 2021  19:30:00 GMT
+If-Unmodified-Since: Tue, 20 Jul 2021   19:30:00 GMT
+If-Range: "abc123etag"
+Range: bytes=0-499
+Referer: https://example.com/page
+TE: trailers,deflate;q=0.5
+Trailer: Expires
+Upgrade: h2c
+Max-Forwards: 10
+Proxy-Authorization: Basic cHJveHVzZXI6cGFzczEyMw==
 
-3
-abc
-0
-X-Verification: 12345

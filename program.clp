@@ -294,7 +294,7 @@
 
 (deftemplate quoted-string
 	(slot name)
-	(slot value))
+	(slot value (default "")))
 
 (deftemplate message-body
 	(slot name)
@@ -391,6 +391,27 @@
 	(slot name)
 	(slot value)
 	(slot weight))
+
+(deftemplate expect-header
+	(slot name)
+	(multislot expectations))
+
+(deftemplate expectation
+	(slot name)
+	(slot token)
+	(slot equals (default FALSE))
+	(slot value)
+	(multislot parameters))
+
+(deftemplate cache-control-header
+	(slot name)
+	(multislot cache-directives))
+
+(deftemplate cache-directive
+	(slot name)
+	(slot token)
+	(slot equals (default FALSE))
+	(slot value))
 
 (deftemplate range-header
 	(slot name)
@@ -635,6 +656,10 @@
 (defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
 (defclass TE-HEADER (is-a HTTP) (multislot t-codings))
 (defclass T-CODING (is-a HTTP) (slot value) (slot weight))
+(defclass EXPECT-HEADER (is-a HTTP) (multislot expectations))
+(defclass EXPECTATION (is-a HTTP) (slot token) (slot value) (multislot parameters))
+(defclass CACHE-CONTROL-HEADER (is-a HTTP) (multislot cache-directives))
+(defclass CACHE-DIRECTIVE (is-a HTTP) (slot token) (slot value))
 (defclass RANGE-HEADER (is-a HTTP) (slot ranges-specifier))
 (defclass RANGES-SPECIFIER (is-a HTTP) (slot range-unit) (slot range-set))
 (defclass RANGE-UNIT (is-a HTTP) (slot value))
@@ -1485,7 +1510,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -3105,10 +3130,44 @@
 	(assert (quoted-pair ?name)
 		(char ?name (get-char ?name))))
 
+;   quoted-string = DQUOTE *( qdtext / quoted-pair ) DQUOTE
+;        qdtext   = HTAB / SP / "!" / %x23-5B / %x5D-7E / obs-text
+(defrule build-quoted-string
+	?c <- (char ?name ?char)
+	?q <- (quoted-string (name ?name) (value ?value))
+	(not (quoted-pair ?name))
+	(test (or
+		(= ?char 9) ; HTAB
+		(= ?char 32) ; SP
+		(= ?char 33) ; !
+		(and (>= ?char 35) (<= ?char 91)) ; %x23-5B
+		(and (>= ?char 93) (<= ?char 126)) ; %x5D-7E
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(retract ?c)
+	(modify ?q (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+;   quoted-pair = "\" ( HTAB / SP / VCHAR / obs-text )
+(defrule build-quoted-string-quoted-pair
+	?c <- (char ?name ?char)
+	?qp <- (quoted-pair ?name)
+	?q <- (quoted-string (name ?name) (value ?value))
+	(test (or
+		(= ?char 9) ; HTAB
+		(= ?char 32) ; SP
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(retract ?c ?qp)
+	(modify ?q (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
 (defrule parameter-end-parameter-value-quoted-string
 	?c <- (char ?name 34) ; "
 	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
 	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?q))
+	(not (quoted-pair ?name))
 	=>
 	(retract ?c ?q)
 	(modify ?p (parameter-value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
@@ -3258,7 +3317,7 @@
 
 (defrule proxy-authorization-end-token68
 	(char ?name 9|13|32) ; HTAB CR SP
-	?t <- (token68 (name ?name) (value ?value) (equals ?equals))
+	?t <- (token68 (name ?name) (value ?value&~"") (equals ?equals))
 	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
@@ -3313,6 +3372,13 @@
 	(retract ?c)
 	(modify ?p (second-part ?auth-params ?auth-param (assert (auth-param (name ?name) (left-side (assert (token (name ?name)))))))))
 
+(defrule proxy-authorization-header-skip-ows-after-auth-param
+	?c <- (char ?name 9|32) ; HTAB SP
+	?clh <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
 (defrule end-proxy-authorization-header
 	(char ?name 13) ; CR
 	?clh <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
@@ -3335,7 +3401,7 @@
 	(modify ?fv (value (assert (te-header (name ?name) (t-codings (assert (t-coding (name ?name) (value (assert (token (name ?name))))))))))))
 
 (defrule t-coding-end-value
-	(char ?name 9|13|32|44|58) ; HTAB CR SP , :
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
 	?t <- (token (name ?name) (value ?value))
 	?t-coding <- (t-coding (name ?name) (value ?t))
 	=>
@@ -3381,10 +3447,17 @@
 	(modify ?t (t-codings ?t-codings ?t-coding (assert (t-coding (name ?name)))))
 	(assert (char ?name (get-char ?name))))
 
-(defrule te-header-ignore-ows-before-text-t-coding
-	?c <- (char ?name 13|32) ; HTAB SP
+(defrule te-header-ignore-ows-before-next-t-coding
+	?c <- (char ?name 9|32) ; HTAB SP
 	?t <- (t-coding (name ?name) (value nil))
 	?te <- (te-header (t-codings $?t-codings ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule te-header-ignore-ows-after-last-t-coding
+	?c <- (char ?name 9|32) ; HTAB SP
+	?clh <- (te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
 	=>
 	(retract ?c)
 	(assert (char ?name (get-char ?name))))
@@ -3638,6 +3711,227 @@
 	(modify ?h (message-body (assert (message-body (name ?name)))))
 	(assert (char ?name (get-char ?name))))
 
+;   Expect      = #expectation
+;    expectation = token [ "=" ( token / quoted-string ) parameters ]
+;     parameters = *( OWS ";" OWS [ parameter ] )
+(defrule detect-expect-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Expect"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (expect-header (name ?name) (expectations (assert (expectation (name ?name) (token (assert (token (name ?name))))))))))))
+
+(defrule expect-header-skip-ows-before-expectation
+	?c <- (char ?name 9|32) ; HTAB SP
+	?t <- (token (name ?name) (value ""))
+	?e <- (expectation (name ?name) (token ?t))
+	(expect-header (name ?name) (expectations $?expectations ?e))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule expectation-end-token
+	(char ?name 9|13|32|44|59|61) ; HTAB CR SP , ; =
+	?t <- (token (name ?name) (value ?value&~""))
+	?e <- (expectation (name ?name) (token ?t))
+	=>
+	(retract ?t)
+	(modify ?e (token ?value)))
+
+(defrule expectation-detect-equals
+	?c <- (char ?name 61) ; =
+	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
+	=>
+	(retract ?c)
+	(modify ?e (equals TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule expectation-detect-value-token
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?e <- (expectation (name ?name) (equals TRUE) (value nil))
+	=>
+	(modify ?e (value (assert (token (name ?name))))))
+
+(defrule expectation-end-value-token
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (token (name ?name) (value ?value&~""))
+	?e <- (expectation (name ?name) (value ?t))
+	=>
+	(retract ?t)
+	(modify ?e (value ?value)))
+
+(defrule expectation-detect-value-quoted-string
+	?c <- (char ?name 34) ; "
+	?e <- (expectation (name ?name) (equals TRUE) (value nil))
+	=>
+	(retract ?c)
+	(modify ?e (value (assert (quoted-string (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule expectation-end-value-quoted-string
+	?c <- (char ?name 34) ; "
+	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
+	?e <- (expectation (name ?name) (value ?q))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?c ?q)
+	(modify ?e (value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule expectation-detect-parameter
+	?c <- (char ?name 59) ; ;
+	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	=>
+	(retract ?c)
+	(modify ?e (parameters ?parameters (assert (parameter (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule expectation-end-parameter
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?p <- (parameter (parameter-name ?pn&:(stringp ?pn)) (parameter-value ?pv&:(stringp ?pv)|:(instancep ?pv)))
+	?e <- (expectation (name ?name) (parameters $?parameters ?p))
+	=>
+	(retract ?p)
+	(modify ?e (parameters ?parameters (make-instance of PARAMETER (filename ?name) (parameter-name ?pn) (parameter-value ?pv)))))
+
+(defrule expect-header-end-expectation
+	(char ?name 13|44) ; CR ,
+	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?eh <- (expect-header (name ?name) (expectations $?expectations ?e))
+	=>
+	(retract ?e)
+	(modify ?eh (expectations ?expectations (make-instance of EXPECTATION (filename ?name) (token ?token) (value ?value) (parameters ?parameters)))))
+
+; OWS is allowed after a completed expectation, both before the "," that
+; starts the next one and before the ";" that starts a parameter, so the
+; expectation is not ended here -- only the whitespace is consumed.
+(defrule expectation-skip-ows-after-token
+	?c <- (char ?name 9|32) ; HTAB SP
+	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	(expect-header (name ?name) (expectations $?expectations ?e))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule expect-header-detect-next-expectation
+	?c <- (char ?name 44) ; ,
+	?eh <- (expect-header (name ?name) (expectations $?expectations ?e&:(instancep ?e)))
+	=>
+	(retract ?c)
+	(modify ?eh (expectations ?expectations ?e (assert (expectation (name ?name) (token (assert (token (name ?name))))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-expect-header
+	(char ?name 13) ; CR
+	?eh <- (expect-header (name ?name) (expectations $?expectations&:(instancep (nth$ (length$ ?expectations) ?expectations))))
+	?fv <- (field-value (value ?eh))
+	=>
+	(retract ?eh)
+	(modify ?fv (value (make-instance of EXPECT-HEADER (filename ?name) (expectations ?expectations)))))
+
+;   Cache-Control   = #cache-directive
+;    cache-directive = token [ "=" ( token / quoted-string ) ]
+(defrule detect-cache-control-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Cache-Control"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (cache-control-header (name ?name) (cache-directives (assert (cache-directive (name ?name) (token (assert (token (name ?name))))))))))))
+
+(defrule cache-control-header-skip-ows-before-cache-directive
+	?c <- (char ?name 9|32) ; HTAB SP
+	?t <- (token (name ?name) (value ""))
+	?cd <- (cache-directive (name ?name) (token ?t))
+	(cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule cache-directive-end-token
+	(char ?name 9|13|32|44|61) ; HTAB CR SP , =
+	?t <- (token (name ?name) (value ?value&~""))
+	?cd <- (cache-directive (name ?name) (token ?t))
+	=>
+	(retract ?t)
+	(modify ?cd (token ?value)))
+
+(defrule cache-directive-detect-equals
+	?c <- (char ?name 61) ; =
+	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
+	=>
+	(retract ?c)
+	(modify ?cd (equals TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cache-directive-detect-value-token
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?cd <- (cache-directive (name ?name) (equals TRUE) (value nil))
+	=>
+	(modify ?cd (value (assert (token (name ?name))))))
+
+(defrule cache-directive-end-value-token
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (token (name ?name) (value ?value&~""))
+	?cd <- (cache-directive (name ?name) (value ?t))
+	=>
+	(retract ?t)
+	(modify ?cd (value ?value)))
+
+(defrule cache-directive-detect-value-quoted-string
+	?c <- (char ?name 34) ; "
+	?cd <- (cache-directive (name ?name) (equals TRUE) (value nil))
+	=>
+	(retract ?c)
+	(modify ?cd (value (assert (quoted-string (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule cache-directive-end-value-quoted-string
+	?c <- (char ?name 34) ; "
+	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
+	?cd <- (cache-directive (name ?name) (value ?q))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?c ?q)
+	(modify ?cd (value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+; OWS is allowed after a completed cache-directive, before the "," that starts
+; the next one, so the directive is not ended here -- only the whitespace is
+; consumed.
+(defrule cache-directive-skip-ows-after-token
+	?c <- (char ?name 9|32) ; HTAB SP
+	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
+	(cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule cache-control-header-end-cache-directive
+	(char ?name 13|44) ; CR ,
+	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
+	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+	=>
+	(retract ?cd)
+	(modify ?cch (cache-directives ?cache-directives (make-instance of CACHE-DIRECTIVE (filename ?name) (token ?token) (value ?value)))))
+
+(defrule cache-control-header-detect-next-cache-directive
+	?c <- (char ?name 44) ; ,
+	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives ?cd&:(instancep ?cd)))
+	=>
+	(retract ?c)
+	(modify ?cch (cache-directives ?cache-directives ?cd (assert (cache-directive (name ?name) (token (assert (token (name ?name))))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-cache-control-header
+	(char ?name 13) ; CR
+	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
+	?fv <- (field-value (value ?cch))
+	=>
+	(retract ?cch)
+	(modify ?fv (value (make-instance of CACHE-CONTROL-HEADER (filename ?name) (cache-directives ?cache-directives)))))
+
 (defrule message-body-set-length-remaining
 	(char ?name 10) ; LF
 	?m <- (message-body (name ?name) (length-remaining nil))
@@ -3779,13 +4073,28 @@
 (retract ?h)
 (make-instance of HTTP-MESSAGE (filename ?name) (start-line ?s) (field-lines $?f) (message-body ?m)))
 
+; Serializes a quoted-string value, re-escaping the DQUOTE and "\" that
+; quoted-pair strips out when the value is parsed.
+(deffunction print-quoted-string (?t ?value)
+	(printout ?t "\"")
+	(bind ?i 1)
+	(while (<= ?i (str-length ?value))
+		(bind ?c (sub-string ?i ?i ?value))
+		(if (or (eq ?c "\"") (eq ?c "\\")) then (printout ?t "\\"))
+		(printout ?t ?c)
+		(bind ?i (+ ?i 1)))
+	(printout ?t "\""))
+
 (defmessage-handler METHOD pprint primary (?t)
 (printout ?t ?self:value))
 
 (defmessage-handler PARAMETER pprint primary (?t)
-(if (eq "charset" (lowcase ?self:parameter-name))
-then (printout ?t (lowcase ?self:parameter-name) "=" (lowcase ?self:parameter-value))
-else (printout ?t ?self:parameter-name "=" ?self:parameter-value)))
+(if (instancep ?self:parameter-value)
+then (printout ?t ?self:parameter-name "=")
+     (print-quoted-string ?t (send ?self:parameter-value get-value))
+else (if (eq "charset" (lowcase ?self:parameter-name))
+     then (printout ?t (lowcase ?self:parameter-name) "=" (lowcase ?self:parameter-value))
+     else (printout ?t ?self:parameter-name "=" ?self:parameter-value))))
 
 (defmessage-handler SEGMENT pprint primary (?t)
 (printout ?t ?self:value))
@@ -4084,6 +4393,41 @@ then (printout ?t "." ?self:fraction)))
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:methods)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler EXPECT-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:expectations
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:expectations)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler EXPECTATION pprint primary (?t)
+	(printout ?t ?self:token)
+	(if (neq ?self:value nil)
+	then
+	     (printout ?t "=")
+	     (if (instancep ?self:value)
+	     then (print-quoted-string ?t (send ?self:value get-value))
+	     else (printout ?t ?self:value)))
+	(foreach ?f ?self:parameters
+	     (printout ?t ";")
+	     (send ?f pprint ?t)))
+
+(defmessage-handler CACHE-CONTROL-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:cache-directives
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:cache-directives)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler CACHE-DIRECTIVE pprint primary (?t)
+	(printout ?t ?self:token)
+	(if (neq ?self:value nil)
+	then
+	     (printout ?t "=")
+	     (if (instancep ?self:value)
+	     then (print-quoted-string ?t (send ?self:value get-value))
+	     else (printout ?t ?self:value))))
 
 (defmessage-handler TE-HEADER pprint primary (?t)
 (bind ?i 0)
