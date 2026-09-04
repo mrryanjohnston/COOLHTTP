@@ -1,0 +1,5 @@
+GET /doc HTTP/1.0
+Host: example.com
+If-Modified-Since: Sat Nov 16 08:49:37 1994
+If-Unmodified-Since: Sun, 06 Nov 1994 08:49:37 GMT
+

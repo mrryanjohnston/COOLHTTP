@@ -11,13 +11,13 @@ Content-Type: application/json
 Content-Length: 0
 Content-Encoding: gzip
 Content-Language: en
-Date: Wed,  23 Jul 2025   04:02:33 GMT
+Date: Wed, 23 Jul 2025 04:02:33 GMT
 Expect: 100-continue
 From: user@example.com
 If-Match: "abc123etag"
 If-None-Match: "abc123etag"
-If-Modified-Since: Tue,   20 Jul 2021  19:30:00 GMT
-If-Unmodified-Since: Tue, 20 Jul 2021   19:30:00 GMT
+If-Modified-Since: Tue, 20 Jul 2021 19:30:00 GMT
+If-Unmodified-Since: Tue, 20 Jul 2021 19:30:00 GMT
 If-Range: "abc123etag"
 Range: bytes=0-499
 Referer: https://example.com/page

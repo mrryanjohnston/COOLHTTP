@@ -544,6 +544,47 @@
 	(slot second-colon)
 	(slot third-2digit (default "")))
 
+;   HTTP-date    = IMF-fixdate / obs-date
+;   IMF-fixdate  = day-name "," SP date1 SP time-of-day SP GMT ; identical to rfc1123-date
+;   obs-date     = rfc850-date / asctime-date
+;   rfc850-date  = day-name-l "," SP date2 SP time-of-day SP GMT
+;   date2        = day "-" month "-" 2DIGIT
+;   asctime-date = day-name SP date3 SP time-of-day SP year
+;   date3        = month SP ( 2DIGIT / ( SP 1DIGIT ))
+(deftemplate http-date-header
+	(slot name)
+	(slot http-date)) ; day-name fact, then rfc1123-date / rfc850-date / asctime-date fact, then instance
+
+(deftemplate day-name
+	(slot name)
+	(slot value (default "")))
+
+(deftemplate rfc850-date
+	(slot name)
+	(slot day-name-l)
+	(slot date2)
+	(slot time)
+	(slot GMT (default "")))
+
+(deftemplate date2
+	(slot name)
+	(slot day (default ""))
+	(slot month)
+	(slot year (default "")))
+
+(deftemplate asctime-date
+	(slot name)
+	(slot day-name)
+	(slot date3)
+	(slot time)
+	(slot year (default "")))
+
+(deftemplate date3
+	(slot name)
+	(slot month)
+	(slot day (default ""))
+	(slot padded (default FALSE)))
+
 ;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
 
 (deftemplate max-age-av
@@ -713,6 +754,16 @@
 (defclass DATE1 (is-a HTTP) (slot first-2digit) (slot month) (slot last-4digit))
 (defclass TIME (is-a HTTP) (slot first-2digit) (slot second-2digit) (slot third-2digit))
 (defclass RFC1123-DATE (is-a HTTP) (slot wkday) (slot date1) (slot time))
+(defclass HTTP-DATE-HEADER (is-a HTTP) (slot http-date))
+(defclass DATE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass LAST-MODIFIED-HEADER (is-a HTTP-DATE-HEADER))
+(defclass IF-MODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass IF-UNMODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass DAY-NAME-L (is-a HTTP) (slot value))
+(defclass RFC850-DATE (is-a HTTP) (slot day-name-l) (slot date2) (slot time))
+(defclass DATE2 (is-a HTTP) (slot day) (slot month) (slot year))
+(defclass ASCTIME-DATE (is-a HTTP) (slot day-name) (slot date3) (slot time) (slot year))
+(defclass DATE3 (is-a HTTP) (slot month) (slot day) (slot padded))
 (defclass SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
 (defclass COOKIE-AV (is-a HTTP) (slot value))
 (defclass DOMAIN-AV (is-a HTTP) (slot subdomain))
@@ -1534,7 +1585,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -3396,6 +3447,282 @@
 	(retract ?mfh)
 	(modify ?fv (value (make-instance of MAX-FORWARDS-HEADER (filename ?name) (value ?max-forwards-header)))))
 
+;   Date                = HTTP-date
+;   Last-Modified       = HTTP-date
+;   If-Modified-Since   = HTTP-date
+;   If-Unmodified-Since = HTTP-date
+;   HTTP-date    = IMF-fixdate / obs-date
+;   IMF-fixdate  = day-name "," SP date1 SP time-of-day SP GMT ; identical to rfc1123-date
+;   obs-date     = rfc850-date / asctime-date
+;   rfc850-date  = day-name-l "," SP date2 SP time-of-day SP GMT
+;   asctime-date = day-name SP date3 SP time-of-day SP year
+;   day-name     = %s"Mon" / %s"Tue" / %s"Wed" / %s"Thu" / %s"Fri" / %s"Sat" / %s"Sun"
+;   day-name-l   = %s"Monday" / %s"Tuesday" / %s"Wednesday" / %s"Thursday"
+;                / %s"Friday" / %s"Saturday" / %s"Sunday"
+; The three forms are told apart by what follows the day name:
+; "," after 3 letters -> IMF-fixdate, "," after a full name -> rfc850-date, SP after 3 letters -> asctime-date
+(defrule detect-http-date-header
+	(char ?name 70|77|83|84|87) ; F M S T W
+	?o <- (object (is-a FIELD-NAME) (value "Date"|"Last-Modified"|"If-Modified-Since"|"If-Unmodified-Since"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name)))))))))
+
+(defrule build-day-name
+	?c <- (char ?name ?char&77|111|110|100|97|121|84|117|101|115|87|104|114|70|105|83|116) ; M o n d a y T u e s W h r F i S t
+	?d <- (day-name (name ?name) (value ?value&:(> 9 (str-length ?value))))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule day-name-end-imf-fixdate
+	?c <- (char ?name 44) ; ,
+	?d <- (day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
+	?h <- (http-date-header (name ?name) (http-date ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?h (http-date (assert (rfc1123-date (name ?name) (wkday (make-instance of WKDAY (filename ?name) (value ?value)))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule day-name-end-rfc850-date
+	?c <- (char ?name 44) ; ,
+	?d <- (day-name (name ?name) (value ?value&"Monday"|"Tuesday"|"Wednesday"|"Thursday"|"Friday"|"Saturday"|"Sunday"))
+	?h <- (http-date-header (name ?name) (http-date ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?h (http-date (assert (rfc850-date (name ?name) (day-name-l (make-instance of DAY-NAME-L (filename ?name) (value ?value)))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule day-name-end-asctime-date
+	?c <- (char ?name 32) ; SP
+	?d <- (day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
+	?h <- (http-date-header (name ?name) (http-date ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?h (http-date (assert (asctime-date (name ?name) (day-name (make-instance of WKDAY (filename ?name) (value ?value))) (date3 (assert (date3 (name ?name) (month (assert (month (name ?name)))))))))))
+	(assert (char ?name (get-char ?name))))
+
+; IMF-fixdate: the rfc1123-date rules above carry the fact through "GMT"
+(defrule http-date-header-end-rfc1123-date
+	(char ?name 9|13|32) ; HTAB CR SP
+	?r <- (rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
+	?h <- (http-date-header (name ?name) (http-date ?r))
+	=>
+	(retract ?r)
+	(modify ?h (http-date (make-instance of RFC1123-DATE (filename ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
+
+;   rfc850-date  = day-name-l "," SP date2 SP time-of-day SP GMT
+;   date2        = day "-" month "-" 2DIGIT
+;                ; e.g., 02-Jun-82
+(defrule rfc850-date-start-date2
+	?c <- (char ?name 32) ; SP
+	?r <- (rfc850-date (name ?name) (day-name-l ?d&:(instancep ?d)) (date2 nil))
+	=>
+	(retract ?c)
+	(modify ?r (date2 (assert (date2 (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date2-build-day
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date2 (name ?name) (day ?day&:(> 2 (str-length ?day))))
+	=>
+	(retract ?c)
+	(modify ?d (day (format nil "%s%c" ?day ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date2-end-day-start-month
+	?c <- (char ?name 45) ; -
+	?d <- (date2 (name ?name) (day ?day&:(= 2 (str-length ?day))) (month nil))
+	=>
+	(retract ?c)
+	(modify ?d (month (assert (month (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date2-end-month
+	?c <- (char ?name 45) ; -
+	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (date2 (name ?name) (month ?m))
+	=>
+	(retract ?c ?m)
+	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date2-build-year
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date2 (name ?name) (month ?m&:(instancep ?m)) (year ?year&:(> 2 (str-length ?year))))
+	=>
+	(retract ?c)
+	(modify ?d (year (format nil "%s%c" ?year ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc850-date-end-date2
+	(char ?name 32) ; SP
+	?d <- (date2 (day ?day) (month ?month) (year ?year&:(= 2 (str-length ?year))))
+	?r <- (rfc850-date (name ?name) (date2 ?d))
+	=>
+	(retract ?d)
+	(modify ?r (date2 (make-instance of DATE2 (filename ?name) (day ?day) (month ?month) (year ?year)))))
+
+(defrule rfc850-date-start-time
+	?c <- (char ?name 32) ; SP
+	?r <- (rfc850-date (name ?name) (date2 ?d&:(instancep ?d)) (time nil))
+	=>
+	(retract ?c)
+	(modify ?r (time (assert (time (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc850-date-end-time
+	?c <- (char ?name 32) ; SP
+	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?r <- (rfc850-date (name ?name) (time ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?r (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule rfc850-date-expect-GMT
+	?c <- (char ?name ?char&71|77|84) ; G M T
+	?r <- (rfc850-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
+	=>
+	(retract ?c)
+	(modify ?r (GMT (format nil "%s%c" ?GMT ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule http-date-header-end-rfc850-date
+	(char ?name 9|13|32) ; HTAB CR SP
+	?r <- (rfc850-date (name ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time) (GMT "GMT"))
+	?h <- (http-date-header (name ?name) (http-date ?r))
+	=>
+	(retract ?r)
+	(modify ?h (http-date (make-instance of RFC850-DATE (filename ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time)))))
+
+;   asctime-date = day-name SP date3 SP time-of-day SP year
+;   date3        = month SP ( 2DIGIT / ( SP 1DIGIT ))
+;                ; e.g., Jun  2
+(defrule date3-end-month
+	?c <- (char ?name 32) ; SP
+	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (date3 (name ?name) (month ?m))
+	=>
+	(retract ?c ?m)
+	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date3-detect-padding
+	?c <- (char ?name 32) ; SP
+	?d <- (date3 (name ?name) (month ?m&:(instancep ?m)) (day "") (padded FALSE))
+	=>
+	(retract ?c)
+	(modify ?d (padded TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date3-build-2digit-day
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date3 (name ?name) (month ?m&:(instancep ?m)) (day ?day&:(> 2 (str-length ?day))) (padded FALSE))
+	=>
+	(retract ?c)
+	(modify ?d (day (format nil "%s%c" ?day ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule date3-build-1digit-day
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?d <- (date3 (name ?name) (day "") (padded TRUE))
+	=>
+	(retract ?c)
+	(modify ?d (day (format nil "%c" ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule asctime-date-end-date3-2digit
+	(char ?name 32) ; SP
+	?d <- (date3 (month ?month) (day ?day&:(= 2 (str-length ?day))) (padded FALSE))
+	?a <- (asctime-date (name ?name) (date3 ?d))
+	=>
+	(retract ?d)
+	(modify ?a (date3 (make-instance of DATE3 (filename ?name) (month ?month) (day ?day) (padded FALSE)))))
+
+(defrule asctime-date-end-date3-1digit
+	(char ?name 32) ; SP
+	?d <- (date3 (month ?month) (day ?day&:(= 1 (str-length ?day))) (padded TRUE))
+	?a <- (asctime-date (name ?name) (date3 ?d))
+	=>
+	(retract ?d)
+	(modify ?a (date3 (make-instance of DATE3 (filename ?name) (month ?month) (day ?day) (padded TRUE)))))
+
+(defrule asctime-date-start-time
+	?c <- (char ?name 32) ; SP
+	?a <- (asctime-date (name ?name) (date3 ?d&:(instancep ?d)) (time nil))
+	=>
+	(retract ?c)
+	(modify ?a (time (assert (time (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule asctime-date-end-time
+	?c <- (char ?name 32) ; SP
+	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?a <- (asctime-date (name ?name) (time ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?a (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule asctime-date-build-year
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?a <- (asctime-date (name ?name) (time ?t&:(instancep ?t)) (year ?year&:(> 4 (str-length ?year))))
+	=>
+	(retract ?c)
+	(modify ?a (year (format nil "%s%c" ?year ?char)))
+	(assert (char ?name (get-char ?name))))
+
+(defrule http-date-header-end-asctime-date
+	(char ?name 9|13|32) ; HTAB CR SP
+	?a <- (asctime-date (name ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year&:(= 4 (str-length ?year))))
+	?h <- (http-date-header (name ?name) (http-date ?a))
+	=>
+	(retract ?a)
+	(modify ?h (http-date (make-instance of ASCTIME-DATE (filename ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year)))))
+
+(defrule end-date-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Date"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of DATE-HEADER (filename ?name) (http-date ?d)))))
+
+(defrule end-last-modified-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Last-Modified"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of LAST-MODIFIED-HEADER (filename ?name) (http-date ?d)))))
+
+(defrule end-if-modified-since-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "If-Modified-Since"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of IF-MODIFIED-SINCE-HEADER (filename ?name) (http-date ?d)))))
+
+(defrule end-if-unmodified-since-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "If-Unmodified-Since"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of IF-UNMODIFIED-SINCE-HEADER (filename ?name) (http-date ?d)))))
+
 (defrule end-content-type-header
 	(char ?name 13)
 	?cth <- (content-type-header (name ?name) (type ?type&:(instancep ?type)) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
@@ -4716,6 +5043,39 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (printout ?t " ")
 (send ?self:time pprint ?t)
 (printout ?t " GMT"))
+
+(defmessage-handler HTTP-DATE-HEADER pprint primary (?t)
+(send ?self:http-date pprint ?t))
+
+(defmessage-handler DAY-NAME-L pprint (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler RFC850-DATE pprint (?t)
+(send ?self:day-name-l pprint ?t)
+(printout ?t ", ")
+(send ?self:date2 pprint ?t)
+(printout ?t " ")
+(send ?self:time pprint ?t)
+(printout ?t " GMT"))
+
+(defmessage-handler DATE2 pprint (?t)
+(printout ?t ?self:day "-")
+(send ?self:month pprint ?t)
+(printout ?t "-" ?self:year))
+
+(defmessage-handler ASCTIME-DATE pprint (?t)
+(send ?self:day-name pprint ?t)
+(printout ?t " ")
+(send ?self:date3 pprint ?t)
+(printout ?t " ")
+(send ?self:time pprint ?t)
+(printout ?t " " ?self:year))
+
+(defmessage-handler DATE3 pprint (?t)
+(send ?self:month pprint ?t)
+(printout ?t " ")
+(if ?self:padded then (printout ?t " "))
+(printout ?t ?self:day))
 
 (defmessage-handler WKDAY pprint (?t)
 (printout ?t ?self:value))
