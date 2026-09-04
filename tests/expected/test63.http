@@ -1,0 +1,4 @@
+GET /agent HTTP/1.0
+Host: example.com
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) curl (a \) b (nested) c) Safari/537.36
+

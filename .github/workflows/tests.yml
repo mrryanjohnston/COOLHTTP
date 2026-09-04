@@ -1,0 +1,60 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLIPS_VERSION: 6.4.2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CLIPS build
+        id: cache-clips
+        uses: actions/cache@v4
+        with:
+          path: ~/clips
+          key: clips-${{ env.CLIPS_VERSION }}-${{ runner.os }}
+
+      - name: Build CLIPS ${{ env.CLIPS_VERSION }}
+        if: steps.cache-clips.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tarball="clips_core_source_${CLIPS_VERSION//./}.tar.gz"
+          curl -fL --retry 3 -o "$tarball" \
+            "https://sourceforge.net/projects/clipsrules/files/CLIPS/$CLIPS_VERSION/$tarball/download"
+          mkdir -p ~/clips
+          tar --strip-components=2 -xzf "$tarball" -C ~/clips
+          make -C ~/clips -j"$(nproc)"
+
+      - name: Put clips on PATH
+        run: echo "$HOME/clips" >> "$GITHUB_PATH"
+
+      - name: Run test suite
+        run: |
+          set -o pipefail
+          timeout 600 make test < /dev/null 2>&1 | tee results.txt
+
+      - name: Check results
+        run: |
+          set -euo pipefail
+          summary=$(grep '^Successful tests: ' results.txt | tail -1 || true)
+          if [ -z "$summary" ]; then
+            echo "::error::Test suite did not print a summary line; see the log above."
+            exit 1
+          fi
+          passed=${summary##*: }
+          total=${passed#*/}
+          passed=${passed%%/*}
+          echo "$summary"
+          if [ "$passed" != "$total" ]; then
+            echo "::error::$((total - passed)) of $total tests failed."
+            exit 1
+          fi
+          echo "All $total tests passed."

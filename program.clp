@@ -319,6 +319,20 @@
 	(slot value (default "")))
 
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
+;   User-Agent = product *( RWS ( product / comment ) )
+;   Server     = product *( RWS ( product / comment ) )
+(deftemplate product-header
+	(slot name)
+	(multislot values) ; product / comment facts, then PRODUCT / COMMENT instances
+	(slot rws (default FALSE)))
+
+;   product         = token [ "/" product-version ]
+;   product-version = token
+(deftemplate product
+	(slot name)
+	(slot token)
+	(slot product-version))
+
 (deftemplate via-header
 	(slot name)
 	(multislot values))
@@ -634,6 +648,10 @@
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
 (defclass VIA-HEADER (is-a HTTP) (multislot values))
 (defclass VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
+(defclass PRODUCT-HEADER (is-a HTTP) (multislot values))
+(defclass USER-AGENT-HEADER (is-a PRODUCT-HEADER))
+(defclass SERVER-HEADER (is-a PRODUCT-HEADER))
+(defclass PRODUCT (is-a HTTP) (slot token) (slot product-version))
 (defclass HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
 (defclass QUOTED-STRING (is-a HTTP) (slot value))
 (defclass MESSAGE-BODY (is-a HTTP) (slot value))
@@ -1510,7 +1528,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2755,15 +2773,8 @@
 	(not (quoted-pair ?name))
 	=>
 	(retract ?c ?c-inner)
-	(modify ?c-outer (values ?values (make-instance of COMMENT (filename ?name) (values ?values-inner ?value))))
+	(modify ?c-outer (values ?values (make-instance of COMMENT (filename ?name) (values ?values-inner ?value)) ""))
 	(assert (char ?name (get-char ?name))))
-
-(defrule comment-start-new-string
-	(char ?name 92) ; \
-	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)))
-	(not (quoted-pair ?name))
-	=>
-	(modify ?co (values ?values ?value "")))
 
 (defrule comment-detect-quoted-pair
 	?ch <- (char ?name 92) ; \
@@ -2785,7 +2796,8 @@
 		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
 	(retract ?ch ?q)
-	(modify ?co (values ?values (format nil "%s%c%c" ?value "\\" ?char))))
+	(modify ?co (values ?values (format nil "%s%c%c" ?value "\\" ?char)))
+	(assert (char ?name (get-char ?name))))
 
 (defrule add-comment-to-comment
 	?ch <- (char ?name 40) ; (
@@ -2793,7 +2805,7 @@
 	(not (quoted-pair ?name))
 	=>
 	(retract ?ch)
-	(modify ?co (values ?values ?value (assert (comment (name ?name)))))
+	(modify ?co (values ?values ?value (assert (comment (name ?name) (values "")))))
 	(assert (char ?name (get-char ?name))))
 
 (defrule via-header-value-end-comment
@@ -2831,6 +2843,115 @@
 
 ;   Accept-Language = #( language-range [ weight ] )
 ;   language-range   = (1*8ALPHA *("-" 1*8alphanum)) / "*"
+
+;   User-Agent = product *( RWS ( product / comment ) )
+;   Server     = product *( RWS ( product / comment ) )
+;   product         = token [ "/" product-version ]
+;   product-version = token
+;   comment         = "(" *( ctext / quoted-pair / comment ) ")"
+(defrule detect-user-agent-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "User-Agent"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (product-header (name ?name) (values (assert (product (name ?name) (token (assert (token (name ?name))))))))))))
+
+(defrule detect-server-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Server"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (product-header (name ?name) (values (assert (product (name ?name) (token (assert (token (name ?name))))))))))))
+
+(defrule product-end-token-start-product-version
+	?c <- (char ?name 47) ; /
+	?t <- (token (name ?name) (value ?value&~""))
+	?p <- (product (name ?name) (token ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?p (token ?value) (product-version (assert (token (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule product-end-token
+	(char ?name 9|13|32) ; HTAB CR SP
+	?t <- (token (name ?name) (value ?value&~""))
+	?p <- (product (name ?name) (token ?t))
+	=>
+	(retract ?t)
+	(modify ?p (token ?value)))
+
+(defrule product-end-product-version
+	(char ?name 9|13|32) ; HTAB CR SP
+	?t <- (token (name ?name) (value ?value&~""))
+	?p <- (product (name ?name) (product-version ?t))
+	=>
+	(retract ?t)
+	(modify ?p (product-version ?value)))
+
+(defrule product-header-end-product
+	(char ?name 9|13|32) ; HTAB CR SP
+	?p <- (product (name ?name) (token ?token&:(stringp ?token)) (product-version ?product-version&nil|:(stringp ?product-version)))
+	?ph <- (product-header (name ?name) (values $?values ?p))
+	=>
+	(retract ?p)
+	(modify ?ph (values ?values (make-instance of PRODUCT (filename ?name) (token ?token) (product-version ?product-version)))))
+
+; RWS is required between products and comments. It also absorbs any
+; trailing OWS before the CR that ends the field line.
+(defrule product-header-detect-RWS
+	?c <- (char ?name 9|32) ; HTAB SP
+	?ph <- (product-header (name ?name) (values $?values ?v&:(instancep ?v)))
+	=>
+	(retract ?c)
+	(modify ?ph (rws TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule product-header-detect-next-product
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?ph <- (product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
+	=>
+	(modify ?ph (rws FALSE) (values ?values ?v (assert (product (name ?name) (token (assert (token (name ?name)))))))))
+
+(defrule product-header-detect-comment
+	?c <- (char ?name 40) ; (
+	?ph <- (product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
+	=>
+	(retract ?c)
+	(modify ?ph (rws FALSE) (values ?values ?v (assert (comment (name ?name) (values "")))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule product-header-end-comment
+	?ch <- (char ?name 41) ; )
+	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	?ph <- (product-header (name ?name) (values $?vs ?co))
+	(not (quoted-pair ?name))
+	=>
+	(retract ?ch ?co)
+	(modify ?ph (values ?vs (make-instance of COMMENT (filename ?name) (values ?values ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-user-agent-header
+	(char ?name 13) ; CR
+	?ph <- (product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?fv <- (field-value (value ?ph))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "User-Agent"))
+	=>
+	(retract ?ph)
+	(modify ?fv (value (make-instance of USER-AGENT-HEADER (filename ?name) (values ?values)))))
+
+(defrule end-server-header
+	(char ?name 13) ; CR
+	?ph <- (product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?fv <- (field-value (value ?ph))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Server"))
+	=>
+	(retract ?ph)
+	(modify ?fv (value (make-instance of SERVER-HEADER (filename ?name) (values ?values)))))
+
 (defrule detect-accept-language-header
 	(char ?name ?char&:(member$ ?char (create$ ?*alpha* 42))) ; *
 	?o <- (object (is-a FIELD-NAME) (value "Accept-Language"))
@@ -4306,6 +4427,18 @@ then (printout ?t ":") (send ?self:port pprint ?t)))
 			then (printout ?t ?f)
 			else (send ?f pprint ?t)))
 	(printout ?t ")"))
+
+(defmessage-handler PRODUCT-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:values
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:values)) then (printout ?t " ") else (printout ?t))))
+
+(defmessage-handler PRODUCT pprint primary (?t)
+	(printout ?t ?self:token)
+	(if (neq ?self:product-version nil)
+		then (printout ?t "/" ?self:product-version)))
 
 (defmessage-handler TYPE pprint primary (?t)
 (printout ?t ?self:value))
