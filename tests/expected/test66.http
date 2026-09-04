@@ -1,0 +1,4 @@
+TRACE /path HTTP/1.0
+Host: example.com
+Max-Forwards: 3
+

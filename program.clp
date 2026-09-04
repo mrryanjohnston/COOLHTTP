@@ -264,6 +264,11 @@
 	(slot name)
 	(slot value (default "")))
 
+;   Max-Forwards = 1*DIGIT
+(deftemplate max-forwards-header
+	(slot name)
+	(slot value (default "")))
+
 (deftemplate content-type-header
 	(slot name)
 	(slot type)
@@ -645,6 +650,7 @@
 (defclass UNKNOWN-HEADER (is-a HTTP) (slot value))
 (defclass ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
 (defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
+(defclass MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
 (defclass VIA-HEADER (is-a HTTP) (multislot values))
 (defclass VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
@@ -1528,7 +1534,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Expect"&~"Host"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -3105,6 +3111,15 @@
 	=>
 	(modify ?fv (value (assert (content-length-header (name ?name))))))
 
+;   Max-Forwards = 1*DIGIT
+(defrule detect-max-forwards-header
+	(char ?name ?char&:(member$ ?char ?*digit*))
+	?o <- (object (is-a FIELD-NAME) (value "Max-Forwards"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (max-forwards-header (name ?name))))))
+
 ;   Content-Type = media-type
 ;     media-type = type "/" subtype parameters
 ;     type       = token
@@ -3340,6 +3355,14 @@
 	(modify ?clh (value (format nil "%s%c" ?content-length-header ?char)))
 	(assert (char ?name (get-char ?name))))
 
+(defrule build-max-forwards-header
+	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+	?mfh <- (max-forwards-header (name ?name) (value ?max-forwards-header))
+	=>
+	(retract ?c)
+	(modify ?mfh (value (format nil "%s%c" ?max-forwards-header ?char)))
+	(assert (char ?name (get-char ?name))))
+
 (defrule unknown-header-allow-ows
 	?c <- (char ?name ?char&9|32) ; HTAB SP
 	?u <- (unknown-header (name ?name) (value ?unknown-header&~"") (possible-ows ?possible-ows))
@@ -3364,6 +3387,14 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of CONTENT-LENGTH-HEADER (filename ?name) (value ?content-length-header)))))
+
+(defrule end-max-forwards-header
+	(char ?name 9|13|32) ; HTAB CR SP
+	?mfh <- (max-forwards-header (name ?name) (value ?max-forwards-header))
+	?fv <- (field-value (value ?mfh))
+	=>
+	(retract ?mfh)
+	(modify ?fv (value (make-instance of MAX-FORWARDS-HEADER (filename ?name) (value ?max-forwards-header)))))
 
 (defrule end-content-type-header
 	(char ?name 13)
@@ -4379,6 +4410,9 @@ then (send ?self:message-body pprint ?t)))
      (if (< ?i (length$ ?self:codings)) then (printout ?t ",") else (printout ?t))))
 
 (defmessage-handler CONTENT-LENGTH-HEADER pprint primary (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler MAX-FORWARDS-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
 (defmessage-handler CONTENT-TYPE-HEADER pprint primary (?t)
