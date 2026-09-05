@@ -402,6 +402,15 @@
 	(slot name)
 	(multislot methods))
 
+; Connection = #connection-option ; connection-option = token
+; Accept-Ranges = 1#range-unit ; range-unit = token
+; Vary = #( "*" / field-name ) ; field-name = token
+; Trailer = #field-name
+; Content-Encoding = #content-coding ; content-coding = token
+(deftemplate token-list-header
+	(slot name)
+	(multislot tokens)) ; token fact while building, string once complete
+
 (deftemplate te-header
 	(slot name)
 	(multislot t-codings))
@@ -719,6 +728,12 @@
 (defclass LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
 (defclass LANGUAGE (is-a HTTP) (slot value))
 (defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
+(defclass TOKEN-LIST-HEADER (is-a HTTP) (multislot tokens))
+(defclass CONNECTION-HEADER (is-a TOKEN-LIST-HEADER))
+(defclass ACCEPT-RANGES-HEADER (is-a TOKEN-LIST-HEADER))
+(defclass VARY-HEADER (is-a TOKEN-LIST-HEADER))
+(defclass TRAILER-HEADER (is-a TOKEN-LIST-HEADER))
+(defclass CONTENT-ENCODING-HEADER (is-a TOKEN-LIST-HEADER))
 (defclass TE-HEADER (is-a HTTP) (multislot t-codings))
 (defclass T-CODING (is-a HTTP) (slot value) (slot weight))
 (defclass EXPECT-HEADER (is-a HTTP) (multislot expectations))
@@ -1585,7 +1600,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Cache-Control"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Upgrade"&~"User-Agent"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2358,6 +2373,100 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of ALLOW-HEADER (filename ?name) (methods ?methods)))))
+
+; Connection = #connection-option ; connection-option = token
+; Accept-Ranges = 1#range-unit ; range-unit = token
+; Vary = #( "*" / field-name ) ; field-name = token
+; Trailer = #field-name
+; Content-Encoding = #content-coding ; content-coding = token
+(defrule detect-token-list-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Connection"|"Accept-Ranges"|"Vary"|"Trailer"|"Content-Encoding"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (token-list-header (name ?name) (tokens (assert (token (name ?name)))))))))
+
+(defrule token-list-header-end-token
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (token (name ?name) (value ?value&~""))
+	?h <- (token-list-header (name ?name) (tokens $?tokens ?t))
+	=>
+	(retract ?t)
+	(modify ?h (tokens ?tokens ?value)))
+
+(defrule token-list-header-detect-next-token
+	?c <- (char ?name 44) ; ,
+	?h <- (token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
+	=>
+	(retract ?c)
+	(modify ?h (tokens ?tokens ?token (assert (token (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule token-list-header-skip-ows-before-token
+	?c <- (char ?name 9|32) ; HTAB SP
+	?t <- (token (name ?name) (value ""))
+	(token-list-header (name ?name) (tokens $?tokens ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule token-list-header-skip-ows-after-token
+	?c <- (char ?name 9|32) ; HTAB SP
+	(token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-connection-header
+	(char ?name 13) ; CR
+	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Connection"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of CONNECTION-HEADER (filename ?name) (tokens ?tokens)))))
+
+(defrule end-accept-ranges-header
+	(char ?name 13) ; CR
+	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Accept-Ranges"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of ACCEPT-RANGES-HEADER (filename ?name) (tokens ?tokens)))))
+
+(defrule end-vary-header
+	(char ?name 13) ; CR
+	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Vary"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of VARY-HEADER (filename ?name) (tokens ?tokens)))))
+
+(defrule end-trailer-header
+	(char ?name 13) ; CR
+	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Trailer"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of TRAILER-HEADER (filename ?name) (tokens ?tokens)))))
+
+(defrule end-content-encoding-header
+	(char ?name 13) ; CR
+	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Content-Encoding"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of CONTENT-ENCODING-HEADER (filename ?name) (tokens ?tokens)))))
 
 ;   Accept = #( media-range [ weight ] )
 ;   media-range    = ( "*/*"
@@ -4887,6 +4996,13 @@ then (printout ?t "." ?self:fraction)))
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:methods)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler TOKEN-LIST-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:tokens
+     (bind ?i (+ ?i 1))
+     (printout ?t ?f)
+     (if (< ?i (length$ ?self:tokens)) then (printout ?t ",") else (printout ?t))))
 
 (defmessage-handler EXPECT-HEADER pprint primary (?t)
 (bind ?i 0)

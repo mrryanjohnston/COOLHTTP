@@ -1,0 +1,5 @@
+GET /doc HTTP/1.0
+Host: example.com
+Trailer:	Expires, Date 	
+Connection: keep-alive
+
