@@ -1,0 +1,6 @@
+GET /resource HTTP/1.1
+Host: example.com
+If-Match:   *  
+If-None-Match:  "a" ,  W/"b",""  
+If-Range:  Tue, 20 Jul 2021 19:30:00 GMT  
+

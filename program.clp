@@ -597,6 +597,31 @@
 	(slot day (default ""))
 	(slot padded (default FALSE)))
 
+;   ETag          = entity-tag
+;   entity-tag    = [ weak ] opaque-tag
+;   weak          = %s"W/" ; case-sensitive
+;   opaque-tag    = DQUOTE *etagc DQUOTE
+;   etagc         = %x21 / %x23-7E / obs-text ; VCHAR except double quotes, plus obs-text
+;   If-Match      = "*" / #entity-tag
+;   If-None-Match = "*" / #entity-tag
+;   If-Range      = entity-tag / HTTP-date
+(deftemplate entity-tag
+	(slot name)
+	(slot weak (default FALSE)) ; FALSE, "W" once W seen, TRUE after "W/"
+	(slot opaque-tag)) ; nil before DQUOTE, string while building
+
+(deftemplate etag-header
+	(slot name)
+	(slot entity-tag)) ; entity-tag fact, then instance
+
+(deftemplate entity-tag-list-header ; If-Match / If-None-Match
+	(slot name)
+	(multislot entity-tags)) ; entity-tag facts while building, instances once complete, or the string "*"
+
+(deftemplate if-range-header
+	(slot name)
+	(slot value)) ; W while peeking, entity-tag fact / http-date-header fact, then instance
+
 ;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
 
 (deftemplate max-age-av
@@ -784,6 +809,12 @@
 (defclass DATE2 (is-a HTTP) (slot day) (slot month) (slot year))
 (defclass ASCTIME-DATE (is-a HTTP) (slot day-name) (slot date3) (slot time) (slot year))
 (defclass DATE3 (is-a HTTP) (slot month) (slot day) (slot padded))
+(defclass ENTITY-TAG (is-a HTTP) (slot weak) (slot opaque-tag))
+(defclass ETAG-HEADER (is-a HTTP) (slot entity-tag))
+(defclass ENTITY-TAG-LIST-HEADER (is-a HTTP) (multislot entity-tags))
+(defclass IF-MATCH-HEADER (is-a ENTITY-TAG-LIST-HEADER))
+(defclass IF-NONE-MATCH-HEADER (is-a ENTITY-TAG-LIST-HEADER))
+(defclass IF-RANGE-HEADER (is-a HTTP) (slot value)) ; ENTITY-TAG or an RFC1123-DATE / RFC850-DATE / ASCTIME-DATE instance
 (defclass SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
 (defclass COOKIE-AV (is-a HTTP) (slot value))
 (defclass DOMAIN-AV (is-a HTTP) (slot subdomain))
@@ -1605,7 +1636,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -3837,6 +3868,231 @@
 	(retract ?h)
 	(modify ?fv (value (make-instance of IF-UNMODIFIED-SINCE-HEADER (filename ?name) (http-date ?d)))))
 
+;   ETag          = entity-tag
+;   entity-tag    = [ weak ] opaque-tag
+;   weak          = %s"W/"
+;   opaque-tag    = DQUOTE *etagc DQUOTE
+;   etagc         = %x21 / %x23-7E / obs-text
+; The entity-tag fact is built by rules keyed only on the fact itself, so the
+; same builder serves ETag, If-Match, If-None-Match and If-Range. Only the
+; rule that closes the tag differs per owning header.
+(defrule entity-tag-detect-weak
+	?c <- (char ?name 87) ; W
+	?e <- (entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
+	=>
+	(retract ?c)
+	(modify ?e (weak "W"))
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-end-weak
+	?c <- (char ?name 47) ; /
+	?e <- (entity-tag (name ?name) (weak "W") (opaque-tag nil))
+	=>
+	(retract ?c)
+	(modify ?e (weak TRUE))
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-start-opaque-tag
+	?c <- (char ?name 34) ; "
+	?e <- (entity-tag (name ?name) (weak FALSE|TRUE) (opaque-tag nil))
+	=>
+	(retract ?c)
+	(modify ?e (opaque-tag ""))
+	(assert (char ?name (get-char ?name))))
+
+(defrule build-opaque-tag
+	?c <- (char ?name ?char)
+	?e <- (entity-tag (name ?name) (opaque-tag ?value&:(stringp ?value)))
+	(test (or
+		(= ?char 33) ; !
+		(and (>= ?char 35) (<= ?char 126)) ; %x23-7E
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(retract ?c)
+	(modify ?e (opaque-tag (format nil "%s%c" ?value ?char)))
+	(assert (char ?name (get-char ?name))))
+
+; ETag = entity-tag
+(defrule detect-etag-header
+	(char ?name 34|87) ; " W
+	?o <- (object (is-a FIELD-NAME) (value "ETag"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (etag-header (name ?name) (entity-tag (assert (entity-tag (name ?name)))))))))
+
+(defrule etag-header-end-entity-tag
+	?c <- (char ?name 34) ; "
+	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (etag-header (name ?name) (entity-tag ?e))
+	=>
+	(retract ?c ?e)
+	(modify ?h (entity-tag (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule etag-header-skip-ows-after-entity-tag
+	?c <- (char ?name 9|32) ; HTAB SP
+	(etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-etag-header
+	(char ?name 13) ; CR
+	?h <- (etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
+	?fv <- (field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of ETAG-HEADER (filename ?name) (entity-tag ?e)))))
+
+;   If-Match      = "*" / #entity-tag
+;   If-None-Match = "*" / #entity-tag
+(defrule detect-entity-tag-list-header
+	(char ?name 34|87) ; " W
+	?o <- (object (is-a FIELD-NAME) (value "If-Match"|"If-None-Match"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (entity-tag-list-header (name ?name) (entity-tags (assert (entity-tag (name ?name)))))))))
+
+(defrule detect-entity-tag-list-header-star
+	?c <- (char ?name 42) ; *
+	?o <- (object (is-a FIELD-NAME) (value "If-Match"|"If-None-Match"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(retract ?c)
+	(modify ?fv (value (assert (entity-tag-list-header (name ?name) (entity-tags "*")))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-list-header-end-entity-tag
+	?c <- (char ?name 34) ; "
+	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
+	=>
+	(retract ?c ?e)
+	(modify ?h (entity-tags ?entity-tags (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-list-header-detect-next-entity-tag
+	?c <- (char ?name 44) ; ,
+	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&:(instancep ?e)))
+	=>
+	(retract ?c)
+	(modify ?h (entity-tags ?entity-tags ?e (assert (entity-tag (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-list-header-skip-ows-before-entity-tag
+	?c <- (char ?name 9|32) ; HTAB SP
+	?e <- (entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
+	(entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule entity-tag-list-header-skip-ows-after-entity-tag
+	?c <- (char ?name 9|32) ; HTAB SP
+	(entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-if-match-header
+	(char ?name 13) ; CR
+	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "If-Match"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of IF-MATCH-HEADER (filename ?name) (entity-tags ?entity-tags ?e)))))
+
+(defrule end-if-none-match-header
+	(char ?name 13) ; CR
+	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+	?fv <- (field-value (value ?h))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "If-None-Match"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of IF-NONE-MATCH-HEADER (filename ?name) (entity-tags ?entity-tags ?e)))))
+
+;   If-Range = entity-tag / HTTP-date
+; The first character picks the branch: DQUOTE is an entity-tag, F M S T start
+; a day name. W is ambiguous (W/"..." or Wed,...), so it is consumed and the
+; next character decides.
+(defrule detect-if-range-header-entity-tag
+	(char ?name 34) ; "
+	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (if-range-header (name ?name) (value (assert (entity-tag (name ?name)))))))))
+
+(defrule detect-if-range-header-http-date
+	(char ?name 70|77|83|84) ; F M S T
+	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (if-range-header (name ?name) (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name))))))))))))
+
+(defrule detect-if-range-header-W
+	?c <- (char ?name 87) ; W
+	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(retract ?c)
+	(modify ?fv (value (assert (if-range-header (name ?name) (value W)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule if-range-header-W-is-weak-entity-tag
+	?c <- (char ?name 47) ; /
+	?h <- (if-range-header (name ?name) (value W))
+	=>
+	(retract ?c)
+	(modify ?h (value (assert (entity-tag (name ?name) (weak TRUE)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule if-range-header-W-is-day-name
+	(char ?name 101) ; e
+	?h <- (if-range-header (name ?name) (value W))
+	=>
+	(modify ?h (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name) (value "W")))))))))
+
+(defrule if-range-header-end-entity-tag
+	?c <- (char ?name 34) ; "
+	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (if-range-header (name ?name) (value ?e))
+	=>
+	(retract ?c ?e)
+	(modify ?h (value (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule if-range-header-end-http-date
+	(char ?name 9|13|32) ; HTAB CR SP
+	?d <- (http-date-header (name ?name) (http-date ?date&:(instancep ?date)))
+	?h <- (if-range-header (name ?name) (value ?d))
+	=>
+	(retract ?d)
+	(modify ?h (value ?date)))
+
+(defrule if-range-header-skip-ows-after-value
+	?c <- (char ?name 9|32) ; HTAB SP
+	(if-range-header (name ?name) (value ?v&:(instancep ?v)))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule end-if-range-header
+	(char ?name 13) ; CR
+	?h <- (if-range-header (name ?name) (value ?v&:(instancep ?v)))
+	?fv <- (field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of IF-RANGE-HEADER (filename ?name) (value ?v)))))
+
 (defrule end-content-type-header
 	(char ?name 13)
 	?cth <- (content-type-header (name ?name) (type ?type&:(instancep ?type)) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
@@ -5184,6 +5440,23 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 
 (defmessage-handler HTTP-DATE-HEADER pprint primary (?t)
 (send ?self:http-date pprint ?t))
+
+(defmessage-handler ENTITY-TAG pprint primary (?t)
+(if ?self:weak then (printout ?t "W/"))
+(printout ?t "\"" ?self:opaque-tag "\""))
+
+(defmessage-handler ETAG-HEADER pprint primary (?t)
+(send ?self:entity-tag pprint ?t))
+
+(defmessage-handler ENTITY-TAG-LIST-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:entity-tags
+     (bind ?i (+ ?i 1))
+     (if (stringp ?f) then (printout ?t ?f) else (send ?f pprint ?t))
+     (if (< ?i (length$ ?self:entity-tags)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler IF-RANGE-HEADER pprint primary (?t)
+(send ?self:value pprint ?t))
 
 (defmessage-handler DAY-NAME-L pprint (?t)
 (printout ?t ?self:value))

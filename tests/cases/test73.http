@@ -1,0 +1,5 @@
+GET /resource HTTP/1.1
+Host: example.com
+If-Range:   W/"x"  
+If-None-Match:  *
+

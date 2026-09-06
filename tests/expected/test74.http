@@ -1,0 +1,4 @@
+HTTP/1.0 200 OK
+ETag: W/"weak-tag"
+Content-Length: 0
+
