@@ -431,6 +431,9 @@
 	(slot value)
 	(multislot parameters))
 
+; Cache-Control = #cache-directive ; cache-directive = token [ "=" ( token / quoted-string ) ]
+; Pragma = #pragma-directive ; pragma-directive = "no-cache" / extension-pragma
+;                            ; extension-pragma = token [ "=" ( token / quoted-string ) ]
 (deftemplate cache-control-header
 	(slot name)
 	(multislot cache-directives))
@@ -738,7 +741,9 @@
 (defclass T-CODING (is-a HTTP) (slot value) (slot weight))
 (defclass EXPECT-HEADER (is-a HTTP) (multislot expectations))
 (defclass EXPECTATION (is-a HTTP) (slot token) (slot value) (multislot parameters))
-(defclass CACHE-CONTROL-HEADER (is-a HTTP) (multislot cache-directives))
+(defclass CACHE-DIRECTIVE-HEADER (is-a HTTP) (multislot cache-directives))
+(defclass CACHE-CONTROL-HEADER (is-a CACHE-DIRECTIVE-HEADER))
+(defclass PRAGMA-HEADER (is-a CACHE-DIRECTIVE-HEADER))
 (defclass CACHE-DIRECTIVE (is-a HTTP) (slot token) (slot value))
 (defclass RANGE-HEADER (is-a HTTP) (slot ranges-specifier))
 (defclass RANGES-SPECIFIER (is-a HTTP) (slot range-unit) (slot range-set))
@@ -1600,7 +1605,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"Expect"&~"Host"&~"If-Modified-Since"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -4420,9 +4425,14 @@
 
 ;   Cache-Control   = #cache-directive
 ;    cache-directive = token [ "=" ( token / quoted-string ) ]
+;   Pragma           = #pragma-directive
+;    pragma-directive = "no-cache" / extension-pragma
+;    extension-pragma = token [ "=" ( token / quoted-string ) ]
+; Pragma (RFC 9111 5.4, deprecated) shares the cache-directive grammar, so the
+; same cache-control-header fact and rules build both; only the end rule differs.
 (defrule detect-cache-control-header
 	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Cache-Control"))
+	?o <- (object (is-a FIELD-NAME) (value "Cache-Control"|"Pragma"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -4516,9 +4526,21 @@
 	(char ?name 13) ; CR
 	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
 	?fv <- (field-value (value ?cch))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Cache-Control"))
 	=>
 	(retract ?cch)
 	(modify ?fv (value (make-instance of CACHE-CONTROL-HEADER (filename ?name) (cache-directives ?cache-directives)))))
+
+(defrule end-pragma-header
+	(char ?name 13) ; CR
+	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
+	?fv <- (field-value (value ?cch))
+	(field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a FIELD-NAME) (name ?fn) (value "Pragma"))
+	=>
+	(retract ?cch)
+	(modify ?fv (value (make-instance of PRAGMA-HEADER (filename ?name) (cache-directives ?cache-directives)))))
 
 (defrule message-body-set-length-remaining
 	(char ?name 10) ; LF
@@ -5023,7 +5045,7 @@ then (printout ?t "." ?self:fraction)))
 	     (printout ?t ";")
 	     (send ?f pprint ?t)))
 
-(defmessage-handler CACHE-CONTROL-HEADER pprint primary (?t)
+(defmessage-handler CACHE-DIRECTIVE-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:cache-directives
      (bind ?i (+ ?i 1))
