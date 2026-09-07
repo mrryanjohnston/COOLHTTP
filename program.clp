@@ -248,6 +248,15 @@
 	(slot codings)
 	(slot weight))
 
+(deftemplate accept-charset-header
+	(slot name)
+	(multislot charsets))
+
+(deftemplate charset
+	(slot name)
+	(slot charset)
+	(slot weight))
+
 (deftemplate weight
 	(slot name)
 	(slot q)
@@ -727,6 +736,7 @@
 (defclass SUBTYPE (is-a HTTP) (slot value))
 (defclass UNKNOWN-HEADER (is-a HTTP) (slot value))
 (defclass ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
+(defclass ACCEPT-CHARSET-HEADER (is-a HTTP) (multislot charsets))
 (defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
 (defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
@@ -748,6 +758,7 @@
 (defclass RECEIVED-BY (is-a HTTP) (slot pseudonym) (slot port))
 (defclass COMMENT (is-a HTTP) (multislot values))
 (defclass CODING (is-a HTTP) (slot codings) (slot weight))
+(defclass CHARSET (is-a HTTP) (slot charset) (slot weight))
 (defclass WEIGHT (is-a HTTP) (slot qvalue))
 (defclass QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
 (defclass ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
@@ -1636,7 +1647,7 @@
 
 (defrule detect-unknown-header
 	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (field-value (name ?name) (value nil))
 	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2749,6 +2760,86 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of ACCEPT-ENCODING-HEADER (filename ?name) (codings ?codings)))))
+
+;   Accept-Charset = #( ( token / "*" ) [ weight ] )
+;   weight = OWS ";" OWS "q=" qvalue
+(defrule detect-accept-charset-header
+	(char ?name ?char&:(member$ ?char ?*tchar*))
+	?o <- (object (is-a FIELD-NAME) (value "Accept-Charset"))
+	?fv <- (field-value (name ?name) (value nil))
+	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (accept-charset-header (name ?name) (charsets (assert (charset (name ?name) (charset (assert (token (name ?name))))))))))))
+
+(defrule accept-charset-header-start-next-charset
+	?c <- (char ?name 44) ; ,
+	?a <- (accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
+	=>
+	(retract ?c)
+	(modify ?a (charsets ?charsets (assert (charset (name ?name) (charset (assert (token (name ?name))))))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule charset-skip-ows-before-charset
+	?c <- (char ?name 9|32) ; HTAB SP
+	?t <- (token (value ""))
+	(charset (name ?name) (charset ?t))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule charset-end-charset
+	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (token (value ?value&~""))
+	?c <- (charset (name ?name) (charset ?t))
+	=>
+	(retract ?t)
+	(modify ?c (charset ?value)))
+
+(defrule charset-skip-ows-before-weight
+	?c <- (char ?name 9|32) ; HTAB SP
+	(charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
+	=>
+	(retract ?c)
+	(assert (char ?name (get-char ?name))))
+
+(defrule charset-detect-weight
+	?ch <- (char ?name 59) ; ;
+	?c <- (charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
+	=>
+	(retract ?ch)
+	(modify ?c (weight (assert (weight (name ?name)))))
+	(assert (char ?name (get-char ?name))))
+
+(defrule charset-end-weight
+	(char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?c <- (charset (name ?name) (weight ?w))
+	=>
+	(retract ?w)
+	(modify ?c (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+
+(defrule charset-skip-ows-after-weight
+	?ch <- (char ?name 9|32) ; HTAB SP
+	(charset (name ?name) (weight ?w&:(instancep ?w)))
+	=>
+	(retract ?ch)
+	(assert (char ?name (get-char ?name))))
+
+(defrule accept-charset-header-end-charset
+	(char ?name 13|44) ; CR ,
+	?c <- (charset (charset ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?a <- (accept-charset-header (name ?name) (charsets $?charsets ?c))
+	=>
+	(retract ?c)
+	(modify ?a (charsets ?charsets (make-instance of CHARSET (filename ?name) (charset ?value) (weight ?w)))))
+
+(defrule end-accept-charset-header
+	(char ?name 13) ; CR
+	?clh <- (accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
+	?fv <- (field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of ACCEPT-CHARSET-HEADER (filename ?name) (charsets ?charsets)))))
 
 ;   Upgrade          = #protocol
 ;  protocol         = protocol-name ["/" protocol-version]
@@ -5123,6 +5214,13 @@ then (send ?self:message-body pprint ?t)))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:codings)) then (printout ?t ",") else (printout ?t))))
 
+(defmessage-handler ACCEPT-CHARSET-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:charsets
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:charsets)) then (printout ?t ",") else (printout ?t))))
+
 (defmessage-handler CONTENT-LENGTH-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
@@ -5211,6 +5309,11 @@ then (bind ?len (length$ ?self:sequences))
 
 (defmessage-handler CODING pprint primary (?t)
 (printout ?t ?self:codings)
+(if (neq ?self:weight nil)
+then (printout ?t ";") (send ?self:weight pprint ?t)))
+
+(defmessage-handler CHARSET pprint primary (?t)
+(printout ?t ?self:charset)
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
 

@@ -1,0 +1,4 @@
+GET /resource HTTP/1.1
+Host: example.com
+Accept-Charset: utf-8;q=1.0 , iso-8859-1 ,  us-ascii;q=0.5, *;q=0.1
+

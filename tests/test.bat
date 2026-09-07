@@ -89,6 +89,7 @@ test71.http
 test72.http
 test73.http
 test74.http
+test75.http
 ))
 
 (foreach ?file ?*files*
