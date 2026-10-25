@@ -90,10 +90,11 @@ test72.http
 test73.http
 test74.http
 test75.http
+test76.http
 ))
 
 (foreach ?file ?*files*
-	(assert (filename ?file))
+	(assert (http-parse (stream ?file) (id ?file)) (http-ready (id ?file)))
 	(open (sym-cat cases/ ?file) ?file)
 )
 
@@ -104,7 +105,7 @@ test75.http
 (foreach ?file ?*files*
 	(open actual actual "w")
 	(bind ?found FALSE)
-	(do-for-instance ((?i HTTP-MESSAGE)) (eq ?file ?i:filename)
+	(do-for-instance ((?i HTTP-MESSAGE)) (eq ?file ?i:id)
 		(bind ?found TRUE)
 		(send ?i pprint actual))
 	(if ?found

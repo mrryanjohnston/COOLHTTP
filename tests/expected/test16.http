@@ -3,10 +3,3 @@ Host: app.example.com
 Content-Type: application/json
 Content-Length: 111
 
-{
-  "username": "ryjo",
-  "email": "ryjo@example.com",
-  "preferences": {
-    "notifications": true
-  }
-}

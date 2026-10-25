@@ -1,43 +1,43 @@
 ; based on HTTP as it is defined in rfc9112
-(defglobal ?*digit* = (create$ 48 49 50 51 52 53 54 55 56 57)) 
-(defglobal ?*upalpha* = (create$ 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90)) 
-(defglobal ?*lowalpha* = (create$ 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122)) 
-(defglobal ?*alpha* = (create$ ?*upalpha* ?*lowalpha*))
-(defglobal ?*alphanum* = (create$ ?*alpha* ?*digit*))
-(defglobal ?*unreserved* = (create$ ?*alphanum* 45 46 95 126)) ; - . _ ~
-(defglobal ?*gen-delims* = (create$ 58 47 63 35 91 93 64)) ; ":" / "/" / "?" / "#" / "[" / "]" / "@"
-(defglobal ?*sub-delims* = (create$ 33 36 38 39 40 41 42 43 44 59 61)) ; "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
-(defglobal ?*reserved* = (create$ ?*gen-delims* ?*sub-delims*))
-(defglobal ?*hex-without-dig* = (create$ 65 66 67 68 69 70 97 98 99 100 101 102)) ; 0-9 A-F a-f
-(defglobal ?*hexdig* = (create$ ?*digit* ?*hex-without-dig*))
-(defglobal ?*methods* = (create$ "OPTIONS" "GET" "HEAD" "PATCH" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
+(defglobal ?*http-digit* = (create$ 48 49 50 51 52 53 54 55 56 57)) 
+(defglobal ?*http-upalpha* = (create$ 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90)) 
+(defglobal ?*http-lowalpha* = (create$ 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122)) 
+(defglobal ?*http-alpha* = (create$ ?*http-upalpha* ?*http-lowalpha*))
+(defglobal ?*http-alphanum* = (create$ ?*http-alpha* ?*http-digit*))
+(defglobal ?*http-unreserved* = (create$ ?*http-alphanum* 45 46 95 126)) ; - . _ ~
+(defglobal ?*http-gen-delims* = (create$ 58 47 63 35 91 93 64)) ; ":" / "/" / "?" / "#" / "[" / "]" / "@"
+(defglobal ?*http-sub-delims* = (create$ 33 36 38 39 40 41 42 43 44 59 61)) ; "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+(defglobal ?*http-reserved* = (create$ ?*http-gen-delims* ?*http-sub-delims*))
+(defglobal ?*http-hex-without-dig* = (create$ 65 66 67 68 69 70 97 98 99 100 101 102)) ; 0-9 A-F a-f
+(defglobal ?*http-hexdig* = (create$ ?*http-digit* ?*http-hex-without-dig*))
+(defglobal ?*http-methods* = (create$ "OPTIONS" "GET" "HEAD" "PATCH" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
 ;      pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
-(defglobal ?*pchar* = (create$ ?*unreserved* ?*sub-delims* 58 64)) ; : @
+(defglobal ?*http-pchar* = (create$ ?*http-unreserved* ?*http-sub-delims* 58 64)) ; : @
 ;      reg-name    = *( unreserved / pct-encoded / sub-delims )
-(defglobal ?*reg-name* = (create$ ?*unreserved* ?*sub-delims*))
-(defglobal ?*reg-name-no-digits* = (create$ ?*alpha* ?*sub-delims* 45 95 126)) ; - _ ~
+(defglobal ?*http-reg-name* = (create$ ?*http-unreserved* ?*http-sub-delims*))
+(defglobal ?*http-reg-name-no-digits* = (create$ ?*http-alpha* ?*http-sub-delims* 45 95 126)) ; - _ ~
 ;     userinfo      = *( unreserved | escaped |
 ;                        ";" | ":" | "&" | "=" | "+" | "$" | "," )
 ;   userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
-(defglobal ?*userinfo* = (create$ ?*unreserved* ?*sub-delims* 58))
+(defglobal ?*http-userinfo* = (create$ ?*http-unreserved* ?*http-sub-delims* 58))
 ;       scheme      = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
-(defglobal ?*scheme* = (create$ ?*alphanum* 38 45 46)) ; + - .
+(defglobal ?*http-scheme* = (create$ ?*http-alphanum* 38 45 46)) ; + - .
 ;    query         = *( pchar / "/" / "?" )
-(defglobal ?*query* = (create$ ?*pchar* 47 63)) ; / ?
+(defglobal ?*http-query* = (create$ ?*http-pchar* 47 63)) ; / ?
 
 ; tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 ;         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-(defglobal ?*tchar* = (create$ ?*alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
-(defglobal ?*ctext* = (create$ ?*alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
-(defglobal ?*other-range* = (create$ ?*alphanum* 33 34 35 36 37 38 39 40 41 42 43 45 46 47 58 59 60 61 62 63 64 91 92 93 94 95 96 123 124 125 126)) ; ! " # $ % & ' ( ) * + - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
-(defglobal ?*token68* = (create$ ?*alphanum* 43 45 46 47 95 126)) ;  ALPHA / DIGIT / "+" / "/" / "-" / "." / "_" / "~"
-(defglobal ?*cookie-octet* = (create$ ?*alphanum* 33 35 36 37 38 39 40 41 42 43 45 46 47 58 60 61 62 63 64 91 93 94 95 96 123 124 125 126)) ; ! # $ % & ' ( ) * + - . / : < = > ? @ [ ] ^ _ ` { | } ~
+(defglobal ?*http-tchar* = (create$ ?*http-alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
+(defglobal ?*http-ctext* = (create$ ?*http-alphanum* 9 32 33 34 35 36 37 38 39 42 43 44 45 46 47 58 59 60 61 62 63 64 91 93 94 95 123 124 125 126)) ; HTAB SP ! " # $ % & ' * + , - . / : ; < = > ? @ [ ] ^ _ { | } ~
+(defglobal ?*http-other-range* = (create$ ?*http-alphanum* 33 34 35 36 37 38 39 40 41 42 43 45 46 47 58 59 60 61 62 63 64 91 92 93 94 95 96 123 124 125 126)) ; ! " # $ % & ' ( ) * + - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
+(defglobal ?*http-token68* = (create$ ?*http-alphanum* 43 45 46 47 95 126)) ;  ALPHA / DIGIT / "+" / "/" / "-" / "." / "_" / "~"
+(defglobal ?*http-cookie-octet* = (create$ ?*http-alphanum* 33 35 36 37 38 39 40 41 42 43 45 46 47 58 60 61 62 63 64 91 93 94 95 96 123 124 125 126)) ; ! # $ % & ' ( ) * + - . / : < = > ? @ [ ] ^ _ ` { | } ~
 
 ;    pct-encoded   = "%" HEXDIG HEXDIG
-(deftemplate pct-encoded
+(deftemplate http-pct-encoded
 	(slot name)
 	(slot first))
-(deftemplate escapable-sequence
+(deftemplate http-escapable-sequence
 	(slot name)
 	(slot sequence (default ""))
 	(slot pct-encoded)
@@ -55,14 +55,14 @@
 	(slot message-body))
 
 ; status-line = HTTP-version SP status-code SP [ reason-phrase ]
-(deftemplate status-line
+(deftemplate http-status-line
 	(slot name)
 	(slot http-version)
 	(slot status-code (default ""))
 	(slot reason-phrase))
 
 ; request-line   = method SP request-target SP HTTP-version
-(deftemplate request-line
+(deftemplate http-request-line
 	(slot name)
 ;   method         = token
 	(slot method)
@@ -75,12 +75,12 @@
 ;   HTTP-name     = %s"HTTP"
 	(slot http-version))
 
-(deftemplate method
+(deftemplate http-method
 	(slot name)
 	(slot value (default "")))
 
 ;   origin-form    = absolute-path [ "?" query ]
-(deftemplate origin-form
+(deftemplate http-origin-form
 	(slot name)
 ;       absolute-path = 1*( "/" segment )
 	(multislot segments)
@@ -90,7 +90,7 @@
 ;   absolute-form  = absolute-URI
 ; https://datatracker.ietf.org/doc/html/rfc3986#section-4.3
 ;   absolute-URI  = scheme ":" hier-part [ "?" query ]
-(deftemplate absolute-uri
+(deftemplate http-absolute-uri
 	(slot name)
 ;       scheme        = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
 	(slot scheme)
@@ -98,7 +98,7 @@
 	(slot query))
 
 ; scheme        = alpha *( alpha | digit | "+" | "-" | "." )
-(deftemplate scheme
+(deftemplate http-scheme
 	(slot name)
 	(slot value))
 
@@ -108,13 +108,13 @@
 ;                  / path-absolute
 ;                  / path-rootless
 ;                  / path-empty
-(deftemplate hier-part
+(deftemplate http-hier-part
 	(slot name)
 	(slot authority)
 	(slot path))
 
 ;       authority     = [ userinfo "@" ] host [ ":" port ]
-(deftemplate authority
+(deftemplate http-authority
 	(slot name)
 ;       userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
 	(slot userinfo)
@@ -123,20 +123,20 @@
 ;       port          = *DIGIT
 	(slot port))
 
-(deftemplate userinfo
+(deftemplate http-userinfo
 	(slot name)
 	(slot value))
 
-(deftemplate host
+(deftemplate http-host
 	(slot name)
 	(slot value))
 
-(deftemplate port
+(deftemplate http-port
 	(slot name)
 	(slot value (default "")))
 
 ;    IP-literal    = "[" ( IPv6address / IPvFuture  ) "]"
-(deftemplate ip-literal
+(deftemplate http-ip-literal
 	(slot name)
 	(slot value))
 
@@ -149,18 +149,18 @@
 ;                 / [ *4( h16 ":" ) h16 ] "::"              ls32
 ;                 / [ *5( h16 ":" ) h16 ] "::"              h16
 ;                 / [ *6( h16 ":" ) h16 ] "::"
-(deftemplate ipv6address
+(deftemplate http-ipv6address
 	(slot name)
 	(multislot parts))
 ;    h16           = 1*4HEXDIG
-(deftemplate h16
+(deftemplate http-h16
 	(slot name)
 	(slot value (default "")))
 
 ;
 ;                                        same as ?*userinfo* 
 ;   IPvFuture     = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
-(deftemplate ipvfuture
+(deftemplate http-ipvfuture
 	(slot hexdigs)
 	(slot value)) 
 
@@ -170,44 +170,44 @@
 ;                   / "1" 2DIGIT            ; 100-199
 ;                   / "2" %x30-34 DIGIT     ; 200-249
 ;                   / "25" %x30-35          ; 250-255
-(deftemplate ipv4address
+(deftemplate http-ipv4address
 	(slot name)
 	(multislot octets))
-(deftemplate dec-octet
+(deftemplate http-dec-octet
 	(slot name)
 	(slot first-digit (default ""))
 	(slot second-digit (default ""))
 	(slot third-digit (default "")))
 
 ;       reg-name    = *( unreserved / pct-encoded / sub-delims )
-(deftemplate reg-name
+(deftemplate http-reg-name
 	(slot name)
 	(slot value))
 
 ;       authority-form = uri-host ":" port
-(deftemplate authority-form
+(deftemplate http-authority-form
 	(slot name)
 	(slot uri-host)
 	(slot port))
 
 ;       path-abempty  = *( "/" segment )
-(deftemplate path-abempty
+(deftemplate http-path-abempty
 	(slot name)
 	(multislot segments))
 
 ;       path-absolute = "/" [ segment-nz *( "/" segment ) ]
-(deftemplate path-absolute
+(deftemplate http-path-absolute
 	(slot name)
 	(slot segment-nz)
 	(multislot segments))
 
 ;       path-rootless = segment-nz *( "/" segment )
-(deftemplate path-rootless
+(deftemplate http-path-rootless
 	(slot name)
 	(slot segment-nz) ; non-zero length
 	(multislot segments))
 
-(deftemplate segment
+(deftemplate http-segment
 	(slot name)
 	(slot value))
 
@@ -220,138 +220,138 @@
 	(slot major)
 	(slot minor))
 
-(deftemplate field-line
+(deftemplate http-field-line
 	(slot name)
 	(slot field-name)
 	(slot field-value))
 
-(deftemplate field-name
+(deftemplate http-field-name
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate field-value
+(deftemplate http-field-value
 	(slot name)
 	(slot value)
 	(slot possible-ows (default "")))
 
-(deftemplate unknown-header
+(deftemplate http-unknown-header
 	(slot name)
 	(slot value (default ""))
 	(slot possible-ows (default "")))
 
-(deftemplate accept-encoding-header
+(deftemplate http-accept-encoding-header
 	(slot name)
 	(multislot codings))
 
-(deftemplate coding
+(deftemplate http-coding
 	(slot name)
 	(slot codings)
 	(slot weight))
 
-(deftemplate accept-charset-header
+(deftemplate http-accept-charset-header
 	(slot name)
 	(multislot charsets))
 
-(deftemplate charset
+(deftemplate http-charset
 	(slot name)
 	(slot charset)
 	(slot weight))
 
-(deftemplate weight
+(deftemplate http-weight
 	(slot name)
 	(slot q)
 	(slot equals)
 	(slot qvalue))
 
-(deftemplate qvalue
+(deftemplate http-qvalue
 	(slot name)
 	(slot first)
 	(slot decimal)
 	(slot fraction (default "")))
 
-(deftemplate content-length-header
+(deftemplate http-content-length-header
 	(slot name)
 	(slot value (default "")))
 
 ;   Max-Forwards = 1*DIGIT
-(deftemplate max-forwards-header
+(deftemplate http-max-forwards-header
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate content-type-header
+(deftemplate http-content-type-header
 	(slot name)
 	(slot type)
 	(slot subtype)
 	(multislot parameters))
 
-(deftemplate host-header
+(deftemplate http-host-header
 	(slot name)
 	(slot uri-host)
 	(slot port))
 
-(deftemplate type
+(deftemplate http-type
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate subtype
+(deftemplate http-subtype
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate parameter
+(deftemplate http-parameter
 	(slot name)
 	(slot parameter-name)
 	(slot parameter-value))
 
-(deftemplate token
+(deftemplate http-token
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate quoted-string
+(deftemplate http-quoted-string
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate message-body
+(deftemplate http-message-body
 	(slot name)
 	(slot value)
 	(slot length-remaining))
 
-(deftemplate octet-stream
+(deftemplate http-octet-stream
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate x-www-form-urlencoded
+(deftemplate http-x-www-form-urlencoded
 	(slot name)
 	(multislot sequences))
 
-(deftemplate sequence
+(deftemplate http-sequence
 	(slot name)
 	(slot name-string (default ""))
 	(slot value-string))
 
-(deftemplate reason-phrase
+(deftemplate http-reason-phrase
 	(slot name)
 	(slot value (default "")))
 
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 ;   User-Agent = product *( RWS ( product / comment ) )
 ;   Server     = product *( RWS ( product / comment ) )
-(deftemplate product-header
+(deftemplate http-product-header
 	(slot name)
 	(multislot values) ; product / comment facts, then PRODUCT / COMMENT instances
 	(slot rws (default FALSE)))
 
 ;   product         = token [ "/" product-version ]
 ;   product-version = token
-(deftemplate product
+(deftemplate http-product
 	(slot name)
 	(slot token)
 	(slot product-version))
 
-(deftemplate via-header
+(deftemplate http-via-header
 	(slot name)
 	(multislot values))
 
-(deftemplate via-header-value
+(deftemplate http-via-header-value
 	(slot name)
 	(slot received-protocol)
 	(slot received-by)
@@ -359,13 +359,13 @@
 	(slot rws))
 
 ;   received-protocol = [ protocol-name "/" ] protocol-version
-(deftemplate received-protocol
+(deftemplate http-received-protocol
 	(slot name)
 	(slot protocol-name)
 	(slot protocol-version))
 
 ;  received-by       = pseudonym [ ":" port ]
-(deftemplate received-by
+(deftemplate http-received-by
 	(slot name)
 ;  pseudonym         = token
 	(slot pseudonym)
@@ -376,38 +376,38 @@
 ; / %x2A-5B ; '*'-'['
 ; / %x5D-7E ; ']'-'~'
 ; / obs-text
-(deftemplate comment
+(deftemplate http-comment
 	(slot name)
 	(multislot values))
 	
 ;  received-by       = pseudonym [ ":" port ]
 
-(deftemplate accept-header
+(deftemplate http-accept-header
 	(slot name)
 	(multislot media-ranges))
 
-(deftemplate media-range
+(deftemplate http-media-range
 	(slot name)
 	(slot type)
 	(slot subtype)
 	(multislot parameters)
 	(slot weight))
 
-(deftemplate accept-language-header
+(deftemplate http-accept-language-header
 	(slot name)
 	(multislot language-ranges))
 
-(deftemplate language-range
+(deftemplate http-language-range
 	(slot name)
 	(slot first-language)
 	(multislot languages)
 	(slot weight))
 
-(deftemplate language
+(deftemplate http-language
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate allow-header
+(deftemplate http-allow-header
 	(slot name)
 	(multislot methods))
 
@@ -416,24 +416,24 @@
 ; Vary = #( "*" / field-name ) ; field-name = token
 ; Trailer = #field-name
 ; Content-Encoding = #content-coding ; content-coding = token
-(deftemplate token-list-header
+(deftemplate http-token-list-header
 	(slot name)
 	(multislot tokens)) ; token fact while building, string once complete
 
-(deftemplate te-header
+(deftemplate http-te-header
 	(slot name)
 	(multislot t-codings))
 
-(deftemplate t-coding
+(deftemplate http-t-coding
 	(slot name)
 	(slot value)
 	(slot weight))
 
-(deftemplate expect-header
+(deftemplate http-expect-header
 	(slot name)
 	(multislot expectations))
 
-(deftemplate expectation
+(deftemplate http-expectation
 	(slot name)
 	(slot token)
 	(slot equals (default FALSE))
@@ -443,121 +443,121 @@
 ; Cache-Control = #cache-directive ; cache-directive = token [ "=" ( token / quoted-string ) ]
 ; Pragma = #pragma-directive ; pragma-directive = "no-cache" / extension-pragma
 ;                            ; extension-pragma = token [ "=" ( token / quoted-string ) ]
-(deftemplate cache-control-header
+(deftemplate http-cache-control-header
 	(slot name)
 	(multislot cache-directives))
 
-(deftemplate cache-directive
+(deftemplate http-cache-directive
 	(slot name)
 	(slot token)
 	(slot equals (default FALSE))
 	(slot value))
 
-(deftemplate range-header
+(deftemplate http-range-header
 	(slot name)
 	(slot ranges-specifier))
 
-(deftemplate ranges-specifier
+(deftemplate http-ranges-specifier
 	(slot name)
 	(slot range-unit)
 	(slot range-set))
 
-(deftemplate range-unit
+(deftemplate http-range-unit
 	(slot name)
 	(slot value))
 
-(deftemplate range-set
+(deftemplate http-range-set
 	(slot name)
 	(multislot range-specs))
 
-(deftemplate range-spec
+(deftemplate http-range-spec
 	(slot name)
 	(slot value))
 
-(deftemplate int-range
+(deftemplate http-int-range
 	(slot name)
 	(slot first-pos (default ""))
 	(slot last-pos))
 
-(deftemplate suffix-range
+(deftemplate http-suffix-range
 	(slot name)
 	(slot suffix-length))
 
-(deftemplate other-range
+(deftemplate http-other-range
 	(slot name)
 	(slot value))
 
-(deftemplate upgrade-header
+(deftemplate http-upgrade-header
 	(slot name)
 	(multislot protocols))
 
-(deftemplate protocol
+(deftemplate http-protocol
 	(slot name)
 	(slot protocol-name)
 	(slot protocol-version))
 
-(deftemplate proxy-authorization-header
+(deftemplate http-proxy-authorization-header
 	(slot name)
 	(slot auth-scheme)
 	(multislot second-part))
 
-(deftemplate token68
+(deftemplate http-token68
 	(slot name)
 	(slot value (default ""))
 	(slot equals (default 0)))
 
-(deftemplate auth-param
+(deftemplate http-auth-param
 	(slot name)
 	(slot left-side)
 	(slot right-side))
 
-(deftemplate cookie-header
+(deftemplate http-cookie-header
 	(slot name)
 	(multislot cookie-pairs))
 
-(deftemplate cookie-pair
+(deftemplate http-cookie-pair
 	(slot name)
 	(slot cookie-name)
 	(slot cookie-value (default ""))
 	(slot cookie-value-quoted))
 
-(deftemplate set-cookie-header
+(deftemplate http-set-cookie-header
 	(slot name)
 	(slot cookie-pair)
 	(multislot cookie-avs))
 
-(deftemplate cookie-av
+(deftemplate http-cookie-av
 	(slot name)
 	(slot string (default ""))
 	(slot value)
 	(slot required-sp))
 
-(deftemplate expires-av
+(deftemplate http-expires-av
 	(slot name)
 	(slot rfc1123-date))
 
-(deftemplate rfc1123-date
+(deftemplate http-rfc1123-date
 	(slot name)
 	(slot wkday)
 	(slot date1)
 	(slot time)
 	(slot GMT (default "")))
 
-(deftemplate wkday
+(deftemplate http-wkday
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate date1
+(deftemplate http-date1
 	(slot name)
 	(slot first-2digit (default ""))
 	(slot month)
 	(slot last-4digit (default "")))
 
-(deftemplate month
+(deftemplate http-month
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate time
+(deftemplate http-time
 	(slot name)
 	(slot first-2digit (default ""))
 	(slot first-colon)
@@ -576,31 +576,31 @@
 	(slot name)
 	(slot http-date)) ; day-name fact, then rfc1123-date / rfc850-date / asctime-date fact, then instance
 
-(deftemplate day-name
+(deftemplate http-day-name
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate rfc850-date
+(deftemplate http-rfc850-date
 	(slot name)
 	(slot day-name-l)
 	(slot date2)
 	(slot time)
 	(slot GMT (default "")))
 
-(deftemplate date2
+(deftemplate http-date2
 	(slot name)
 	(slot day (default ""))
 	(slot month)
 	(slot year (default "")))
 
-(deftemplate asctime-date
+(deftemplate http-asctime-date
 	(slot name)
 	(slot day-name)
 	(slot date3)
 	(slot time)
 	(slot year (default "")))
 
-(deftemplate date3
+(deftemplate http-date3
 	(slot name)
 	(slot month)
 	(slot day (default ""))
@@ -614,59 +614,59 @@
 ;   If-Match      = "*" / #entity-tag
 ;   If-None-Match = "*" / #entity-tag
 ;   If-Range      = entity-tag / HTTP-date
-(deftemplate entity-tag
+(deftemplate http-entity-tag
 	(slot name)
 	(slot weak (default FALSE)) ; FALSE, "W" once W seen, TRUE after "W/"
 	(slot opaque-tag)) ; nil before DQUOTE, string while building
 
-(deftemplate etag-header
+(deftemplate http-etag-header
 	(slot name)
 	(slot entity-tag)) ; entity-tag fact, then instance
 
-(deftemplate entity-tag-list-header ; If-Match / If-None-Match
+(deftemplate http-entity-tag-list-header ; If-Match / If-None-Match
 	(slot name)
 	(multislot entity-tags)) ; entity-tag facts while building, instances once complete, or the string "*"
 
-(deftemplate if-range-header
+(deftemplate http-if-range-header
 	(slot name)
 	(slot value)) ; W while peeking, entity-tag fact / http-date-header fact, then instance
 
 ;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
 
-(deftemplate max-age-av
+(deftemplate http-max-age-av
 	(slot name)
 	(slot first-digit)
 	(slot rest (default ""))
 )
 
-(deftemplate domain-av
+(deftemplate http-domain-av
 	(slot name)
 	(slot subdomain)
 )
 
-(deftemplate path-av
+(deftemplate http-path-av
 	(slot name)
 	(slot value (default "")))
 
-(deftemplate secure-av
+(deftemplate http-secure-av
 	(slot name)
 )
 
-(deftemplate httponly-av
+(deftemplate http-httponly-av
 	(slot name)
 )
 
-(deftemplate samesite-av
+(deftemplate http-samesite-av
 	(slot name)
 	(slot value)
 )
 
-(deftemplate lax
+(deftemplate http-lax
 	(slot name)
 	(slot a)
 	(slot x))
 
-(deftemplate strict
+(deftemplate http-strict
 	(slot name)
 	(slot t)
 	(slot r)
@@ -674,22 +674,22 @@
 	(slot c)
 	(slot last-t))
 
-(deftemplate none
+(deftemplate http-none
 	(slot name)
 	(slot o)
 	(slot n)
 	(slot e))
 
-(deftemplate subdomain
+(deftemplate http-subdomain
 	(slot name)
 	(multislot ldh-labels)
 	(slot top-label))
 
-(deftemplate top-label
+(deftemplate http-top-label
 	(slot name)
 	(slot value))
 
-(deftemplate ldh-label
+(deftemplate http-ldh-label
 	(slot name)
 	(slot value))
 
@@ -697,205 +697,239 @@
 ;                    path-av / secure-av / httponly-av /
 ;                    samesite-av / extension-av
 
-(deffacts supported-content-types
-	(supported-content-type "application" "octet-stream")
-	(supported-content-type "application" "x-www-form-urlencoded"))
+(deffacts http-supported-content-types
+	(http-supported-content-type "application" "json")
+	(http-supported-content-type "application" "octet-stream")
+	(http-supported-content-type "application" "x-www-form-urlencoded"))
 
-(defclass HTTP (is-a USER) (slot filename))
+(defclass HTTP (is-a USER) (slot id))
 (defclass HTTP-MESSAGE (is-a HTTP) (slot start-line) (multislot field-lines) (slot message-body))
-(defclass REQUEST-LINE (is-a HTTP) (slot method) (slot request-target) (slot http-version))
-(defclass METHOD (is-a HTTP) (slot value))
-(defclass ORIGIN-FORM (is-a HTTP) (multislot segments) (slot query))
-(defclass ABSOLUTE-URI (is-a HTTP) (slot scheme) (slot hier-part) (slot query))
-(defclass ASTERISK-FORM (is-a HTTP))
-(defclass AUTHORITY-FORM (is-a HTTP) (slot uri-host) (slot port))
-(defclass SCHEME (is-a HTTP) (slot value))
-(defclass USERINFO (is-a HTTP) (slot value))
-(defclass HIER-PART (is-a HTTP) (slot authority) (slot path))
-(defclass AUTHORITY (is-a HTTP) (slot userinfo) (slot host) (slot port))
-(defclass IP-LITERAL (is-a HTTP) (slot value))
-(defclass IPV6ADDRESS (is-a HTTP) (multislot parts))
-(defclass H16 (is-a HTTP) (slot value))
-(defclass DEC-OCTET (is-a HTTP) (slot hexdigs) (slot value)) 
-(defclass IPVFUTURE (is-a HTTP) (slot hexdigs) (slot value)) 
-(defclass IPV4ADDRESS (is-a HTTP) (slot first-octet) (slot second-octet) (slot third-octet) (slot fourth-octet))
-(defclass REG-NAME (is-a HTTP) (slot value))
-(defclass HOST (is-a HTTP) (slot value))
-(defclass PORT (is-a HTTP) (slot value))
-(defclass PATH-ABEMPTY (is-a HTTP) (multislot segments))
-(defclass PATH-ABSOLUTE (is-a HTTP) (slot segment-nz) (multislot segments))
-(defclass PATH-ROOTLESS (is-a HTTP) (slot segment-nz) (multislot segments))
-(defclass SEGMENT (is-a HTTP) (slot value))
-(defclass PARAMETER (is-a HTTP) (slot parameter-name) (slot parameter-value))
-(defclass QUERY (is-a HTTP) (slot value))
+(defclass HTTP-REQUEST-LINE (is-a HTTP) (slot method) (slot request-target) (slot http-version))
+(defclass HTTP-METHOD (is-a HTTP) (slot value))
+(defclass HTTP-ORIGIN-FORM (is-a HTTP) (multislot segments) (slot query))
+(defclass HTTP-ABSOLUTE-URI (is-a HTTP) (slot scheme) (slot hier-part) (slot query))
+(defclass HTTP-ASTERISK-FORM (is-a HTTP))
+(defclass HTTP-AUTHORITY-FORM (is-a HTTP) (slot uri-host) (slot port))
+(defclass HTTP-SCHEME (is-a HTTP) (slot value))
+(defclass HTTP-USERINFO (is-a HTTP) (slot value))
+(defclass HTTP-HIER-PART (is-a HTTP) (slot authority) (slot path))
+(defclass HTTP-AUTHORITY (is-a HTTP) (slot userinfo) (slot host) (slot port))
+(defclass HTTP-IP-LITERAL (is-a HTTP) (slot value))
+(defclass HTTP-IPV6ADDRESS (is-a HTTP) (multislot parts))
+(defclass HTTP-H16 (is-a HTTP) (slot value))
+(defclass HTTP-DEC-OCTET (is-a HTTP) (slot hexdigs) (slot value)) 
+(defclass HTTP-IPVFUTURE (is-a HTTP) (slot hexdigs) (slot value)) 
+(defclass HTTP-IPV4ADDRESS (is-a HTTP) (slot first-octet) (slot second-octet) (slot third-octet) (slot fourth-octet))
+(defclass HTTP-REG-NAME (is-a HTTP) (slot value))
+(defclass HTTP-HOST (is-a HTTP) (slot value))
+(defclass HTTP-PORT (is-a HTTP) (slot value))
+(defclass HTTP-PATH-ABEMPTY (is-a HTTP) (multislot segments))
+(defclass HTTP-PATH-ABSOLUTE (is-a HTTP) (slot segment-nz) (multislot segments))
+(defclass HTTP-PATH-ROOTLESS (is-a HTTP) (slot segment-nz) (multislot segments))
+(defclass HTTP-SEGMENT (is-a HTTP) (slot value))
+(defclass HTTP-PARAMETER (is-a HTTP) (slot parameter-name) (slot parameter-value))
+(defclass HTTP-QUERY (is-a HTTP) (slot value))
 (defclass HTTP-VERSION (is-a HTTP) (slot H) (slot T) (slot TT) (slot P) (slot major) (slot minor))
-(defclass FIELD-LINE (is-a HTTP) (slot field-name) (slot field-value))
-(defclass FIELD-NAME (is-a HTTP) (slot value))
-(defclass FIELD-VALUE (is-a HTTP) (slot value))
-(defclass TYPE (is-a HTTP) (slot value))
-(defclass SUBTYPE (is-a HTTP) (slot value))
-(defclass UNKNOWN-HEADER (is-a HTTP) (slot value))
-(defclass ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
-(defclass ACCEPT-CHARSET-HEADER (is-a HTTP) (multislot charsets))
-(defclass CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
-(defclass MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
-(defclass CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
-(defclass VIA-HEADER (is-a HTTP) (multislot values))
-(defclass VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
-(defclass PRODUCT-HEADER (is-a HTTP) (multislot values))
-(defclass USER-AGENT-HEADER (is-a PRODUCT-HEADER))
-(defclass SERVER-HEADER (is-a PRODUCT-HEADER))
-(defclass PRODUCT (is-a HTTP) (slot token) (slot product-version))
-(defclass HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
-(defclass QUOTED-STRING (is-a HTTP) (slot value))
-(defclass MESSAGE-BODY (is-a HTTP) (slot value))
-(defclass OCTET-STREAM (is-a HTTP) (slot value))
-(defclass X-WWW-FORM-URLENCODED (is-a HTTP) (multislot sequences))
-(defclass SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
-(defclass STATUS-LINE (is-a HTTP) (slot http-version) (slot status-code) (slot reason-phrase))
-(defclass REASON-PHRASE (is-a HTTP) (slot value))
-(defclass RECEIVED-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
-(defclass RECEIVED-BY (is-a HTTP) (slot pseudonym) (slot port))
-(defclass COMMENT (is-a HTTP) (multislot values))
-(defclass CODING (is-a HTTP) (slot codings) (slot weight))
-(defclass CHARSET (is-a HTTP) (slot charset) (slot weight))
-(defclass WEIGHT (is-a HTTP) (slot qvalue))
-(defclass QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
-(defclass ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
-(defclass MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
-(defclass ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
-(defclass LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
-(defclass LANGUAGE (is-a HTTP) (slot value))
-(defclass ALLOW-HEADER (is-a HTTP) (multislot methods))
-(defclass TOKEN-LIST-HEADER (is-a HTTP) (multislot tokens))
-(defclass CONNECTION-HEADER (is-a TOKEN-LIST-HEADER))
-(defclass ACCEPT-RANGES-HEADER (is-a TOKEN-LIST-HEADER))
-(defclass VARY-HEADER (is-a TOKEN-LIST-HEADER))
-(defclass TRAILER-HEADER (is-a TOKEN-LIST-HEADER))
-(defclass CONTENT-ENCODING-HEADER (is-a TOKEN-LIST-HEADER))
-(defclass TE-HEADER (is-a HTTP) (multislot t-codings))
-(defclass T-CODING (is-a HTTP) (slot value) (slot weight))
-(defclass EXPECT-HEADER (is-a HTTP) (multislot expectations))
-(defclass EXPECTATION (is-a HTTP) (slot token) (slot value) (multislot parameters))
-(defclass CACHE-DIRECTIVE-HEADER (is-a HTTP) (multislot cache-directives))
-(defclass CACHE-CONTROL-HEADER (is-a CACHE-DIRECTIVE-HEADER))
-(defclass PRAGMA-HEADER (is-a CACHE-DIRECTIVE-HEADER))
-(defclass CACHE-DIRECTIVE (is-a HTTP) (slot token) (slot value))
-(defclass RANGE-HEADER (is-a HTTP) (slot ranges-specifier))
-(defclass RANGES-SPECIFIER (is-a HTTP) (slot range-unit) (slot range-set))
-(defclass RANGE-UNIT (is-a HTTP) (slot value))
-(defclass RANGE-SET (is-a HTTP) (multislot range-specs))
-(defclass INT-RANGE (is-a HTTP) (slot first-pos) (slot last-pos))
-(defclass SUFFIX-RANGE (is-a HTTP) (slot suffix-length))
-(defclass OTHER-RANGE (is-a HTTP) (slot value))
-(defclass RANGE-SPEC (is-a HTTP) (slot value))
-(defclass UPGRADE-HEADER (is-a HTTP) (multislot protocols))
-(defclass PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
-(defclass PROXY-AUTHORIZATION-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
-(defclass TOKEN68 (is-a HTTP) (slot value) (slot equals))
-(defclass AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
-(defclass COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
-(defclass COOKIE-PAIR (is-a HTTP) (slot cookie-name) (slot cookie-value) (slot cookie-value-quoted))
-(defclass SECURE-AV (is-a HTTP))
-(defclass MAX-AGE-AV (is-a HTTP) (slot value))
-(defclass PATH-AV (is-a HTTP) (slot value))
-(defclass HTTPONLY-AV (is-a HTTP))
-(defclass EXTENSION-AV (is-a HTTP) (slot value))
-(defclass EXPIRES-AV (is-a HTTP) (slot rfc1123-date))
-(defclass STRICT (is-a HTTP))
-(defclass LAX (is-a HTTP))
-(defclass NONE (is-a HTTP))
-(defclass WKDAY (is-a HTTP) (slot value))
-(defclass MONTH (is-a HTTP) (slot value))
-(defclass DATE1 (is-a HTTP) (slot first-2digit) (slot month) (slot last-4digit))
-(defclass TIME (is-a HTTP) (slot first-2digit) (slot second-2digit) (slot third-2digit))
-(defclass RFC1123-DATE (is-a HTTP) (slot wkday) (slot date1) (slot time))
+(defclass HTTP-FIELD-LINE (is-a HTTP) (slot field-name) (slot field-value))
+(defclass HTTP-FIELD-NAME (is-a HTTP) (slot value))
+(defclass HTTP-FIELD-VALUE (is-a HTTP) (slot value))
+(defclass HTTP-TYPE (is-a HTTP) (slot value))
+(defclass HTTP-SUBTYPE (is-a HTTP) (slot value))
+(defclass HTTP-UNKNOWN-HEADER (is-a HTTP) (slot value))
+(defclass HTTP-ACCEPT-ENCODING-HEADER (is-a HTTP) (multislot codings))
+(defclass HTTP-ACCEPT-CHARSET-HEADER (is-a HTTP) (multislot charsets))
+(defclass HTTP-CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
+(defclass HTTP-MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
+(defclass HTTP-CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
+(defclass HTTP-VIA-HEADER (is-a HTTP) (multislot values))
+(defclass HTTP-VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
+(defclass HTTP-PRODUCT-HEADER (is-a HTTP) (multislot values))
+(defclass HTTP-USER-AGENT-HEADER (is-a HTTP-PRODUCT-HEADER))
+(defclass HTTP-SERVER-HEADER (is-a HTTP-PRODUCT-HEADER))
+(defclass HTTP-PRODUCT (is-a HTTP) (slot token) (slot product-version))
+(defclass HTTP-HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
+(defclass HTTP-QUOTED-STRING (is-a HTTP) (slot value))
+(defclass HTTP-MESSAGE-BODY (is-a HTTP) (slot value))
+(defclass HTTP-OCTET-STREAM (is-a HTTP) (slot value))
+(defclass HTTP-X-WWW-FORM-URLENCODED (is-a HTTP) (multislot sequences))
+(defclass HTTP-SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
+(defclass HTTP-STATUS-LINE (is-a HTTP) (slot http-version) (slot status-code) (slot reason-phrase))
+(defclass HTTP-REASON-PHRASE (is-a HTTP) (slot value))
+(defclass HTTP-RECEIVED-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
+(defclass HTTP-RECEIVED-BY (is-a HTTP) (slot pseudonym) (slot port))
+(defclass HTTP-COMMENT (is-a HTTP) (multislot values))
+(defclass HTTP-CODING (is-a HTTP) (slot codings) (slot weight))
+(defclass HTTP-CHARSET (is-a HTTP) (slot charset) (slot weight))
+(defclass HTTP-WEIGHT (is-a HTTP) (slot qvalue))
+(defclass HTTP-QVALUE (is-a HTTP) (slot first) (slot decimal) (slot fraction))
+(defclass HTTP-ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
+(defclass HTTP-MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
+(defclass HTTP-ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
+(defclass HTTP-LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
+(defclass HTTP-LANGUAGE (is-a HTTP) (slot value))
+(defclass HTTP-ALLOW-HEADER (is-a HTTP) (multislot methods))
+(defclass HTTP-TOKEN-LIST-HEADER (is-a HTTP) (multislot tokens))
+(defclass HTTP-CONNECTION-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
+(defclass HTTP-ACCEPT-RANGES-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
+(defclass HTTP-VARY-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
+(defclass HTTP-TRAILER-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
+(defclass HTTP-CONTENT-ENCODING-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
+(defclass HTTP-TE-HEADER (is-a HTTP) (multislot t-codings))
+(defclass HTTP-T-CODING (is-a HTTP) (slot value) (slot weight))
+(defclass HTTP-EXPECT-HEADER (is-a HTTP) (multislot expectations))
+(defclass HTTP-EXPECTATION (is-a HTTP) (slot token) (slot value) (multislot parameters))
+(defclass HTTP-CACHE-DIRECTIVE-HEADER (is-a HTTP) (multislot cache-directives))
+(defclass HTTP-CACHE-CONTROL-HEADER (is-a HTTP-CACHE-DIRECTIVE-HEADER))
+(defclass HTTP-PRAGMA-HEADER (is-a HTTP-CACHE-DIRECTIVE-HEADER))
+(defclass HTTP-CACHE-DIRECTIVE (is-a HTTP) (slot token) (slot value))
+(defclass HTTP-RANGE-HEADER (is-a HTTP) (slot ranges-specifier))
+(defclass HTTP-RANGES-SPECIFIER (is-a HTTP) (slot range-unit) (slot range-set))
+(defclass HTTP-RANGE-UNIT (is-a HTTP) (slot value))
+(defclass HTTP-RANGE-SET (is-a HTTP) (multislot range-specs))
+(defclass HTTP-INT-RANGE (is-a HTTP) (slot first-pos) (slot last-pos))
+(defclass HTTP-SUFFIX-RANGE (is-a HTTP) (slot suffix-length))
+(defclass HTTP-OTHER-RANGE (is-a HTTP) (slot value))
+(defclass HTTP-RANGE-SPEC (is-a HTTP) (slot value))
+(defclass HTTP-UPGRADE-HEADER (is-a HTTP) (multislot protocols))
+(defclass HTTP-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
+(defclass HTTP-PROXY-AUTHORIZATION-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
+(defclass HTTP-TOKEN68 (is-a HTTP) (slot value) (slot equals))
+(defclass HTTP-AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
+(defclass HTTP-COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
+(defclass HTTP-COOKIE-PAIR (is-a HTTP) (slot cookie-name) (slot cookie-value) (slot cookie-value-quoted))
+(defclass HTTP-SECURE-AV (is-a HTTP))
+(defclass HTTP-MAX-AGE-AV (is-a HTTP) (slot value))
+(defclass HTTP-PATH-AV (is-a HTTP) (slot value))
+(defclass HTTP-HTTPONLY-AV (is-a HTTP))
+(defclass HTTP-EXTENSION-AV (is-a HTTP) (slot value))
+(defclass HTTP-EXPIRES-AV (is-a HTTP) (slot rfc1123-date))
+(defclass HTTP-STRICT (is-a HTTP))
+(defclass HTTP-LAX (is-a HTTP))
+(defclass HTTP-NONE (is-a HTTP))
+(defclass HTTP-WKDAY (is-a HTTP) (slot value))
+(defclass HTTP-MONTH (is-a HTTP) (slot value))
+(defclass HTTP-DATE1 (is-a HTTP) (slot first-2digit) (slot month) (slot last-4digit))
+(defclass HTTP-TIME (is-a HTTP) (slot first-2digit) (slot second-2digit) (slot third-2digit))
+(defclass HTTP-RFC1123-DATE (is-a HTTP) (slot wkday) (slot date1) (slot time))
 (defclass HTTP-DATE-HEADER (is-a HTTP) (slot http-date))
-(defclass DATE-HEADER (is-a HTTP-DATE-HEADER))
-(defclass LAST-MODIFIED-HEADER (is-a HTTP-DATE-HEADER))
-(defclass IF-MODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
-(defclass IF-UNMODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
-(defclass DAY-NAME-L (is-a HTTP) (slot value))
-(defclass RFC850-DATE (is-a HTTP) (slot day-name-l) (slot date2) (slot time))
-(defclass DATE2 (is-a HTTP) (slot day) (slot month) (slot year))
-(defclass ASCTIME-DATE (is-a HTTP) (slot day-name) (slot date3) (slot time) (slot year))
-(defclass DATE3 (is-a HTTP) (slot month) (slot day) (slot padded))
-(defclass ENTITY-TAG (is-a HTTP) (slot weak) (slot opaque-tag))
-(defclass ETAG-HEADER (is-a HTTP) (slot entity-tag))
-(defclass ENTITY-TAG-LIST-HEADER (is-a HTTP) (multislot entity-tags))
-(defclass IF-MATCH-HEADER (is-a ENTITY-TAG-LIST-HEADER))
-(defclass IF-NONE-MATCH-HEADER (is-a ENTITY-TAG-LIST-HEADER))
-(defclass IF-RANGE-HEADER (is-a HTTP) (slot value)) ; ENTITY-TAG or an RFC1123-DATE / RFC850-DATE / ASCTIME-DATE instance
-(defclass SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
-(defclass COOKIE-AV (is-a HTTP) (slot value))
-(defclass DOMAIN-AV (is-a HTTP) (slot subdomain))
-(defclass SUBDOMAIN (is-a HTTP) (multislot ldh-labels) (slot top-label))
-(defclass TOP-LABEL (is-a HTTP) (slot value))
-(defclass LDH-LABEL (is-a HTTP) (slot value))
-(defclass SAMESITE-AV (is-a HTTP) (slot value))
+(defclass HTTP-DATE (is-a HTTP-DATE-HEADER))
+(defclass HTTP-LAST-MODIFIED-HEADER (is-a HTTP-DATE-HEADER))
+(defclass HTTP-IF-MODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass HTTP-IF-UNMODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass HTTP-DAY-NAME-L (is-a HTTP) (slot value))
+(defclass HTTP-RFC850-DATE (is-a HTTP) (slot day-name-l) (slot date2) (slot time))
+(defclass HTTP-DATE2 (is-a HTTP) (slot day) (slot month) (slot year))
+(defclass HTTP-ASCTIME-DATE (is-a HTTP) (slot day-name) (slot date3) (slot time) (slot year))
+(defclass HTTP-DATE3 (is-a HTTP) (slot month) (slot day) (slot padded))
+(defclass HTTP-ENTITY-TAG (is-a HTTP) (slot weak) (slot opaque-tag))
+(defclass HTTP-ETAG-HEADER (is-a HTTP) (slot entity-tag))
+(defclass HTTP-ENTITY-TAG-LIST-HEADER (is-a HTTP) (multislot entity-tags))
+(defclass HTTP-IF-MATCH-HEADER (is-a HTTP-ENTITY-TAG-LIST-HEADER))
+(defclass HTTP-IF-NONE-MATCH-HEADER (is-a HTTP-ENTITY-TAG-LIST-HEADER))
+(defclass HTTP-IF-RANGE-HEADER (is-a HTTP) (slot value)) ; ENTITY-TAG or an RFC1123-DATE / RFC850-DATE / ASCTIME-DATE instance
+(defclass HTTP-SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
+(defclass HTTP-COOKIE-AV (is-a HTTP) (slot value))
+(defclass HTTP-DOMAIN-AV (is-a HTTP) (slot subdomain))
+(defclass HTTP-SUBDOMAIN (is-a HTTP) (multislot ldh-labels) (slot top-label))
+(defclass HTTP-TOP-LABEL (is-a HTTP) (slot value))
+(defclass HTTP-LDH-LABEL (is-a HTTP) (slot value))
+(defclass HTTP-SAMESITE-AV (is-a HTTP) (slot value))
 
-(defrule initialize-request
-	(filename ?name)
+;;; the start fact: a program asserts it with the
+;;; logical name of an open file or socket and an id for the result, then
+;;; asserts http-ready for the id and runs.  The codec reads one message.
+(deftemplate http-parse
+	(slot stream)
+	(slot id))
+
+;;; the codec reads only after a ready fact for the id exists (9.3 of the
+;;; plan); the start of a message consumes it
+(deftemplate http-ready
+	(slot id))
+
+;;; one stream that the codec reads: the id of its facts and its logical name
+(deftemplate http-stream
+	(slot id)
+	(slot stream))
+
+(deffunction http-read (?name)
+	"one character of the stream with an id; the stream can have a name of its own"
+	(bind ?stream ?name)
+	(do-for-fact ((?s http-stream)) (eq ?s:id ?name) (bind ?stream ?s:stream))
+	(get-char ?stream))
+
+
+;;; the end fact: the message.  The program that matches it retracts it.
+(deftemplate http-done
+	(slot id)
+	(slot message)
+	(slot stream))                     ; the logical name the message came from; a body codec reads on from it
+
+(defrule http-initialize-request
+	?p <- (http-parse (stream ?stream) (id ?name))
+	?r <- (http-ready (id ?name))
 	=>
+	(retract ?p ?r)
 	(assert
-		(char ?name (get-char ?name))
+		(http-stream (id ?name) (stream ?stream))
+		(http-char ?name (http-read ?name))
 		;(start ?name (time))
-		(http-message (name ?name) (start-line (assert (request-line (name ?name) (method (assert (method (name ?name))))))))))
+		(http-message (name ?name) (start-line (assert (http-request-line (name ?name) (method (assert (http-method (name ?name))))))))))
 
-(defrule build-method
-	?c <- (char ?name ?char&65|67|68|69|71|72|73|76|78|79|80|82|83|84|85) ; A|C|D|E|G|H|I|L|N|O|P|R|S|T|U
-	?m <- (method (name ?name) (value ?value&~"H"&:(> 7 (str-length ?value))))
+(defrule http-build-method
+	?c <- (http-char ?name ?char&65|67|68|69|71|72|73|76|78|79|80|82|83|84|85) ; A|C|D|E|G|H|I|L|N|O|P|R|S|T|U
+	?m <- (http-method (name ?name) (value ?value&~"H"&:(> 7 (str-length ?value))))
 	=>
 	(retract ?c)
 	(modify ?m (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule continue-method-when-head
-	?c <- (char ?name ?char&69) ; E
-	?m <- (method (name ?name) (value "H"))
+(defrule http-continue-method-when-head
+	?c <- (http-char ?name ?char&69) ; E
+	?m <- (http-method (name ?name) (value "H"))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name)))
+	(assert (http-char ?name (http-read ?name)))
 	(modify ?m (value "HE")))
 
-(defrule find-http-version-instead-of-method
-	?c <- (char ?name 84) ; T
-	?m <- (method (name ?name) (value "H"))
-	?r <- (request-line (method ?m))
+(defrule http-find-http-version-instead-of-method
+	?c <- (http-char ?name 84) ; T
+	?m <- (http-method (name ?name) (value "H"))
+	?r <- (http-request-line (method ?m))
 	?h <- (http-message (start-line ?r))
 	=>
 	(retract ?c ?m ?r)
-	(modify ?h (start-line (assert (status-line (name ?name) (http-version (assert (http-version (name ?name) (H TRUE) (T TRUE))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (start-line (assert (http-status-line (name ?name) (http-version (assert (http-version (name ?name) (H TRUE) (T TRUE))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule status-line-http-version-end
-	?c <- (char ?name 32) ; SP
+(defrule http-status-line-http-version-end
+	?c <- (http-char ?name 32) ; SP
 	?h <- (http-version (name ?name) (major ?major) (minor ?minor&~nil))
-	?s <- (status-line (http-version ?h))
+	?s <- (http-status-line (http-version ?h))
 	=>
 	(retract ?c ?h)
-	(modify ?s (http-version (make-instance of HTTP-VERSION (filename ?name) (major ?major) (minor ?minor))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (http-version (make-instance of HTTP-VERSION (id ?name) (major ?major) (minor ?minor))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule status-line-build-status-code
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?s <- (status-line (name ?name) (http-version ?h&:(instancep ?h)) (status-code ?status-code&:(> 3 (str-length ?status-code))))
+(defrule http-status-line-build-status-code
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?s <- (http-status-line (name ?name) (http-version ?h&:(instancep ?h)) (status-code ?status-code&:(> 3 (str-length ?status-code))))
 	=>
 	(retract ?c)
 	(modify ?s (status-code (format nil "%s%c" ?status-code ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule status-line-initialize-reason-phrase
-	?c <- (char ?name 32) ; SP
-	?s <- (status-line (name ?name) (status-code ?status-code&:(= 3 (str-length ?status-code))) (reason-phrase nil))
+(defrule http-status-line-initialize-reason-phrase
+	?c <- (http-char ?name 32) ; SP
+	?s <- (http-status-line (name ?name) (status-code ?status-code&:(= 3 (str-length ?status-code))) (reason-phrase nil))
 	=>
 	(retract ?c)
-	(modify ?s (reason-phrase (assert (reason-phrase (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (reason-phrase (assert (http-reason-phrase (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-reason-phrase
-	?c <- (char ?name ?char)
-	?r <- (reason-phrase (name ?name) (value ?value))
+(defrule http-build-reason-phrase
+	?c <- (http-char ?name ?char)
+	?r <- (http-reason-phrase (name ?name) (value ?value))
 	(test (or
 		(= 9 ?char)
 		(= 32 ?char)
@@ -904,186 +938,186 @@
 	=>
 	(retract ?c)
 	(modify ?r (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule status-line-end-reason-phrase
-	?c <- (char ?name 13) ; CR
-	?r <- (reason-phrase (name ?name) (value ?value))
-	?s <- (status-line (reason-phrase ?r))
+(defrule http-status-line-end-reason-phrase
+	?c <- (http-char ?name 13) ; CR
+	?r <- (http-reason-phrase (name ?name) (value ?value))
+	?s <- (http-status-line (reason-phrase ?r))
 	=>
 	(retract ?c ?r)
-	(modify ?s (reason-phrase (make-instance of REASON-PHRASE (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (reason-phrase (make-instance of HTTP-REASON-PHRASE (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule status-line-end
-	?c <- (char ?name 10) ; LF
-	?s <- (status-line (http-version ?http-version) (status-code ?status-code) (reason-phrase ?reason-phrase&:(instancep ?reason-phrase)))
+(defrule http-status-line-end
+	?c <- (http-char ?name 10) ; LF
+	?s <- (http-status-line (http-version ?http-version) (status-code ?status-code) (reason-phrase ?reason-phrase&:(instancep ?reason-phrase)))
 	?h <- (http-message (name ?name) (start-line ?s))
 	=>
 	(retract ?c ?s)
-	(modify ?h (start-line (make-instance of STATUS-LINE (filename ?name) (http-version ?http-version) (status-code ?status-code) (reason-phrase ?reason-phrase))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (start-line (make-instance of HTTP-STATUS-LINE (id ?name) (http-version ?http-version) (status-code ?status-code) (reason-phrase ?reason-phrase))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-method
-	?c <- (char ?name 32)
-	?m <- (method (name ?name) (value ?value&:(member$ ?value ?*methods*)))
-	?r <- (request-line (method ?m))
+(defrule http-end-method
+	?c <- (http-char ?name 32)
+	?m <- (http-method (name ?name) (value ?value&:(member$ ?value ?*http-methods*)))
+	?r <- (http-request-line (method ?m))
 	=>
 	(retract ?c ?m)
-	(modify ?r (method (make-instance of METHOD (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (method (make-instance of HTTP-METHOD (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
  
 ;   request-target = origin-form
 ;                  / absolute-form
 ;                  / authority-form
 ;                  / asterisk-form
-(defrule start-request-target-origin-form
-	?c <- (char ?name 47) ; /
-	?r <- (request-line (name ?name) (method ?method&:(instancep ?method)) (request-target nil))
+(defrule http-start-request-target-origin-form
+	?c <- (http-char ?name 47) ; /
+	?r <- (http-request-line (name ?name) (method ?method&:(instancep ?method)) (request-target nil))
 	=>
 	(retract ?c)
-	(modify ?r (request-target (assert (origin-form (name ?name) (segments (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*)))))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (assert (http-origin-form (name ?name) (segments (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*)))))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule start-request-target-authority-form
-	(char ?name ?char&:(member$ ?char (create$ ?*alphanum* 91))) ; [
-	?m <- (object (is-a METHOD) (value "CONNECT"))
-	?r <- (request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
+(defrule http-start-request-target-authority-form
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-alphanum* 91))) ; [
+	?m <- (object (is-a HTTP-METHOD) (value "CONNECT"))
+	?r <- (http-request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
 	=>
-	(modify ?r (request-target (assert (authority-form (name ?name) (uri-host (assert (host (name ?name)))))))))
+	(modify ?r (request-target (assert (http-authority-form (name ?name) (uri-host (assert (http-host (name ?name)))))))))
 
-(defrule start-request-target-absolute-form
-	?c <- (char ?name ?char&:(member$ ?char ?*alpha*))
-	?m <- (object (is-a METHOD) (value ~"CONNECT"&~"OPTIONS"))
-	?r <- (request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
+(defrule http-start-request-target-absolute-form
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alpha*))
+	?m <- (object (is-a HTTP-METHOD) (value ~"CONNECT"&~"OPTIONS"))
+	?r <- (http-request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
 	=>
 	(retract ?c)
-	(modify ?r (request-target (assert (absolute-uri (name ?name) (scheme (assert (scheme (name ?name) (value (format nil "%c" ?char)))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (assert (http-absolute-uri (name ?name) (scheme (assert (http-scheme (name ?name) (value (format nil "%c" ?char)))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule continue-scheme
-	?c <- (char ?name ?char&:(member$ ?char ?*scheme*))
-	?s <- (scheme (name ?name) (value ?value&~nil))
+(defrule http-continue-scheme
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-scheme*))
+	?s <- (http-scheme (name ?name) (value ?value&~nil))
 	=>
 	(retract ?c)
 	(modify ?s (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule absolute-uri-end-scheme
-	?c <- (char ?name 58) ; :
-	?s <- (scheme (name ?name) (value ?value&~nil))
-	?a <- (absolute-uri (scheme ?s))
+(defrule http-absolute-uri-end-scheme
+	?c <- (http-char ?name 58) ; :
+	?s <- (http-scheme (name ?name) (value ?value&~nil))
+	?a <- (http-absolute-uri (scheme ?s))
 	=>
 	(retract ?c ?s)
-	(modify ?a (scheme (make-instance of SCHEME (filename ?name) (value ?value))) (hier-part (assert (hier-part (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (scheme (make-instance of HTTP-SCHEME (id ?name) (value ?value))) (hier-part (assert (http-hier-part (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule hier-part-find-path-absolute-first-slash
-	?c <- (char ?name 47) ; /
-	?h <- (hier-part (name ?name) (authority nil) (path nil))
+(defrule http-hier-part-find-path-absolute-first-slash
+	?c <- (http-char ?name 47) ; /
+	?h <- (http-hier-part (name ?name) (authority nil) (path nil))
 	=>
 	(retract ?c)
-	(modify ?h (path (assert (path-absolute (name ?name) (segment-nz (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (path (assert (http-path-absolute (name ?name) (segment-nz (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule hier-part-find-second-slash-change-path-absolute-to-authority
-	?c <- (char ?name 47) ; /
-	?e <- (escapable-sequence (sequence ""))
-	?path <- (path-absolute (name ?name) (segment-nz ?e))
-	?h <- (hier-part (path ?path))
+(defrule http-hier-part-find-second-slash-change-path-absolute-to-authority
+	?c <- (http-char ?name 47) ; /
+	?e <- (http-escapable-sequence (sequence ""))
+	?path <- (http-path-absolute (name ?name) (segment-nz ?e))
+	?h <- (http-hier-part (path ?path))
 	=>
 	(retract ?c ?e ?path)
-	(modify ?h (path nil) (authority (assert (authority (name ?name) (host (assert (host (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (path nil) (authority (assert (http-authority (name ?name) (host (assert (http-host (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule authority-change-host-port-to-userinfo
-	(char ?name ?char&:(not (member$ ?char ?*digit*)))
-	?r <- (object (is-a REG-NAME) (value ?reg-name))
-	?h <- (object (is-a HOST) (value =(instance-name ?r)))
-	?p <- (port (value ?port))
-	?a <- (authority (name ?name) (userinfo nil) (host =(instance-name ?h)) (port ?p))
+(defrule http-authority-change-host-port-to-userinfo
+	(http-char ?name ?char&:(not (member$ ?char ?*http-digit*)))
+	?r <- (object (is-a HTTP-REG-NAME) (value ?reg-name))
+	?h <- (object (is-a HTTP-HOST) (value =(instance-name ?r)))
+	?p <- (http-port (value ?port))
+	?a <- (http-authority (name ?name) (userinfo nil) (host =(instance-name ?h)) (port ?p))
 	=>
 	(retract ?p)
 	(unmake-instance ?r ?h)
-	(modify ?a (host nil) (port nil) (userinfo (assert (escapable-sequence (name ?name) (sequence (format nil "%s:%s" ?reg-name ?port)) (allowed-chars ?*userinfo*))))))
+	(modify ?a (host nil) (port nil) (userinfo (assert (http-escapable-sequence (name ?name) (sequence (format nil "%s:%s" ?reg-name ?port)) (allowed-chars ?*http-userinfo*))))))
 
-(defrule authority-form-end-port
-	(char ?name 32) ; SP
-	?p <- (port (value ?port))
-	?a <- (authority-form (name ?name) (uri-host ?host&:(instancep ?host)) (port ?p))
+(defrule http-authority-form-end-port
+	(http-char ?name 32) ; SP
+	?p <- (http-port (value ?port))
+	?a <- (http-authority-form (name ?name) (uri-host ?host&:(instancep ?host)) (port ?p))
 	=>
 	(retract ?p)
-	(modify ?a (port (make-instance of PORT (filename ?name) (value ?port)))))
+	(modify ?a (port (make-instance of HTTP-PORT (id ?name) (value ?port)))))
 
-(defrule authority-end-userinfo
-	?c <- (char ?name 64) ; @
-	?e <- (escapable-sequence (sequence ?sequence) (pct-encoded nil))
-	?a <- (authority (name ?name) (userinfo ?e))
+(defrule http-authority-end-userinfo
+	?c <- (http-char ?name 64) ; @
+	?e <- (http-escapable-sequence (sequence ?sequence) (pct-encoded nil))
+	?a <- (http-authority (name ?name) (userinfo ?e))
 	=>
 	(retract ?c ?e)
-	(modify ?a (userinfo (make-instance of USERINFO (filename ?name) (value ?sequence))) (host (assert (host (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (userinfo (make-instance of HTTP-USERINFO (id ?name) (value ?sequence))) (host (assert (http-host (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule authority-end-host
-	(char ?name 32|47|58) ; SP / :
-	?h <- (host (value ?host&:(instancep ?host)))
-	?a <- (authority (name ?name) (host ?h))
+(defrule http-authority-end-host
+	(http-char ?name 32|47|58) ; SP / :
+	?h <- (http-host (value ?host&:(instancep ?host)))
+	?a <- (http-authority (name ?name) (host ?h))
 	=>
 	(retract ?h)
-	(modify ?a (host (make-instance of HOST (filename ?name) (value ?host)))))
+	(modify ?a (host (make-instance of HTTP-HOST (id ?name) (value ?host)))))
 
-(defrule authority-form-end-host
-	(char ?name 32|47|58) ; SP / :
-	?h <- (host (value ?host&:(instancep ?host)))
-	?a <- (authority-form (name ?name) (uri-host ?h))
+(defrule http-authority-form-end-host
+	(http-char ?name 32|47|58) ; SP / :
+	?h <- (http-host (value ?host&:(instancep ?host)))
+	?a <- (http-authority-form (name ?name) (uri-host ?h))
 	=>
 	(retract ?h)
-	(modify ?a (uri-host (make-instance of HOST (filename ?name) (value ?host)))))
+	(modify ?a (uri-host (make-instance of HTTP-HOST (id ?name) (value ?host)))))
 
-(defrule host-detect-ip-literal
-	?c <- (char ?name 91) ; [
-	?h <- (host (name ?name) (value nil))
+(defrule http-host-detect-ip-literal
+	?c <- (http-char ?name 91) ; [
+	?h <- (http-host (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?h (value (assert (ip-literal (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (value (assert (http-ip-literal (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule ip-literal-detect-ipv6address
-	(char ?name ?char&:(member$ ?char ?*hexdig*))
-	?i <- (ip-literal (name ?name) (value nil))
+(defrule http-ip-literal-detect-ipv6address
+	(http-char ?name ?char&:(member$ ?char ?*http-hexdig*))
+	?i <- (http-ip-literal (name ?name) (value nil))
 	=>
-	(modify ?i (value (assert (ipv6address (name ?name) (parts (assert (h16 (name ?name)))))))))
+	(modify ?i (value (assert (http-ipv6address (name ?name) (parts (assert (http-h16 (name ?name)))))))))
 
-(defrule ip-literal-detect-ipv6address-colon
-	?c <- (char ?name 58)
-	?i <- (ip-literal (name ?name) (value nil))
+(defrule http-ip-literal-detect-ipv6address-colon
+	?c <- (http-char ?name 58)
+	?i <- (http-ip-literal (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?i (value (assert (ipv6address (name ?name) (parts ":")))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?i (value (assert (http-ipv6address (name ?name) (parts ":")))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule ipv6address-detect-h16
-	(char ?name ?char&:(member$ ?char ?*hex-without-dig*))
-	?i <- (ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(eq H16 (class (nth$ (length$ ?parts) ?parts))) ":"))
+(defrule http-ipv6address-detect-h16
+	(http-char ?name ?char&:(member$ ?char ?*http-hex-without-dig*))
+	?i <- (http-ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(eq HTTP-H16 (class (nth$ (length$ ?parts) ?parts))) ":"))
 	=>
-	(modify ?i (parts ?parts (assert (h16 (name ?name))))))
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name))))))
 
-(defrule ipv6address-detect-ipv4address
-	(char ?name ?char&:(member$ ?char ?*digit*))
-	?i <- (ipv6address (name ?name) (parts $?parts&:(> 7 (length$ ?parts))&:(> 0 (length$ ?parts))&:(instancep (nth$ (length$ ?parts) ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts)) ":"))
+(defrule http-ipv6address-detect-ipv4address
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?i <- (http-ipv6address (name ?name) (parts $?parts&:(> 7 (length$ ?parts))&:(> 0 (length$ ?parts))&:(instancep (nth$ (length$ ?parts) ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts)) ":"))
 	=>
-	(modify ?i (parts ?parts (assert (ipv4address (name ?name) (octets (assert (dec-octet (name ?name)))))))))
+	(modify ?i (parts ?parts (assert (http-ipv4address (name ?name) (octets (assert (http-dec-octet (name ?name)))))))))
 
-(defrule ipv6address-change-ipv4address-to-h16
-	?octet <- (dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
-	?i4 <- (ipv4address (name ?name) (octets ?octet))
-	?i <- (ipv6address (name ?name) (parts $?parts ?i4))
+(defrule http-ipv6address-change-ipv4address-to-h16
+	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
+	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	(or
-		(char ?name ?char&:(member$ ?char ?*hex-without-dig*))
-		(char ?name 93) ; ]
+		(http-char ?name ?char&:(member$ ?char ?*http-hex-without-dig*))
+		(http-char ?name 93) ; ]
 		(and
-			(neq nil ?third)
-			(char ?name ?char&:(member$ ?char ?*hexdig*))))
+			(http-neq nil ?third)
+			(http-char ?name ?char&:(member$ ?char ?*http-hexdig*))))
 	=>
 	(retract ?octet ?i4)
 	(bind ?value "")
@@ -1093,654 +1127,654 @@
 		then (bind ?value (str-cat ?value ?second)))
 	(if (neq nil ?third)
 		then (bind ?value (str-cat ?value ?third)))
-	(modify ?i (parts ?parts (assert (h16 (name ?name) (value ?value))))))
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value ?value))))))
 
-(defrule ipv6address-end-ipv4address
-	(char ?name 93) ; ]
-	?i4 <- (ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
-	?i6 <- (ipv6address (parts $?parts ?i4))
+(defrule http-ipv6address-end-ipv4address
+	(http-char ?name 93) ; ]
+	?i4 <- (http-ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
+	?i6 <- (http-ipv6address (parts $?parts ?i4))
 	=>
 	(retract ?i6)
-	(modify ?i6 (parts ?parts (make-instance of IPV4ADDRESS (filename ?name) (value (format nil "%s%s%s%s" ?first ?second ?third ?fourth))))))
+	(modify ?i6 (parts ?parts (make-instance of HTTP-IPV4ADDRESS (id ?name) (first-octet ?first) (second-octet ?second) (third-octet ?third) (fourth-octet ?fourth)))))
 
-(defrule continue-h16
-	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?h <- (h16 (name ?name) (value ?value&:(> 4 (str-length ?value))))
+(defrule http-continue-h16
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-hexdig*))
+	?h <- (http-h16 (name ?name) (value ?value&:(> 4 (str-length ?value))))
 	=>
 	(retract ?c)
 	(modify ?h (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-h16-in-ipv6address
-	(char ?name 58|93) ; : ]
-	?h <- (h16 (name ?name) (value ?value))
-	?i <- (ipv6address (parts $?parts ?h))
+(defrule http-end-h16-in-ipv6address
+	(http-char ?name 58|93) ; : ]
+	?h <- (http-h16 (name ?name) (value ?value))
+	?i <- (http-ipv6address (parts $?parts ?h))
 	=>
 	(retract ?h)
-	(modify ?i (parts ?parts (make-instance of H16 (filename ?name) (value ?value)))))
+	(modify ?i (parts ?parts (make-instance of HTTP-H16 (id ?name) (value ?value)))))
 
-(defrule ipv6address-detect-double-colon
-	?c <- (char ?name 58) ; :
-	?i <- (ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))&~:(member$ "::" ?parts) ":"))
+(defrule http-ipv6address-detect-double-colon
+	?c <- (http-char ?name 58) ; :
+	?i <- (http-ipv6address (name ?name) (parts $?parts&:(> 8 (length$ ?parts))&:(= 0 (length$ ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))&~:(member$ "::" ?parts) ":"))
 	=>
 	(retract ?c)
 	(modify ?i (parts ?parts "::" ":"))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule ipv6address-detect-next-part
-	?c <- (char ?name 58) ; :
-	?i6 <- (ipv6address (name ?name) (parts $?parts&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))))
+(defrule http-ipv6address-detect-next-part
+	?c <- (http-char ?name 58) ; :
+	?i6 <- (http-ipv6address (name ?name) (parts $?parts&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))))
 	=>
 	(retract ?c)
 	(modify ?i6 (parts ?parts ":"))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-ipv6address
-	(char ?name 93) ; ]
-	?i6 <- (ipv6address (name ?name) (parts $?parts&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))))
-	?il <- (ip-literal (value ?i6))
+(defrule http-end-ipv6address
+	(http-char ?name 93) ; ]
+	?i6 <- (http-ipv6address (name ?name) (parts $?parts&:(= 0 (length$ ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts))|:(instancep (nth$ (length$ ?parts) ?parts))))
+	?il <- (http-ip-literal (value ?i6))
 	=>
 	(retract ?i6)
-	(modify ?il (value (make-instance of IPV6ADDRESS (filename ?name) (parts ?parts)))))
+	(modify ?il (value (make-instance of HTTP-IPV6ADDRESS (id ?name) (parts ?parts)))))
 	
-(defrule end-ipliteral
-	?c <- (char ?name 93) ; ]
-	?i <- (ip-literal (name ?name) (value ?i6&:(instancep ?i6)))
-	?h <- (host (value ?i))
+(defrule http-end-ipliteral
+	?c <- (http-char ?name 93) ; ]
+	?i <- (http-ip-literal (name ?name) (value ?i6&:(instancep ?i6)))
+	?h <- (http-host (value ?i))
 	=>
 	(retract ?c ?i)
-	(modify ?h (value (make-instance of IP-LITERAL (filename ?name) (value ?i6))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (value (make-instance of HTTP-IP-LITERAL (id ?name) (value ?i6))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;(defrule ip-literal-detect-ipvfuture
 ;	?c <- (char ?name 118) ; v
 
-(defrule host-detect-ipv4address
-	(char ?name ?char&:(member$ ?char ?*digit*))
-	?h <- (host (name ?name) (value nil))
+(defrule http-host-detect-ipv4address
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?h <- (http-host (name ?name) (value nil))
 	=>
-	(modify ?h (value (assert (ipv4address (name ?name) (octets (assert (dec-octet (name ?name)))))))))
+	(modify ?h (value (assert (http-ipv4address (name ?name) (octets (assert (http-dec-octet (name ?name)))))))))
 
-(defrule dec-octet-set-first-digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (dec-octet (name ?name) (first-digit ""))
+(defrule http-dec-octet-set-first-digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (http-dec-octet (name ?name) (first-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (first-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule dec-octet-set-second-digit-when-first-digit-is-one
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (dec-octet (name ?name) (first-digit "1") (second-digit ""))
+(defrule http-dec-octet-set-second-digit-when-first-digit-is-one
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (http-dec-octet (name ?name) (first-digit "1") (second-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (second-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule dec-octet-set-second-digit-when-first-digit-is-two
-	?c <- (char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
-	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit ""))
+(defrule http-dec-octet-set-second-digit-when-first-digit-is-two
+	?c <- (http-char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
+	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (second-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule dec-octet-set-third-digit-when-first-digit-is-one
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (dec-octet (name ?name) (first-digit "1") (second-digit ~"") (third-digit ""))
+(defrule http-dec-octet-set-third-digit-when-first-digit-is-one
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (http-dec-octet (name ?name) (first-digit "1") (second-digit ~"") (third-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (third-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-5
-	?c <- (char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
-	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit "5") (third-digit ""))
+(defrule http-dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-5
+	?c <- (http-char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
+	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit "5") (third-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (third-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-not-5
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (dec-octet (name ?name) (first-digit "2") (second-digit ~"5") (third-digit ""))
+(defrule http-dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-not-5
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit ~"5") (third-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (third-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-dec-octet
-	(char ?name 32|46|58) ; SP . :
-	?o <- (dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
-	?i <- (ipv4address (octets $?octets ?o))
+(defrule http-end-dec-octet
+	(http-char ?name 32|46|58) ; SP . :
+	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+	?i <- (http-ipv4address (octets $?octets ?o))
 	=>
 	(retract ?o)
-	(modify ?i (octets ?octets (make-instance of DEC-OCTET (filename ?name) (value (format nil "%s%s%s" ?first ?second ?third))))))
+	(modify ?i (octets ?octets (make-instance of HTTP-DEC-OCTET (id ?name) (value (format nil "%s%s%s" ?first ?second ?third))))))
 
-(defrule ipv4address-create-octet
-	?c <- (char ?name 46) ; .
-	?i <- (ipv4address (name ?name) (octets $?octets&:(> 4 (length$ ?octets))&:(instancep (nth$ (length$ ?octets) ?octets))))
+(defrule http-ipv4address-create-octet
+	?c <- (http-char ?name 46) ; .
+	?i <- (http-ipv4address (name ?name) (octets $?octets&:(> 4 (length$ ?octets))&:(instancep (nth$ (length$ ?octets) ?octets))))
 	=>
 	(retract ?c)
-	(modify ?i (octets ?octets (assert (dec-octet (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?i (octets ?octets (assert (http-dec-octet (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule host-end-ipv4address
-	(char ?name 13|32|47|58) ; CR SP / :
-	?i <- (ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
-	?h <- (host (value ?i))
+(defrule http-host-end-ipv4address
+	(http-char ?name 13|32|47|58) ; CR SP / :
+	?i <- (http-ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
+	?h <- (http-host (value ?i))
 	=>
 	(retract ?i)
-	(modify ?h (value (make-instance of IPV4ADDRESS (filename ?name) (value (format nil "%s%s%s%s" ?first ?second ?third ?fourth))))))
+	(modify ?h (value (make-instance of HTTP-IPV4ADDRESS (id ?name) (first-octet ?first) (second-octet ?second) (third-octet ?third) (fourth-octet ?fourth)))))
 
-(defrule host-ipv4address-change-to-reg-name
-	?i <- (ipv4address (name ?name) (octets $?octets))
-	?h <- (host (value ?i))
+(defrule http-host-ipv4address-change-to-reg-name
+	?i <- (http-ipv4address (name ?name) (octets $?octets))
+	?h <- (http-host (value ?i))
 	(or
-		(char ?name ?char&:(member$ ?char (create$ ?*reg-name-no-digits* 37))) ; %
+		(http-char ?name ?char&:(member$ ?char (create$ ?*http-reg-name-no-digits* 37))) ; %
 		(and
-			(char ?name ~46) ; .
+			(http-char ?name ~46) ; .
 			(test (< 0 (length$ ?octets)))
 			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
 			(test (neq "" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
 			(test (neq "1" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
 			(test (neq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
 		(and
-			(char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
+			(http-char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
 			(test (< 0 (length$ ?octets)))
 			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
 			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
 			(test (eq "5" (fact-slot-value (nth$ (length$ ?octets) ?octets) second-digit))))
 		(and
-			(char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
+			(http-char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
 			(test (< 0 (length$ ?octets)))
 			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
 			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
 		(and
-			(char ?name ~13&~32&~47&~58)
+			(http-char ?name ~13&~32&~47&~58)
 			(test (= 4 (length$ ?octets)))
 			(test (instancep (nth$ 4 ?octets)))))
 	=>
 	(retract ?i)
 	(bind ?value "")
-	(do-for-all-instances ((?octet DEC-OCTET)) (member$ ?octet ?octets)
+	(do-for-all-instances ((?octet HTTP-DEC-OCTET)) (member$ ?octet ?octets)
 		(bind ?value (str-cat ?value (send ?octet get-value)))
 		(unmake-instance ?octet))
-	(do-for-fact ((?octet dec-octet)) (member$ ?octet ?octets)
+	(do-for-fact ((?octet http-dec-octet)) (member$ ?octet ?octets)
 		(bind ?value (str-cat ?value "." (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit)))
 		(retract ?octet))
-	(modify ?h (value (assert (reg-name (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*reg-name*) (sequence ?value)))))))))
+	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*) (sequence ?value)))))))))
 
-(defrule host-detect-reg-name
-	(char ?name ?char&:(member$ ?char (create$ ?*reg-name-no-digits* 37))) ; %
-	?h <- (host (name ?name) (value nil))
+(defrule http-host-detect-reg-name
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-reg-name-no-digits* 37))) ; %
+	?h <- (http-host (name ?name) (value nil))
 	=>
-	(modify ?h (value (assert (reg-name (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*reg-name*)))))))))
+	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*)))))))))
 
-(defrule end-reg-name
-	(char ?name 13|32|47|58) ; CR SP / :
-	?e <- (escapable-sequence (sequence ?sequence) (pct-encoded nil))
-	?r <- (reg-name (value ?e))
-	?h <- (host (name ?name) (value ?r))
+(defrule http-end-reg-name
+	(http-char ?name 13|32|47|58) ; CR SP / :
+	?e <- (http-escapable-sequence (sequence ?sequence) (pct-encoded nil))
+	?r <- (http-reg-name (value ?e))
+	?h <- (http-host (name ?name) (value ?r))
 	=>
 	(retract ?e ?r)
-	(modify ?h (value (make-instance of REG-NAME (filename ?name) (value ?sequence)))))
+	(modify ?h (value (make-instance of HTTP-REG-NAME (id ?name) (value ?sequence)))))
 
-(defrule authority-form-start-port
-	?c <- (char ?name 58) ; :
-	?a <- (authority-form (name ?name) (uri-host ?host&:(instancep ?host)) (port nil))
+(defrule http-authority-form-start-port
+	?c <- (http-char ?name 58) ; :
+	?a <- (http-authority-form (name ?name) (uri-host ?host&:(instancep ?host)) (port nil))
 	=>
 	(retract ?c)
-	(modify ?a (port (assert (port (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (port (assert (http-port (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule authority-start-port
-	?c <- (char ?name 58) ; :
-	?a <- (authority (name ?name) (host ?host&:(instancep ?host)) (port nil))
+(defrule http-authority-start-port
+	?c <- (http-char ?name 58) ; :
+	?a <- (http-authority (name ?name) (host ?host&:(instancep ?host)) (port nil))
 	=>
 	(retract ?c)
-	(modify ?a (port (assert (port (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (port (assert (http-port (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule continue-port
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?p <- (port (name ?name) (value ?start&:(> 5 (str-length ?start))))
+(defrule http-continue-port
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?p <- (http-port (name ?name) (value ?start&:(> 5 (str-length ?start))))
 	=>
 	(retract ?c)
 	(modify ?p (value (format nil "%s%c" ?start ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-authority-form
-	?c <- (char ?name 32) ; SP
-	?a <- (authority-form (name ?name) (uri-host ?host) (port ?p&:(instancep ?p)))
-	?r <- (request-line (request-target ?a))
+(defrule http-end-authority-form
+	?c <- (http-char ?name 32) ; SP
+	?a <- (http-authority-form (name ?name) (uri-host ?host) (port ?p&:(instancep ?p)))
+	?r <- (http-request-line (request-target ?a))
 	=>
 	(retract ?c ?a)
-	(modify ?r (request-target (make-instance of AUTHORITY-FORM (filename ?name) (uri-host ?host) (port ?p))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (make-instance of HTTP-AUTHORITY-FORM (id ?name) (uri-host ?host) (port ?p))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule authority-end-port
-	(char ?name 32|47) ; SP /
-	?p <- (port (name ?name) (value ?port))
-	?a <- (authority (host ?host&:(instancep ?host)) (port ?p))
+(defrule http-authority-end-port
+	(http-char ?name 32|47) ; SP /
+	?p <- (http-port (name ?name) (value ?port))
+	?a <- (http-authority (host ?host&:(instancep ?host)) (port ?p))
 	=>
 	(retract ?p)
-	(modify ?a (port (make-instance of PORT (filename ?name) (value ?port)))))
+	(modify ?a (port (make-instance of HTTP-PORT (id ?name) (value ?port)))))
 
-(defrule end-authority
-	(char ?name 32|47|63) ; SP / ?
-	?a <- (authority (name ?name) (userinfo ?userinfo&nil|:(instancep ?userinfo)) (host ?host&:(instancep ?host)) (port ?port&nil|:(instancep ?port)))
-	?h <- (hier-part (authority ?a))
+(defrule http-end-authority
+	(http-char ?name 32|47|63) ; SP / ?
+	?a <- (http-authority (name ?name) (userinfo ?userinfo&nil|:(instancep ?userinfo)) (host ?host&:(instancep ?host)) (port ?port&nil|:(instancep ?port)))
+	?h <- (http-hier-part (authority ?a))
 	=>
 	(retract ?a)
-	(modify ?h (authority (make-instance of AUTHORITY (filename ?name) (userinfo ?userinfo) (host ?host) (port ?port)))))
+	(modify ?h (authority (make-instance of HTTP-AUTHORITY (id ?name) (userinfo ?userinfo) (host ?host) (port ?port)))))
 
-(defrule start-path-abempty
-	(char ?name 32|47|63) ; SP / ?
-	?h <- (hier-part (name ?name) (authority ?a&:(instancep ?a)) (path nil))
+(defrule http-start-path-abempty
+	(http-char ?name 32|47|63) ; SP / ?
+	?h <- (http-hier-part (name ?name) (authority ?a&:(instancep ?a)) (path nil))
 	=>
-	(modify ?h (path (assert (path-abempty (name ?name))))))
+	(modify ?h (path (assert (http-path-abempty (name ?name))))))
 
-(defrule end-path-abempty
-	(char ?name 32|63) ; SP ?
-	?p <- (path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
-	?h <- (hier-part (path ?p))
+(defrule http-end-path-abempty
+	(http-char ?name 32|63) ; SP ?
+	?p <- (http-path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
+	?h <- (http-hier-part (path ?p))
 	=>
 	(retract ?p)
-	(modify ?h (path (make-instance of PATH-ABEMPTY (filename ?name) (segments ?segments)))))
+	(modify ?h (path (make-instance of HTTP-PATH-ABEMPTY (id ?name) (segments ?segments)))))
 
-(defrule end-hier-part
-	(char ?name 32|63) ; SP ?
-	?h <- (hier-part (name ?name) (authority ?authority&nil|:(instancep ?authority)) (path ?path&:(instancep ?path)))
-	?a <- (absolute-uri (hier-part ?h))
+(defrule http-end-hier-part
+	(http-char ?name 32|63) ; SP ?
+	?h <- (http-hier-part (name ?name) (authority ?authority&nil|:(instancep ?authority)) (path ?path&:(instancep ?path)))
+	?a <- (http-absolute-uri (hier-part ?h))
 	=>
 	(retract ?h)
-	(modify ?a (hier-part (make-instance of HIER-PART (filename ?name) (authority ?authority) (path ?path)))))
+	(modify ?a (hier-part (make-instance of HTTP-HIER-PART (id ?name) (authority ?authority) (path ?path)))))
 
-(defrule absolute-uri-start-query
-	?c <- (char ?name 63) ; ?
-	?a <- (absolute-uri (name ?name) (hier-part ?h&:(instancep ?h)))
+(defrule http-absolute-uri-start-query
+	?c <- (http-char ?name 63) ; ?
+	?a <- (http-absolute-uri (name ?name) (hier-part ?h&:(instancep ?h)))
 	=>
 	(retract ?c)
-	(modify ?a (query (assert (escapable-sequence (name ?name) (allowed-chars ?*query*)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (query (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-query*)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule absolute-uri-end-query
-	(char ?name 32) ; SP
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
-	?a <- (absolute-uri (query ?e))
+(defrule http-absolute-uri-end-query
+	(http-char ?name 32) ; SP
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+	?a <- (http-absolute-uri (query ?e))
 	=>
 	(retract ?e)
-	(modify ?a (query (make-instance of QUERY (filename ?name) (value ?sequence)))))
+	(modify ?a (query (make-instance of HTTP-QUERY (id ?name) (value ?sequence)))))
 
-(defrule start-request-target-asterisk-form
-	?c <- (char ?name 42) ; *
-	?m <- (object (is-a METHOD) (value "OPTIONS"))
-	?r <- (request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
+(defrule http-start-request-target-asterisk-form
+	?c <- (http-char ?name 42) ; *
+	?m <- (object (is-a HTTP-METHOD) (value "OPTIONS"))
+	?r <- (http-request-line (name ?name) (method =(instance-name ?m)) (request-target nil))
 	=>
 	(retract ?c)
 	(modify ?r (request-target "*"))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-request-target-asterisk-form
-	?c <- (char ?name 32) ; SP
-	?r <- (request-line (name ?name) (request-target "*"))
+(defrule http-end-request-target-asterisk-form
+	?c <- (http-char ?name 32) ; SP
+	?r <- (http-request-line (name ?name) (request-target "*"))
 	=>
 	(retract ?c)
-	(modify ?r (request-target (make-instance of ASTERISK-FORM (filename ?name))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (make-instance of HTTP-ASTERISK-FORM (id ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 	; the type of path this segment is for (origin-form, path-abempty, path-absolute, path-rootless)
-(defrule origin-form-end-of-segment
-	(char ?name 32|47|63) ; SP / ?
-	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es))
-	?o <- (origin-form (name ?name) (segments $?segments ?s))
+(defrule http-origin-form-end-of-segment
+	(http-char ?name 32|47|63) ; SP / ?
+	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
+	?s <- (http-segment (value ?es))
+	?o <- (http-origin-form (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?o (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
+	(modify ?o (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
-(defrule path-abempty-end-of-segment
-	(char ?name 32|47|63) ; SP / ?
-	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es))
-	?p <- (path-abempty (name ?name) (segments $?segments ?s))
+(defrule http-path-abempty-end-of-segment
+	(http-char ?name 32|47|63) ; SP / ?
+	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
+	?s <- (http-segment (value ?es))
+	?p <- (http-path-abempty (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
+	(modify ?p (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
-(defrule path-absolute-end-of-segment
-	(char ?name 32|47|63) ; SP / ?
-	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es))
-	?p <- (path-absolute (name ?name) (segments $?segments ?s))
+(defrule http-path-absolute-end-of-segment
+	(http-char ?name 32|47|63) ; SP / ?
+	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
+	?s <- (http-segment (value ?es))
+	?p <- (http-path-absolute (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
+	(modify ?p (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
-(defrule path-rootless-end-of-segment
-	(char ?name 32|47|63) ; SP / ?
-	?es <- (escapable-sequence (sequence ?value) (pct-encoded nil))
-	?s <- (segment (value ?es))
-	?p <- (path-rootless (name ?name) (segments $?segments ?s))
+(defrule http-path-rootless-end-of-segment
+	(http-char ?name 32|47|63) ; SP / ?
+	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
+	?s <- (http-segment (value ?es))
+	?p <- (http-path-rootless (name ?name) (segments $?segments ?s))
 	=>
 	(retract ?es ?s)
-	(modify ?p (segments ?segments (make-instance of SEGMENT (filename ?name) (value ?value)))))
+	(modify ?p (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
-(defrule origin-form-find-next-segment
-	?c <- (char ?name 47) ; /
-	?o <- (origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
+(defrule http-origin-form-find-next-segment
+	?c <- (http-char ?name 47) ; /
+	?o <- (http-origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
-	(modify ?o (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?o (segments ?segments ?segment (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule path-abempty-find-next-segment
-	?c <- (char ?name 47) ; /
-	?p <- (path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
+(defrule http-path-abempty-find-next-segment
+	?c <- (http-char ?name 47) ; /
+	?p <- (http-path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
 	=>
 	(retract ?c)
-	(modify ?p (segments ?segments (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (segments ?segments (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
 	
-(defrule path-absolute-find-next-segment
-	?c <- (char ?name 47) ; /
-	?p <- (path-absolute (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
+(defrule http-path-absolute-find-next-segment
+	?c <- (http-char ?name 47) ; /
+	?p <- (http-path-absolute (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
-	(modify ?p (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (segments ?segments ?segment (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
 	
-(defrule path-rootless-find-next-segment
-	?c <- (char ?name 47) ; /
-	?p <- (path-rootless (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
+(defrule http-path-rootless-find-next-segment
+	?c <- (http-char ?name 47) ; /
+	?p <- (http-path-rootless (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
 	=>
 	(retract ?c)
-	(modify ?p (segments ?segments ?segment (assert (segment (name ?name) (value (assert (escapable-sequence (name ?name) (allowed-chars ?*pchar*))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (segments ?segments ?segment (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule origin-form-start-query
-	?c <- (char ?name 63) ; ?
-	?a <- (origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)) (query nil))
+(defrule http-origin-form-start-query
+	?c <- (http-char ?name 63) ; ?
+	?a <- (http-origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)) (query nil))
 	=>
 	(retract ?c)
-	(modify ?a (query (assert (escapable-sequence (name ?name) (allowed-chars ?*query*)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (query (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-query*)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule origin-form-end-query
-	(char ?name 32) ; SP
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
-	?a <- (origin-form (query ?e))
+(defrule http-origin-form-end-query
+	(http-char ?name 32) ; SP
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+	?a <- (http-origin-form (query ?e))
 	=>
 	(retract ?e)
-	(modify ?a (query (make-instance of QUERY (filename ?name) (value ?sequence)))))
+	(modify ?a (query (make-instance of HTTP-QUERY (id ?name) (value ?sequence)))))
 
-(defrule end-of-origin-form
-	?c <- (char ?name 32) ; SP
-	?o <- (origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)) (query ?query&nil|:(instancep ?query)))
-	?r <- (request-line (request-target ?o))
+(defrule http-end-of-origin-form
+	?c <- (http-char ?name 32) ; SP
+	?o <- (http-origin-form (name ?name) (segments $?segments ?segment&:(instancep ?segment)) (query ?query&nil|:(instancep ?query)))
+	?r <- (http-request-line (request-target ?o))
 	=>
 	(retract ?c ?o)
-	(modify ?r (request-target (make-instance of ORIGIN-FORM (filename ?name) (segments ?segments ?segment) (query ?query))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (make-instance of HTTP-ORIGIN-FORM (id ?name) (segments ?segments ?segment) (query ?query))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-of-absolute-uri
-	?c <- (char ?name 32) ; SP
-	?a <- (absolute-uri (name ?name) (scheme ?scheme) (hier-part ?hier-part&:(instancep ?hier-part)) (query ?query&nil|:(instancep ?query)))
-	?r <- (request-line (request-target ?a))
+(defrule http-end-of-absolute-uri
+	?c <- (http-char ?name 32) ; SP
+	?a <- (http-absolute-uri (name ?name) (scheme ?scheme) (hier-part ?hier-part&:(instancep ?hier-part)) (query ?query&nil|:(instancep ?query)))
+	?r <- (http-request-line (request-target ?a))
 	=>
 	(retract ?c ?a)
-	(modify ?r (request-target (make-instance of ABSOLUTE-URI (filename ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (request-target (make-instance of HTTP-ABSOLUTE-URI (id ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule char-is-allowed-char-in-escapable-sequence
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (allowed-chars $?allowed-chars) (pct-encoded nil))
-	?c <- (char ?name ?char&:(member$ ?char ?allowed-chars))
+(defrule http-char-is-allowed-char-in-escapable-sequence
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (allowed-chars $?allowed-chars) (pct-encoded nil))
+	?c <- (http-char ?name ?char&:(member$ ?char ?allowed-chars))
 	=>
 	(retract ?c)
 	(modify ?e (sequence (format nil "%s%c" ?sequence ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule pct-encoded-sequence
-	?c <- (char ?name 37) ; %
-	?e <- (escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+(defrule http-pct-encoded-sequence
+	?c <- (http-char ?name 37) ; %
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
 	=>
 	(retract ?c)
-	(modify ?e (pct-encoded (assert (pct-encoded (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?e (pct-encoded (assert (http-pct-encoded (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule pct-encoded-find-first
-	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?p <- (pct-encoded (name ?name) (first nil))
+(defrule http-pct-encoded-find-first
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-hexdig*))
+	?p <- (http-pct-encoded (name ?name) (first nil))
 	=>
 	(retract ?c)
 	(modify ?p (first ?char))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule pct-encoded-find-second
-	?c <- (char ?name ?char&:(member$ ?char ?*hexdig*))
-	?p <- (pct-encoded (name ?name) (first ?first&~nil))
-	?es <- (escapable-sequence (pct-encoded ?p) (sequence ?sequence))
+(defrule http-pct-encoded-find-second
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-hexdig*))
+	?p <- (http-pct-encoded (name ?name) (first ?first&~nil))
+	?es <- (http-escapable-sequence (pct-encoded ?p) (sequence ?sequence))
 	=>
 	(retract ?p ?c)
 	(modify ?es (sequence (format nil "%s%c%c%c" ?sequence 37 ?first ?char)) (pct-encoded nil))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version
-	?c <- (char ?name 72) ; H
-	?r <- (request-line (name ?name) (request-target ?request-target&:(instancep ?request-target)) (http-version nil))
+(defrule http-find-http-version
+	?c <- (http-char ?name 72) ; H
+	?r <- (http-request-line (name ?name) (request-target ?request-target&:(instancep ?request-target)) (http-version nil))
 	=>
 	(retract ?c)
 	(modify ?r (http-version (assert (http-version (name ?name) (H TRUE)))))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-first-T
-	?c <- (char ?name 84) ; T
+(defrule http-find-http-version-first-T
+	?c <- (http-char ?name 84) ; T
 	?h <- (http-version (name ?name) (H TRUE) (T nil))
 	=>
 	(retract ?c)
 	(modify ?h (T TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-second-T
-	?c <- (char ?name 84) ; T
+(defrule http-find-http-version-second-T
+	?c <- (http-char ?name 84) ; T
 	?h <- (http-version (name ?name) (T TRUE) (TT nil))
 	=>
 	(retract ?c)
 	(modify ?h (TT TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-P
-	?c <- (char ?name 80) ; P
+(defrule http-find-http-version-P
+	?c <- (http-char ?name 80) ; P
 	?h <- (http-version (name ?name) (TT TRUE) (P nil))
 	=>
 	(retract ?c)
 	(modify ?h (P TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-slash
-	?c <- (char ?name 47) ; /
+(defrule http-find-http-version-slash
+	?c <- (http-char ?name 47) ; /
 	?h <- (http-version (name ?name) (P TRUE) (major nil))
 	=>
 	(retract ?c)
 	(modify ?h (major ""))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-continue-major
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+(defrule http-find-http-version-continue-major
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
 	?h <- (http-version (name ?name) (major ?major&~nil) (minor nil))
 	=>
 	(retract ?c)
 	(modify ?h (major (format nil "%s%c" ?major ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-period
-	?c <- (char ?name 46) ; .
+(defrule http-find-http-version-period
+	?c <- (http-char ?name 46) ; .
 	?h <- (http-version (name ?name) (major ~nil) (minor nil))
 	=>
 	(retract ?c)
 	(modify ?h (minor ""))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule find-http-version-continue-minor
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
+(defrule http-find-http-version-continue-minor
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
 	?h <- (http-version (name ?name) (minor ?minor&~nil))
 	=>
 	(retract ?c)
 	(modify ?h (minor (format nil "%s%c" ?minor ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule request-line-http-version-end
-	?c <- (char ?name 13) ; CR
+(defrule http-request-line-http-version-end
+	?c <- (http-char ?name 13) ; CR
 	?h <- (http-version (name ?name) (major ?major) (minor ?minor&~nil))
-	?r <- (request-line (http-version ?h))
+	?r <- (http-request-line (http-version ?h))
 	=>
 	(retract ?c ?h)
-	(modify ?r (http-version (make-instance of HTTP-VERSION (filename ?name) (major ?major) (minor ?minor))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (http-version (make-instance of HTTP-VERSION (id ?name) (major ?major) (minor ?minor))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule request-line-end
-	?c <- (char ?name 10) ; LF
-	?r <- (request-line (method ?method) (request-target ?request-target) (http-version ?http-version&:(instancep ?http-version)))
+(defrule http-request-line-end
+	?c <- (http-char ?name 10) ; LF
+	?r <- (http-request-line (method ?method) (request-target ?request-target) (http-version ?http-version&:(instancep ?http-version)))
 	?h <- (http-message (name ?name) (start-line ?r))
 	=>
 	(retract ?c ?r)
-	(modify ?h (start-line (make-instance of REQUEST-LINE (filename ?name) (method ?method) (request-target ?request-target) (http-version ?http-version))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (start-line (make-instance of HTTP-REQUEST-LINE (id ?name) (method ?method) (request-target ?request-target) (http-version ?http-version))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule detect-field-line
-	(char ?name ?char&:(member$ ?char ?*tchar*))
+(defrule http-detect-field-line
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
 	?h <- (http-message (name ?name) (start-line ?s&:(instancep ?s)) (field-lines $?field-lines&:(= 0 (length$ ?field-lines))|:(instancep (nth$ (length$ ?field-lines) ?field-lines))) (message-body nil))
 	=>
-	(modify ?h (field-lines ?field-lines (assert (field-line (name ?name) (field-name (assert (field-name (name ?name)))))))))
+	(modify ?h (field-lines ?field-lines (assert (http-field-line (name ?name) (field-name (assert (http-field-name (name ?name)))))))))
 
-(defrule continue-field-name
-	?c <- (char ?name ?char&:(member$ ?char ?*tchar*))
-	?f <- (field-name (name ?name) (value ?value))
+(defrule http-continue-field-name
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?f <- (http-field-name (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?f (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-field-name
-	?c <- (char ?name 58)
-	?fn <- (field-name (name ?name) (value ?value))
-	?fl <- (field-line (field-name ?fn))
+(defrule http-end-field-name
+	?c <- (http-char ?name 58)
+	?fn <- (http-field-name (name ?name) (value ?value))
+	?fl <- (http-field-line (field-name ?fn))
 	=>
 	(retract ?c ?fn)
-	(modify ?fl (field-name (make-instance of FIELD-NAME (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?fl (field-name (make-instance of HTTP-FIELD-NAME (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule ignore-ows-after-field-name
-	?c <- (char ?name 9|32) ; HTAB SP
-	(field-line (name ?name) (field-name ?f&:(instancep ?f)) (field-value nil))
+(defrule http-ignore-ows-after-field-name
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-field-line (name ?name) (field-name ?f&:(instancep ?f)) (field-value nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule detect-field-value
-	(char ?name ~9&~32) ; HTAB SP
-	?o <- (object (is-a FIELD-NAME))
-	?fl <- (field-line (name ?name) (field-name =(instance-name ?o)) (field-value nil))
+(defrule http-detect-field-value
+	(http-char ?name ~9&~32) ; HTAB SP
+	?o <- (object (is-a HTTP-FIELD-NAME))
+	?fl <- (http-field-line (name ?name) (field-name =(instance-name ?o)) (field-value nil))
 	=>
-	(modify ?fl (field-value (assert (field-value (name ?name))))))
+	(modify ?fl (field-value (assert (http-field-value (name ?name))))))
 
-(defrule detect-unknown-header
-	(char ?name ?char)
-	?o <- (object (is-a FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-unknown-header
+	(http-char ?name ?char)
+	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
 		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
 		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
-	(modify ?fv (value (assert (unknown-header (name ?name))))))
+	(modify ?fv (value (assert (http-unknown-header (name ?name))))))
 
-(defrule build-unknown-header
-	?c <- (char ?name ?char)
-	?u <- (unknown-header (name ?name) (value ?value) (possible-ows ?possible-ows))
+(defrule http-build-unknown-header
+	?c <- (http-char ?name ?char)
+	?u <- (http-unknown-header (name ?name) (value ?value) (possible-ows ?possible-ows))
 	(test (or
 		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
 		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
 	=>
 	(retract ?c)
 	(modify ?u (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;  set-cookie-header = "Set-Cookie:" SP set-cookie-string
 ;  set-cookie-string = cookie-pair *( ";" SP cookie-av )
-(defrule detect-set-cookie-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Set-Cookie"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-set-cookie-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Set-Cookie"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (set-cookie-header (name ?name) (cookie-pair (assert (cookie-pair (name ?name) (cookie-name (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-set-cookie-header (name ?name) (cookie-pair (assert (http-cookie-pair (name ?name) (cookie-name (assert (http-token (name ?name))))))))))))
 
-(defrule end-set-cookie-header
-	(char ?name 13) ; CR
-	?clh <- (set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-set-cookie-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of SET-COOKIE-HEADER (filename ?name) (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs)))))
+	(modify ?fv (value (make-instance of HTTP-SET-COOKIE-HEADER (id ?name) (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs)))))
 
-(defrule set-cookie-header-end-quoted-cookie-pair
-	?c <- (char ?name 34) ; "
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
-	?set-cookie-header <- (set-cookie-header (cookie-pair ?cookie-pair))
+(defrule http-set-cookie-header-end-quoted-cookie-pair
+	?c <- (http-char ?name 34) ; "
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
+	?set-cookie-header <- (http-set-cookie-header (cookie-pair ?cookie-pair))
 	=>
 	(retract ?c ?cookie-pair)
-	(modify ?set-cookie-header (cookie-pair (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?set-cookie-header (cookie-pair (make-instance of HTTP-COOKIE-PAIR (id ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule set-cookie-header-end-cookie-pair
-	(char ?name 13|32|59) ; CR SP ;
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
-	?set-cookie-header <- (set-cookie-header (cookie-pair ?cookie-pair))
+(defrule http-set-cookie-header-end-cookie-pair
+	(http-char ?name 13|32|59) ; CR SP ;
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
+	?set-cookie-header <- (http-set-cookie-header (cookie-pair ?cookie-pair))
 	=>
 	(retract ?cookie-pair)
-	(modify ?set-cookie-header (cookie-pair (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
+	(modify ?set-cookie-header (cookie-pair (make-instance of HTTP-COOKIE-PAIR (id ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
 
-(defrule set-cookie-header-detect-next-cookie-pair
-	?c <- (char ?name 59) ; ;
-	?set-cookie-header <- (set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
+(defrule http-set-cookie-header-detect-next-cookie-pair
+	?c <- (http-char ?name 59) ; ;
+	?set-cookie-header <- (http-set-cookie-header (name ?name) (cookie-pair ?cookie-pair&:(instancep ?cookie-pair)) (cookie-avs $?cookie-avs&:(= 0 (length$ ?cookie-avs))|:(instancep (nth$ (length$ ?cookie-avs) ?cookie-avs))))
 	=>
 	(retract ?c)
-	(modify ?set-cookie-header (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs (assert (cookie-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?set-cookie-header (cookie-pair ?cookie-pair) (cookie-avs ?cookie-avs (assert (http-cookie-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule set-cookie-header-end-cookie-av
-	(char ?name 13|59) ; CR ;
-	?c <- (cookie-av (value ?value&:(instancep ?value)))
-	?set-cookie-header <- (set-cookie-header (name ?name) (cookie-avs $?cookie-avs ?c))
+(defrule http-set-cookie-header-end-cookie-av
+	(http-char ?name 13|59) ; CR ;
+	?c <- (http-cookie-av (value ?value&:(instancep ?value)))
+	?set-cookie-header <- (http-set-cookie-header (name ?name) (cookie-avs $?cookie-avs ?c))
 	=>
 	(retract ?c)
-	(modify ?set-cookie-header (cookie-avs ?cookie-avs (make-instance of COOKIE-AV (filename ?name) (value ?value)))))
+	(modify ?set-cookie-header (cookie-avs ?cookie-avs (make-instance of HTTP-COOKIE-AV (id ?name) (value ?value)))))
 
-(defrule cookie-av-detect-required-sp
-	?c <- (char ?name 32) ; SP
-	?ca <- (cookie-av (name ?name) (required-sp nil))
+(defrule http-cookie-av-detect-required-sp
+	?c <- (http-char ?name 32) ; SP
+	?ca <- (http-cookie-av (name ?name) (required-sp nil))
 	=>
 	(retract ?c)
 	(modify ?ca (required-sp TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-cookie-av
-	?c <- (char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)&~61) ; SP : < ~ =
-	?ca <- (cookie-av (name ?name) (string ?string) (value nil) (required-sp TRUE))
+(defrule http-build-cookie-av
+	?c <- (http-char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)&~61) ; SP : < ~ =
+	?ca <- (http-cookie-av (name ?name) (string ?string) (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
 	(modify ?ca (string (format nil "%s%c" ?string ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-av-continue-on-equals-if-unknown-attribute
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-continue-on-equals-if-unknown-attribute
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
 	(modify ?ca (string (format nil "%s%c" ?string 61)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;cookie-av         = expires-av / max-age-av / domain-av /
 ;                    path-av / secure-av / httponly-av /
@@ -1748,13 +1782,13 @@
 ;  expires-av        = "Expires=" sane-cookie-date
 ;  sane-cookie-date  = <rfc1123-date, defined in [RFC2616], Section 3.3.1>
 
-(defrule cookie-av-detect-expires-av
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string "Expires") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-expires-av
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string "Expires") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
-	(modify ?ca (value (assert (expires-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ca (value (assert (http-expires-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 	
 ;  max-age-av        = "Max-Age=" non-zero-digit *DIGIT
 ;                        ; In practice, both expires-av and max-age-av
@@ -1762,329 +1796,329 @@
 ;                        ; user agent.
 ;  non-zero-digit    = %x31-39
 ;                        ; digits 1 through 9
-(defrule cookie-av-detect-max-age-av
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string "Max-Age") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-max-age-av
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string "Max-Age") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
-	(modify ?ca (value (assert (max-age-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ca (value (assert (http-max-age-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule max-age-av-detect-first-digit
-	?c <- (char ?name ?char&49|50|51|52|53|54|55|56|57) ; 1-9
-	?m <- (max-age-av (name ?name) (first-digit nil))
+(defrule http-max-age-av-detect-first-digit
+	?c <- (http-char ?name ?char&49|50|51|52|53|54|55|56|57) ; 1-9
+	?m <- (http-max-age-av (name ?name) (first-digit nil))
 	=>
 	(retract ?c)
 	(modify ?m (first-digit (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule max-age-av-build-rest
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?m <- (max-age-av (name ?name) (first-digit ~nil) (rest ?rest))
+(defrule http-max-age-av-build-rest
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?m <- (http-max-age-av (name ?name) (first-digit ~nil) (rest ?rest))
 	=>
 	(retract ?c)
 	(modify ?m (rest (format nil "%s%c" ?rest ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-av-end-max-age-av
-	(char ?name 13|59) ; CR ;
-	?m <- (max-age-av (name ?name) (first-digit ?first&~nil) (rest ?rest))
-	?ca <- (cookie-av (value ?m))
+(defrule http-cookie-av-end-max-age-av
+	(http-char ?name 13|59) ; CR ;
+	?m <- (http-max-age-av (name ?name) (first-digit ?first&~nil) (rest ?rest))
+	?ca <- (http-cookie-av (value ?m))
 	=>
 	(retract ?m)
-	(modify ?ca (value (make-instance of MAX-AGE-AV (filename ?name) (value (format nil "%s%s" ?first ?rest))))))
+	(modify ?ca (value (make-instance of HTTP-MAX-AGE-AV (id ?name) (value (format nil "%s%s" ?first ?rest))))))
 	
 ;  domain-av         = "Domain=" domain-value
 ;  domain-value      = <subdomain>
 ;                        ; defined in [RFC1034], Section 3.5, as
 ;                        ; enhanced by [RFC1123], Section 2.1
-(defrule cookie-av-detect-domain-av
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string "Domain") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-domain-av
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string "Domain") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
-	(modify ?ca (value (assert (domain-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ca (value (assert (http-domain-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; derived, not actually defined formally in ABNF in an RFC
 ; subdomain  = *( ldh-label "." ) top-label
 ; ldh-label  = alphanum [ *( alphanum / "-" ) alphanum ]
 ; top-label  = ALPHA [ *( alphanum / "-" ) alphanum ]
 
-(defrule domain-av-detect-subdomain
-	(char ?name ?char&:(member$ ?char ?*alphanum*))
-	?d <- (domain-av (name ?name) (subdomain nil))
+(defrule http-domain-av-detect-subdomain
+	(http-char ?name ?char&:(member$ ?char ?*http-alphanum*))
+	?d <- (http-domain-av (name ?name) (subdomain nil))
 	=>
-	(modify ?d (subdomain (assert (subdomain (name ?name))))))
+	(modify ?d (subdomain (assert (http-subdomain (name ?name))))))
 
-(defrule subdomain-detect-ldh-label
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
-	=>
-	(retract ?c)
-	(modify ?s (ldh-labels (assert (ldh-label (name ?name) (value (format nil "%c" ?char))))))
-	(assert (char ?name (get-char ?name))))
-
-(defrule subdomain-detect-top-label
-	?c <- (char ?name ?char&:(member$ ?char ?*alpha*))
-	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
+(defrule http-subdomain-detect-ldh-label
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?s <- (http-subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
 	=>
 	(retract ?c)
-	(modify ?s (top-label (assert (top-label (name ?name) (value (format nil "%c" ?char))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (ldh-labels (assert (http-ldh-label (name ?name) (value (format nil "%c" ?char))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule subdomain-change-top-label-to-ldh-label
-	(char ?name 46) ; .
-	?t <- (top-label (name ?name) (value ?value))
-	?s <- (subdomain (name ?name) (ldh-labels $?ldh-labels) (top-label ?t))
+(defrule http-subdomain-detect-top-label
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alpha*))
+	?s <- (http-subdomain (name ?name) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))) (top-label nil))
+	=>
+	(retract ?c)
+	(modify ?s (top-label (assert (http-top-label (name ?name) (value (format nil "%c" ?char))))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-subdomain-change-top-label-to-ldh-label
+	(http-char ?name 46) ; .
+	?t <- (http-top-label (name ?name) (value ?value))
+	?s <- (http-subdomain (name ?name) (ldh-labels $?ldh-labels) (top-label ?t))
 	=>
 	(retract ?t)
-	(modify ?s (ldh-labels ?ldh-labels (assert (ldh-label (name ?name) (value ?value)))) (top-label nil)))
+	(modify ?s (ldh-labels ?ldh-labels (assert (http-ldh-label (name ?name) (value ?value)))) (top-label nil)))
 
-(defrule build-top-label
-	?c <- (char ?name ?char&:(member$ ?char (create$ ?*alphanum* 45))) ; -
-	?t <- (top-label (name ?name) (value ?value))
+(defrule http-build-top-label
+	?c <- (http-char ?name ?char&:(member$ ?char (create$ ?*http-alphanum* 45))) ; -
+	?t <- (http-top-label (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-ldh-label
-	?c <- (char ?name ?char&:(member$ ?char (create$ ?*alphanum* 45))) ; -
-	?l <- (ldh-label (name ?name) (value ?value))
+(defrule http-build-ldh-label
+	?c <- (http-char ?name ?char&:(member$ ?char (create$ ?*http-alphanum* 45))) ; -
+	?l <- (http-ldh-label (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?l (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule subdomain-end-ldh-label
-	?c <- (char ?name 46) ; .
-	?l <- (ldh-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
-	?s <- (subdomain (ldh-labels $?ldh-labels ?l))
+(defrule http-subdomain-end-ldh-label
+	?c <- (http-char ?name 46) ; .
+	?l <- (http-ldh-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
+	?s <- (http-subdomain (ldh-labels $?ldh-labels ?l))
 	=>
 	(retract ?c ?l)
-	(modify ?s (ldh-labels ?ldh-labels (make-instance of LDH-LABEL (filename ?name) (value (format nil "%s." ?value)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (ldh-labels ?ldh-labels (make-instance of HTTP-LDH-LABEL (id ?name) (value (format nil "%s." ?value)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule subdomain-end-top-label
-	(char ?name 13|59) ; CR ;
-	?t <- (top-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
-	?s <- (subdomain (top-label ?t))
+(defrule http-subdomain-end-top-label
+	(http-char ?name 13|59) ; CR ;
+	?t <- (http-top-label (name ?name) (value ?value&:(neq (sub-string (- (str-length ?value) 1) (str-length ?value) ?value) "-")))
+	?s <- (http-subdomain (top-label ?t))
 	=>
 	(retract ?t)
-	(modify ?s (top-label (make-instance of TOP-LABEL (filename ?name) (value ?value)))))
+	(modify ?s (top-label (make-instance of HTTP-TOP-LABEL (id ?name) (value ?value)))))
 
-(defrule domain-av-end-subdomain
-	(char ?name 13|59) ; CR ;
-	?s <- (subdomain (name ?name) (top-label ?t&:(instancep ?t)) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))))
-	?d <- (domain-av (name ?name) (subdomain ?s))
+(defrule http-domain-av-end-subdomain
+	(http-char ?name 13|59) ; CR ;
+	?s <- (http-subdomain (name ?name) (top-label ?t&:(instancep ?t)) (ldh-labels $?ldh-labels&:(= 0 (length$ ?ldh-labels))|:(instancep (nth$ (length$ ?ldh-labels) ?ldh-labels))))
+	?d <- (http-domain-av (name ?name) (subdomain ?s))
 	=>
 	(retract ?s)
-	(modify ?d (subdomain (make-instance of SUBDOMAIN (filename ?name) (top-label ?t) (ldh-labels ?ldh-labels)))))
+	(modify ?d (subdomain (make-instance of HTTP-SUBDOMAIN (id ?name) (top-label ?t) (ldh-labels ?ldh-labels)))))
 
-(defrule cookie-av-end-domain-av
-	(char ?name 13|59) ; CR ;
-	?d <- (domain-av (name ?name) (subdomain ?s&:(instancep ?s)))
-	?ca <- (cookie-av (name ?name) (value ?d))
+(defrule http-cookie-av-end-domain-av
+	(http-char ?name 13|59) ; CR ;
+	?d <- (http-domain-av (name ?name) (subdomain ?s&:(instancep ?s)))
+	?ca <- (http-cookie-av (name ?name) (value ?d))
 	=>
 	(retract ?d)
-	(modify ?ca (value (make-instance of DOMAIN-AV (filename ?name) (subdomain ?s)))))
+	(modify ?ca (value (make-instance of HTTP-DOMAIN-AV (id ?name) (subdomain ?s)))))
 
 ;  path-av           = "Path=" path-value
 ;  path-value        = <any CHAR except CTLs or ";">
-(defrule cookie-av-detect-path-av
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string "Path") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-path-av
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string "Path") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
-	(modify ?ca (value (assert (path-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ca (value (assert (http-path-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-path-av
-	?c <- (char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)) ; = SP : < ~
-	?ca <- (path-av (name ?name) (value ?value))
+(defrule http-build-path-av
+	?c <- (http-char ?name ?char&:(<= 32 ?char)&:(>= 58 ?char)|:(<= 60 ?char)&:(>= 126 ?char)) ; = SP : < ~
+	?ca <- (http-path-av (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?ca (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-av-end-path-av
-	(char ?name 13|59) ; CR ;
-	?p <- (path-av (name ?name) (value ?value))
-	?ca <- (cookie-av (name ?name) (value ?p))
+(defrule http-cookie-av-end-path-av
+	(http-char ?name 13|59) ; CR ;
+	?p <- (http-path-av (name ?name) (value ?value))
+	?ca <- (http-cookie-av (name ?name) (value ?p))
 	=>
 	(retract ?p)
-	(modify ?ca (value (make-instance of PATH-AV (filename ?name) (value ?value)))))
+	(modify ?ca (value (make-instance of HTTP-PATH-AV (id ?name) (value ?value)))))
 
 ;  secure-av         = "Secure"
-(defrule cookie-av-detect-secure-av
-	(char ?name 13|59) ; CR ;
-	?ca <- (cookie-av (name ?name) (string "Secure") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-secure-av
+	(http-char ?name 13|59) ; CR ;
+	?ca <- (http-cookie-av (name ?name) (string "Secure") (value nil) (required-sp TRUE))
 	=>
-	(modify ?ca (value (make-instance of SECURE-AV (filename ?name)))))
+	(modify ?ca (value (make-instance of HTTP-SECURE-AV (id ?name)))))
 
 ;  httponly-av       = "HttpOnly"
-(defrule cookie-av-detect-httponly-av
-	(char ?name 13|59) ; CR ;
-	?ca <- (cookie-av (name ?name) (string "HttpOnly") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-httponly-av
+	(http-char ?name 13|59) ; CR ;
+	?ca <- (http-cookie-av (name ?name) (string "HttpOnly") (value nil) (required-sp TRUE))
 	=>
-	(modify ?ca (value (make-instance of HTTPONLY-AV (filename ?name)))))
+	(modify ?ca (value (make-instance of HTTP-HTTPONLY-AV (id ?name)))))
 
 ;samesite-av       = "SameSite" BWS "=" BWS samesite-value
 ;samesite-value    = "Strict" / "Lax" / "None"
-(defrule cookie-av-detect-samesite-av
-	?c <- (char ?name 61) ; =
-	?ca <- (cookie-av (name ?name) (string "SameSite") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-detect-samesite-av
+	?c <- (http-char ?name 61) ; =
+	?ca <- (http-cookie-av (name ?name) (string "SameSite") (value nil) (required-sp TRUE))
 	=>
 	(retract ?c)
-	(modify ?ca (value (assert (samesite-av (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ca (value (assert (http-samesite-av (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule samesite-av-detect-strict
-	?c <- (char ?name 83) ; S
-	?s <- (samesite-av (name ?name) (value nil))
+(defrule http-samesite-av-detect-strict
+	?c <- (http-char ?name 83) ; S
+	?s <- (http-samesite-av (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?s (value (assert (strict (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (value (assert (http-strict (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule strict-detect-t
-	?c <- (char ?name 116) ; t
-	?l <- (strict (name ?name) (t nil))
+(defrule http-strict-detect-t
+	?c <- (http-char ?name 116) ; t
+	?l <- (http-strict (name ?name) (t nil))
 	=>
 	(retract ?c)
 	(modify ?l (t TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule strict-detect-r
-	?c <- (char ?name 114) ; r
-	?l <- (strict (name ?name) (t TRUE) (r nil))
+(defrule http-strict-detect-r
+	?c <- (http-char ?name 114) ; r
+	?l <- (http-strict (name ?name) (t TRUE) (r nil))
 	=>
 	(retract ?c)
 	(modify ?l (r TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule strict-detect-i
-	?c <- (char ?name 105) ; i
-	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i nil))
+(defrule http-strict-detect-i
+	?c <- (http-char ?name 105) ; i
+	?l <- (http-strict (name ?name) (t TRUE) (r TRUE) (i nil))
 	=>
 	(retract ?c)
 	(modify ?l (i TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule strict-detect-c
-	?c <- (char ?name 99) ; c
-	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c nil))
+(defrule http-strict-detect-c
+	?c <- (http-char ?name 99) ; c
+	?l <- (http-strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c nil))
 	=>
 	(retract ?c)
 	(modify ?l (c TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule strict-detect-last-t
-	?c <- (char ?name 116) ; t
-	?l <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t nil))
+(defrule http-strict-detect-last-t
+	?c <- (http-char ?name 116) ; t
+	?l <- (http-strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t nil))
 	=>
 	(retract ?c)
 	(modify ?l (last-t TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule samesite-av-end-strict
-	(char ?name 13|59) ; CR ;
-	?st <- (strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t TRUE))
-	?s <- (samesite-av (name ?name) (value ?st))
+(defrule http-samesite-av-end-strict
+	(http-char ?name 13|59) ; CR ;
+	?st <- (http-strict (name ?name) (t TRUE) (r TRUE) (i TRUE) (c TRUE) (last-t TRUE))
+	?s <- (http-samesite-av (name ?name) (value ?st))
 	=>
 	(retract ?st)
-	(modify ?s (value (make-instance of STRICT (filename ?name)))))
+	(modify ?s (value (make-instance of HTTP-STRICT (id ?name)))))
 
-(defrule samesite-av-detect-lax
-	?c <- (char ?name 76) ; L
-	?s <- (samesite-av (name ?name) (value nil))
+(defrule http-samesite-av-detect-lax
+	?c <- (http-char ?name 76) ; L
+	?s <- (http-samesite-av (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?s (value (assert (lax (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (value (assert (http-lax (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule lax-detect-a
-	?c <- (char ?name 97) ; a
-	?l <- (lax (name ?name) (a nil))
+(defrule http-lax-detect-a
+	?c <- (http-char ?name 97) ; a
+	?l <- (http-lax (name ?name) (a nil))
 	=>
 	(retract ?c)
 	(modify ?l (a TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule lax-detect-x
-	?c <- (char ?name 120) ; x
-	?l <- (lax (name ?name) (a TRUE) (x nil))
+(defrule http-lax-detect-x
+	?c <- (http-char ?name 120) ; x
+	?l <- (http-lax (name ?name) (a TRUE) (x nil))
 	=>
 	(retract ?c)
 	(modify ?l (x TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule samesite-av-end-lax
-	(char ?name 13|59) ; CR ;
-	?l <- (lax (name ?name) (a TRUE) (x TRUE))
-	?s <- (samesite-av (name ?name) (value ?l))
+(defrule http-samesite-av-end-lax
+	(http-char ?name 13|59) ; CR ;
+	?l <- (http-lax (name ?name) (a TRUE) (x TRUE))
+	?s <- (http-samesite-av (name ?name) (value ?l))
 	=>
 	(retract ?l)
-	(modify ?s (value (make-instance of LAX (filename ?name)))))
+	(modify ?s (value (make-instance of HTTP-LAX (id ?name)))))
 
-(defrule samesite-av-detect-none
-	?c <- (char ?name 78) ; N
-	?s <- (samesite-av (name ?name) (value nil))
+(defrule http-samesite-av-detect-none
+	?c <- (http-char ?name 78) ; N
+	?s <- (http-samesite-av (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?s (value (assert (none (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?s (value (assert (http-none (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule none-detect-o
-	?c <- (char ?name 111) ; o
-	?l <- (none (name ?name) (o nil))
+(defrule http-none-detect-o
+	?c <- (http-char ?name 111) ; o
+	?l <- (http-none (name ?name) (o nil))
 	=>
 	(retract ?c)
 	(modify ?l (o TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule none-detect-n
-	?c <- (char ?name 110) ; n
-	?l <- (none (name ?name) (o TRUE) (n nil))
+(defrule http-none-detect-n
+	?c <- (http-char ?name 110) ; n
+	?l <- (http-none (name ?name) (o TRUE) (n nil))
 	=>
 	(retract ?c)
 	(modify ?l (n TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule none-detect-e
-	?c <- (char ?name 101) ; e
-	?l <- (none (name ?name) (o TRUE) (n TRUE) (e nil))
+(defrule http-none-detect-e
+	?c <- (http-char ?name 101) ; e
+	?l <- (http-none (name ?name) (o TRUE) (n TRUE) (e nil))
 	=>
 	(retract ?c)
 	(modify ?l (e TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule samesite-av-end-none
-	(char ?name 13|59) ; CR ;
-	?n <- (none (name ?name) (o TRUE) (n TRUE) (e TRUE))
-	?s <- (samesite-av (name ?name) (value ?n))
+(defrule http-samesite-av-end-none
+	(http-char ?name 13|59) ; CR ;
+	?n <- (http-none (name ?name) (o TRUE) (n TRUE) (e TRUE))
+	?s <- (http-samesite-av (name ?name) (value ?n))
 	=>
 	(retract ?n)
-	(modify ?s (value (make-instance of NONE (filename ?name)))))
+	(modify ?s (value (make-instance of HTTP-NONE (id ?name)))))
 
-(defrule cookie-av-end-samesite-av
-	(char ?name 13|59) ; CR ;
-	?s <- (samesite-av (name ?name) (value ?v&:(instancep ?v)))
-	?ca <- (cookie-av (name ?name) (value ?s) (required-sp TRUE))
+(defrule http-cookie-av-end-samesite-av
+	(http-char ?name 13|59) ; CR ;
+	?s <- (http-samesite-av (name ?name) (value ?v&:(instancep ?v)))
+	?ca <- (http-cookie-av (name ?name) (value ?s) (required-sp TRUE))
 	=>
 	(retract ?s)
-	(modify ?ca (value (make-instance of SAMESITE-AV (filename ?name) (value ?v)))))
+	(modify ?ca (value (make-instance of HTTP-SAMESITE-AV (id ?name) (value ?v)))))
 
 ;extension-av      = *av-octet
 ;av-octet          = %x20-3A / %x3C-7E
                       ; any CHAR except CTLs or ";"
-(defrule cookie-av-end-extension-av
-	(char ?name 13|59) ; CR ;
-	?ca <- (cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite"&~"Secure"&~"HttpOnly") (value nil) (required-sp TRUE))
+(defrule http-cookie-av-end-extension-av
+	(http-char ?name 13|59) ; CR ;
+	?ca <- (http-cookie-av (name ?name) (string ?string&~"Expires"&~"Max-Age"&~"Domain"&~"Path"&~"SameSite"&~"Secure"&~"HttpOnly") (value nil) (required-sp TRUE))
 	=>
 	(retract ?ca)
-	(modify ?ca (value (make-instance of EXTENSION-AV (filename ?name) (value ?string)))))
+	(modify ?ca (value (make-instance of HTTP-EXTENSION-AV (id ?name) (value ?string)))))
 
 ;  expires-av        = "Expires=" sane-cookie-date
 ;  sane-cookie-date  = <rfc1123-date, defined in [RFC2616], Section 3.3.1>
@@ -2098,178 +2132,178 @@
 ;       month        = "Jan" | "Feb" | "Mar" | "Apr"
 ;                    | "May" | "Jun" | "Jul" | "Aug"
 ;                    | "Sep" | "Oct" | "Nov" | "Dec"
-(defrule expires-av-build-value
-	(char ?name 70|77|83|84|87) ; F M S T W
-	?e <- (expires-av (name ?name) (rfc1123-date nil))
+(defrule http-expires-av-build-value
+	(http-char ?name 70|77|83|84|87) ; F M S T W
+	?e <- (http-expires-av (name ?name) (rfc1123-date nil))
 	=>
-	(modify ?e (rfc1123-date (assert (rfc1123-date (name ?name))))))
+	(modify ?e (rfc1123-date (assert (http-rfc1123-date (name ?name))))))
 
-(defrule rfc1123-date-detect-wkday
-	(char ?name 70|77|83|84|87) ; F M S T W
-	?r <- (rfc1123-date (name ?name) (wkday nil))
+(defrule http-rfc1123-date-detect-wkday
+	(http-char ?name 70|77|83|84|87) ; F M S T W
+	?r <- (http-rfc1123-date (name ?name) (wkday nil))
 	=>
-	(modify ?r (wkday (assert (wkday (name ?name))))))
+	(modify ?r (wkday (assert (http-wkday (name ?name))))))
 
-(defrule build-wkday
-	?c <- (char ?name ?char&70|77|83|84|87|114|105|111|110|97|116|117|101|104|100) ; F M S T W r i o n a t u e h d
-	?w <- (wkday (name ?name) (value ?value&:(> 3 (str-length ?value))))
+(defrule http-build-wkday
+	?c <- (http-char ?name ?char&70|77|83|84|87|114|105|111|110|97|116|117|101|104|100) ; F M S T W r i o n a t u e h d
+	?w <- (http-wkday (name ?name) (value ?value&:(> 3 (str-length ?value))))
 	=>
 	(retract ?c)
 	(modify ?w (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-wkday
-	?c <- (char ?name 44) ; ,
-	?w <- (wkday (value ?value&"Fri"|"Mon"|"Sat"|"Sun"|"Tue"|"Thu"|"Wed"))
-	?r <- (rfc1123-date (name ?name) (wkday ?w))
+(defrule http-end-wkday
+	?c <- (http-char ?name 44) ; ,
+	?w <- (http-wkday (value ?value&"Fri"|"Mon"|"Sat"|"Sun"|"Tue"|"Thu"|"Wed"))
+	?r <- (http-rfc1123-date (name ?name) (wkday ?w))
 	=>
 	(retract ?c ?w)
-	(modify ?r (wkday (make-instance of WKDAY (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (wkday (make-instance of HTTP-WKDAY (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;  date1        = 2DIGIT SP month SP 4DIGIT
 ;       month        = "Jan" | "Feb" | "Mar" | "Apr"
 ;                    | "May" | "Jun" | "Jul" | "Aug"
 ;                    | "Sep" | "Oct" | "Nov" | "Dec"
-(defrule rfc1123-date-start-date1
-	?c <- (char ?name 32) ; SP
-	?r <- (rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 nil))
+(defrule http-rfc1123-date-start-date1
+	?c <- (http-char ?name 32) ; SP
+	?r <- (http-rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 nil))
 	=>
 	(retract ?c)
-	(modify ?r (date1 (assert (date1 (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (date1 (assert (http-date1 (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date1-build-first-2digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date1 (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
+(defrule http-date1-build-first-2digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date1 (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
 	=>
 	(retract ?c)
 	(modify ?d (first-2digit (format nil "%s%c" ?first ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date1-detect-end-first-2digit-start-month
-	?c <- (char ?name 32) ; SP
-	?d <- (date1 (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (month nil))
+(defrule http-date1-detect-end-first-2digit-start-month
+	?c <- (http-char ?name 32) ; SP
+	?d <- (http-date1 (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (month nil))
 	=>
 	(retract ?c)
-	(modify ?d (month (assert (month (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?d (month (assert (http-month (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-month
-	?c <- (char ?name ?char&74|97|110|70|101|98|77|114|65|112|121|117|108|103|83|79|99|116|78|111|118|68) ; J a n F e b M r A p y u l g S O c t N o v D
-	?m <- (month (name ?name) (value ?value&:(> 3 (str-length ?value))))
+(defrule http-build-month
+	?c <- (http-char ?name ?char&74|97|110|70|101|98|77|114|65|112|121|117|108|103|83|79|99|116|78|111|118|68) ; J a n F e b M r A p y u l g S O c t N o v D
+	?m <- (http-month (name ?name) (value ?value&:(> 3 (str-length ?value))))
 	=>
 	(retract ?c)
 	(modify ?m (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date1-end-month
-	?c <- (char ?name 32) ; SP
-	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
-	?d <- (date1 (name ?name) (month ?m))
+(defrule http-date1-end-month
+	?c <- (http-char ?name 32) ; SP
+	?m <- (http-month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (http-date1 (name ?name) (month ?m))
 	=>
 	(retract ?c ?m)
-	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?d (month (make-instance of HTTP-MONTH (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date1-build-last-4digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date1 (name ?name) (month ?m&:(instancep ?m)) (last-4digit ?last&:(> 4 (str-length ?last))))
+(defrule http-date1-build-last-4digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date1 (name ?name) (month ?m&:(instancep ?m)) (last-4digit ?last&:(> 4 (str-length ?last))))
 	=>
 	(retract ?c)
 	(modify ?d (last-4digit (format nil "%s%c" ?last ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc1123-end-date1
-	(char ?name 32) ; SP
-	?d <- (date1 (first-2digit ?first) (month ?month) (last-4digit ?last&:(= 4 (str-length ?last))))
-	?r <- (rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 ?d))
+(defrule http-rfc1123-end-date1
+	(http-char ?name 32) ; SP
+	?d <- (http-date1 (first-2digit ?first) (month ?month) (last-4digit ?last&:(= 4 (str-length ?last))))
+	?r <- (http-rfc1123-date (name ?name) (wkday ?w&:(instancep ?w)) (date1 ?d))
 	=>
 	(retract ?d)
-	(modify ?r (date1 (make-instance of DATE1 (filename ?name) (first-2digit ?first) (month ?month) (last-4digit ?last)))))
+	(modify ?r (date1 (make-instance of HTTP-DATE1 (id ?name) (first-2digit ?first) (month ?month) (last-4digit ?last)))))
 
 ;       time         = 2DIGIT ":" 2DIGIT ":" 2DIGIT
 ;                      ; 00:00:00 - 23:59:59
-(defrule rfc1123-date-start-time
-	?c <- (char ?name 32) ; SP
-	?r <- (rfc1123-date (name ?name) (date1 ?d&:(instancep ?d)) (time nil))
+(defrule http-rfc1123-date-start-time
+	?c <- (http-char ?name 32) ; SP
+	?r <- (http-rfc1123-date (name ?name) (date1 ?d&:(instancep ?d)) (time nil))
 	=>
 	(retract ?c)
-	(modify ?r (time (assert (time (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (time (assert (http-time (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule time-build-first-2digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?t <- (time (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
+(defrule http-time-build-first-2digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?t <- (http-time (name ?name) (first-2digit ?first&:(> 2 (str-length ?first))))
 	=>
 	(retract ?c)
 	(modify ?t (first-2digit (format nil "%s%c" ?first ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule time-detect-first-colon
-	?c <- (char ?name 58) ; :
-	?t <- (time (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (first-colon nil))
+(defrule http-time-detect-first-colon
+	?c <- (http-char ?name 58) ; :
+	?t <- (http-time (name ?name) (first-2digit ?first&:(= 2 (str-length ?first))) (first-colon nil))
 	=>
 	(retract ?c)
 	(modify ?t (first-colon TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule time-build-second-2digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?t <- (time (name ?name) (first-colon TRUE) (second-2digit ?second&:(> 2 (str-length ?second))))
+(defrule http-time-build-second-2digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?t <- (http-time (name ?name) (first-colon TRUE) (second-2digit ?second&:(> 2 (str-length ?second))))
 	=>
 	(retract ?c)
 	(modify ?t (second-2digit (format nil "%s%c" ?second ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule time-detect-second-colon
-	?c <- (char ?name 58) ; :
-	?t <- (time (name ?name) (second-2digit ?second&:(= 2 (str-length ?second))) (second-colon nil))
+(defrule http-time-detect-second-colon
+	?c <- (http-char ?name 58) ; :
+	?t <- (http-time (name ?name) (second-2digit ?second&:(= 2 (str-length ?second))) (second-colon nil))
 	=>
 	(retract ?c)
 	(modify ?t (second-colon TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule time-build-third-2digit
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?t <- (time (name ?name) (second-colon TRUE) (third-2digit ?third&:(> 2 (str-length ?third))))
+(defrule http-time-build-third-2digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?t <- (http-time (name ?name) (second-colon TRUE) (third-2digit ?third&:(> 2 (str-length ?third))))
 	=>
 	(retract ?c)
 	(modify ?t (third-2digit (format nil "%s%c" ?third ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc1123-date-end-time
-	?c <- (char ?name 32) ; SP
-	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
-	?r <- (rfc1123-date (name ?name) (time ?t))
+(defrule http-rfc1123-date-end-time
+	?c <- (http-char ?name 32) ; SP
+	?t <- (http-time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?r <- (http-rfc1123-date (name ?name) (time ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?r (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (time (make-instance of HTTP-TIME (id ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc1123-expect-GMT
-	?c <- (char ?name ?char&71|77|84) ; G M T
-	?r <- (rfc1123-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
+(defrule http-rfc1123-expect-GMT
+	?c <- (http-char ?name ?char&71|77|84) ; G M T
+	?r <- (http-rfc1123-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
 	=>
 	(retract ?c)
 	(modify ?r (GMT (format nil "%s%c" ?GMT ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expires-av-end-rfc1123
-	(char ?name 13|59) ; CR ;
-	?r <- (rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
-	?e <- (expires-av (name ?name) (rfc1123-date ?r))
+(defrule http-expires-av-end-rfc1123
+	(http-char ?name 13|59) ; CR ;
+	?r <- (http-rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
+	?e <- (http-expires-av (name ?name) (rfc1123-date ?r))
 	=>
 	(retract ?r)
-	(modify ?e (rfc1123-date (make-instance of RFC1123-DATE (filename ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
+	(modify ?e (rfc1123-date (make-instance of HTTP-RFC1123-DATE (id ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
 
-(defrule cookie-av-end-expires-av
-	(char ?name 13|59) ; CR ;
-	?e <- (expires-av (name ?name) (rfc1123-date ?r&:(instancep ?r)))
-	?ca <- (cookie-av (name ?name) (value ?e) (required-sp TRUE))
+(defrule http-cookie-av-end-expires-av
+	(http-char ?name 13|59) ; CR ;
+	?e <- (http-expires-av (name ?name) (rfc1123-date ?r&:(instancep ?r)))
+	?ca <- (http-cookie-av (name ?name) (value ?e) (required-sp TRUE))
 	=>
 	(retract ?e)
-	(modify ?ca (value (make-instance of EXPIRES-AV (filename ?name) (rfc1123-date ?r)))))
+	(modify ?ca (value (make-instance of HTTP-EXPIRES-AV (id ?name) (rfc1123-date ?r)))))
 
 ;   cookie-header     = "Cookie:" OWS cookie-string OWS
 ;   cookie-string     = cookie-pair *( ";" SP cookie-pair )
@@ -2280,808 +2314,808 @@
 ;                         ; US-ASCII characters excluding CTLs,
 ;                         ; whitespace DQUOTE, comma, semicolon,
 ;                         ; and backslash
-(defrule detect-cookie-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Cookie"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-cookie-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Cookie"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (cookie-header (name ?name) (cookie-pairs (assert (cookie-pair (name ?name)))))))))
+	(modify ?fv (value (assert (http-cookie-header (name ?name) (cookie-pairs (assert (http-cookie-pair (name ?name)))))))))
 
-(defrule cookie-pair-detect-cookie-name
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?c <- (cookie-pair (name ?name) (cookie-name nil))
+(defrule http-cookie-pair-detect-cookie-name
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?c <- (http-cookie-pair (name ?name) (cookie-name nil))
 	=>
-	(modify ?c (cookie-name (assert (token (name ?name))))))
+	(modify ?c (cookie-name (assert (http-token (name ?name))))))
 
-(defrule cookie-pair-end-cookie-name
-	?c <- (char ?name 61) ; =
-	?t <- (token (value ?value))
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?t))
+(defrule http-cookie-pair-end-cookie-name
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token (value ?value))
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?t))
 	=>
 	(retract ?c ?t)
 	(modify ?cookie-pair (cookie-name ?value))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-pair-detect-cookie-value
-	(char ?name ?char&:(member$ ?char ?*cookie-octet*))
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
+(defrule http-cookie-pair-detect-cookie-value
+	(http-char ?name ?char&:(member$ ?char ?*http-cookie-octet*))
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
 	=>
 	(modify ?cookie-pair (cookie-value-quoted FALSE)))
 
-(defrule cookie-pair-detect-quoted-cookie-value
-	?c <- (char ?name 34) ; "
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
+(defrule http-cookie-pair-detect-quoted-cookie-value
+	?c <- (http-char ?name 34) ; "
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value "") (cookie-value-quoted nil))
 	=>
 	(retract ?c)
 	(modify ?cookie-pair (cookie-value-quoted TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-pair-build-cookie-value
-	?c <- (char ?name ?char&:(member$ ?char ?*cookie-octet*))
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?value) (cookie-value-quoted TRUE|FALSE))
+(defrule http-cookie-pair-build-cookie-value
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-cookie-octet*))
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?value) (cookie-value-quoted TRUE|FALSE))
 	=>
 	(retract ?c)
 	(modify ?cookie-pair (cookie-value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-header-end-quoted-cookie-pair
-	?c <- (char ?name 34) ; "
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
-	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+(defrule http-cookie-header-end-quoted-cookie-pair
+	?c <- (http-char ?name 34) ; "
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))
+	?cookie-header <- (http-cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
 	=>
 	(retract ?c ?cookie-pair)
-	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of HTTP-COOKIE-PAIR (id ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted TRUE))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-header-end-cookie-pair
-	(char ?name 13|32|59) ; CR SP ;
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
-	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+(defrule http-cookie-header-end-cookie-pair
+	(http-char ?name 13|32|59) ; CR SP ;
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name ?cookie-name&:(stringp ?cookie-name)) (cookie-value ?cookie-value) (cookie-value-quoted FALSE|nil))
+	?cookie-header <- (http-cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
 	=>
 	(retract ?cookie-pair)
-	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of COOKIE-PAIR (filename ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs (make-instance of HTTP-COOKIE-PAIR (id ?name) (cookie-name ?cookie-name) (cookie-value ?cookie-value) (cookie-value-quoted FALSE)))))
 
-(defrule cookie-header-skip-ows-after-end-cookie-pair
-	?c <- (char ?name 32) ; SP
-	?cookie-header <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+(defrule http-cookie-header-skip-ows-after-end-cookie-pair
+	?c <- (http-char ?name 32) ; SP
+	?cookie-header <- (http-cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-header-detect-next-cookie-pair
-	?c <- (char ?name 59) ; ;
-	?cookie-header <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+(defrule http-cookie-header-detect-next-cookie-pair
+	?c <- (http-char ?name 59) ; ;
+	?cookie-header <- (http-cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
 	=>
 	(retract ?c)
-	(modify ?cookie-header (cookie-pairs ?cookie-pairs ?cookie-pair (assert (cookie-pair (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cookie-header (cookie-pairs ?cookie-pairs ?cookie-pair (assert (http-cookie-pair (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cookie-header-skip-ows-before-next-cookie-pair
-	?c <- (char ?name 32) ; SP
-	?cookie-pair <- (cookie-pair (name ?name) (cookie-name nil))
-	?cookie-header <- (cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
+(defrule http-cookie-header-skip-ows-before-next-cookie-pair
+	?c <- (http-char ?name 32) ; SP
+	?cookie-pair <- (http-cookie-pair (name ?name) (cookie-name nil))
+	?cookie-header <- (http-cookie-header (cookie-pairs $?cookie-pairs ?cookie-pair))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-cookie-header
-	(char ?name 13) ; CR
-	?clh <- (cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-cookie-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-cookie-header (name ?name) (cookie-pairs $?cookie-pairs ?cookie-pair&:(instancep ?cookie-pair)))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of COOKIE-HEADER (filename ?name) (cookie-pairs ?cookie-pairs ?cookie-pair)))))
+	(modify ?fv (value (make-instance of HTTP-COOKIE-HEADER (id ?name) (cookie-pairs ?cookie-pairs ?cookie-pair)))))
 
 ; Allow = #method
-(defrule detect-allow-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Allow"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-allow-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Allow"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (allow-header (name ?name) (methods (assert (method (name ?name)))))))))
+	(modify ?fv (value (assert (http-allow-header (name ?name) (methods (assert (http-method (name ?name)))))))))
 
-(defrule allow-header-detect-next-method
-	?c <- (char ?name 44) ; ,
-	?a <- (allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
-	=>
-	(retract ?c)
-	(modify ?a (methods ?methods ?method (assert (method (name ?name)))))
-	(assert (char ?name (get-char ?name))))
-
-(defrule allow-header-skip-ows-before-method
-	?c <- (char ?name 9|13|32) ; HTAB CR SP
-	?method <- (method (name ?name) (value ""))
-	(allow-header (name ?name) (methods $?methods ?method))
+(defrule http-allow-header-detect-next-method
+	?c <- (http-char ?name 44) ; ,
+	?a <- (http-allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (methods ?methods ?method (assert (http-method (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule allow-header-end-method
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?method <- (method (name ?name) (value ?value&~""))
-	?a <- (allow-header (name ?name) (methods $?methods ?method))
+(defrule http-allow-header-skip-ows-before-method
+	?c <- (http-char ?name 9|13|32) ; HTAB CR SP
+	?method <- (http-method (name ?name) (value ""))
+	(http-allow-header (name ?name) (methods $?methods ?method))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-allow-header-end-method
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?method <- (http-method (name ?name) (value ?value&~""))
+	?a <- (http-allow-header (name ?name) (methods $?methods ?method))
 	=>
 	(retract ?method)
-	(modify ?a (methods ?methods (make-instance of METHOD (filename ?name) (value ?value)))))
+	(modify ?a (methods ?methods (make-instance of HTTP-METHOD (id ?name) (value ?value)))))
 
-(defrule allow-header-skip-ows-after-method
-	?c <- (char ?name 9|32) ; HTAB CR SP
-	(allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
+(defrule http-allow-header-skip-ows-after-method
+	?c <- (http-char ?name 9|32) ; HTAB CR SP
+	(http-allow-header (name ?name) (methods $?methods ?method&:(instancep ?method)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-allow-header
-	(char ?name 13) ; CR
-	?clh <- (allow-header (name ?name) (methods $?methods&:(instancep (nth$ (length$ ?methods) ?methods))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-allow-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-allow-header (name ?name) (methods $?methods&:(instancep (nth$ (length$ ?methods) ?methods))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of ALLOW-HEADER (filename ?name) (methods ?methods)))))
+	(modify ?fv (value (make-instance of HTTP-ALLOW-HEADER (id ?name) (methods ?methods)))))
 
 ; Connection = #connection-option ; connection-option = token
 ; Accept-Ranges = 1#range-unit ; range-unit = token
 ; Vary = #( "*" / field-name ) ; field-name = token
 ; Trailer = #field-name
 ; Content-Encoding = #content-coding ; content-coding = token
-(defrule detect-token-list-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Connection"|"Accept-Ranges"|"Vary"|"Trailer"|"Content-Encoding"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-token-list-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Connection"|"Accept-Ranges"|"Vary"|"Trailer"|"Content-Encoding"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (token-list-header (name ?name) (tokens (assert (token (name ?name)))))))))
+	(modify ?fv (value (assert (http-token-list-header (name ?name) (tokens (assert (http-token (name ?name)))))))))
 
-(defrule token-list-header-end-token
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (token (name ?name) (value ?value&~""))
-	?h <- (token-list-header (name ?name) (tokens $?tokens ?t))
+(defrule http-token-list-header-end-token
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens ?t))
 	=>
 	(retract ?t)
 	(modify ?h (tokens ?tokens ?value)))
 
-(defrule token-list-header-detect-next-token
-	?c <- (char ?name 44) ; ,
-	?h <- (token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
+(defrule http-token-list-header-detect-next-token
+	?c <- (http-char ?name 44) ; ,
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
 	=>
 	(retract ?c)
-	(modify ?h (tokens ?tokens ?token (assert (token (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (tokens ?tokens ?token (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule token-list-header-skip-ows-before-token
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (name ?name) (value ""))
-	(token-list-header (name ?name) (tokens $?tokens ?t))
+(defrule http-token-list-header-skip-ows-before-token
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	(http-token-list-header (name ?name) (tokens $?tokens ?t))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule token-list-header-skip-ows-after-token
-	?c <- (char ?name 9|32) ; HTAB SP
-	(token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
+(defrule http-token-list-header-skip-ows-after-token
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-token-list-header (name ?name) (tokens $?tokens ?token&:(stringp ?token)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-connection-header
-	(char ?name 13) ; CR
-	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Connection"))
+(defrule http-end-connection-header
+	(http-char ?name 13) ; CR
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Connection"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of CONNECTION-HEADER (filename ?name) (tokens ?tokens)))))
+	(modify ?fv (value (make-instance of HTTP-CONNECTION-HEADER (id ?name) (tokens ?tokens)))))
 
-(defrule end-accept-ranges-header
-	(char ?name 13) ; CR
-	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Accept-Ranges"))
+(defrule http-end-accept-ranges-header
+	(http-char ?name 13) ; CR
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Accept-Ranges"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of ACCEPT-RANGES-HEADER (filename ?name) (tokens ?tokens)))))
+	(modify ?fv (value (make-instance of HTTP-ACCEPT-RANGES-HEADER (id ?name) (tokens ?tokens)))))
 
-(defrule end-vary-header
-	(char ?name 13) ; CR
-	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Vary"))
+(defrule http-end-vary-header
+	(http-char ?name 13) ; CR
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Vary"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of VARY-HEADER (filename ?name) (tokens ?tokens)))))
+	(modify ?fv (value (make-instance of HTTP-VARY-HEADER (id ?name) (tokens ?tokens)))))
 
-(defrule end-trailer-header
-	(char ?name 13) ; CR
-	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Trailer"))
+(defrule http-end-trailer-header
+	(http-char ?name 13) ; CR
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Trailer"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of TRAILER-HEADER (filename ?name) (tokens ?tokens)))))
+	(modify ?fv (value (make-instance of HTTP-TRAILER-HEADER (id ?name) (tokens ?tokens)))))
 
-(defrule end-content-encoding-header
-	(char ?name 13) ; CR
-	?h <- (token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Content-Encoding"))
+(defrule http-end-content-encoding-header
+	(http-char ?name 13) ; CR
+	?h <- (http-token-list-header (name ?name) (tokens $?tokens&:(stringp (nth$ (length$ ?tokens) ?tokens))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Content-Encoding"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of CONTENT-ENCODING-HEADER (filename ?name) (tokens ?tokens)))))
+	(modify ?fv (value (make-instance of HTTP-CONTENT-ENCODING-HEADER (id ?name) (tokens ?tokens)))))
 
 ;   Accept = #( media-range [ weight ] )
 ;   media-range    = ( "*/*"
 ;                     / ( type "/" "*" )
 ;                     / ( type "/" subtype )
 ;                   ) parameters
-(defrule detect-accept-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Accept"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-accept-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Accept"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (accept-header (name ?name) (media-ranges (assert (media-range (name ?name)))))))))
+	(modify ?fv (value (assert (http-accept-header (name ?name) (media-ranges (assert (http-media-range (name ?name)))))))))
 
-(defrule media-range-detect-type
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?m <- (media-range (name ?name) (type nil))
+(defrule http-media-range-detect-type
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?m <- (http-media-range (name ?name) (type nil))
 	=>
-	(modify ?m (type (assert (type (name ?name))))))
+	(modify ?m (type (assert (http-type (name ?name))))))
 
-(defrule media-range-end-type
-	?c <- (char ?name 47) ; /
-	?t <- (type (name ?name) (value ?value))
-	?m <- (media-range (type ?t))
+(defrule http-media-range-end-type
+	?c <- (http-char ?name 47) ; /
+	?t <- (http-type (name ?name) (value ?value))
+	?m <- (http-media-range (type ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?m (type (make-instance of TYPE (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?m (type (make-instance of HTTP-TYPE (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule media-range-detect-subtype
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?m <- (media-range (name ?name) (type ?t&:(instancep ?t)) (subtype nil))
+(defrule http-media-range-detect-subtype
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?m <- (http-media-range (name ?name) (type ?t&:(instancep ?t)) (subtype nil))
 	=>
-	(modify ?m (subtype (assert (subtype (name ?name))))))
+	(modify ?m (subtype (assert (http-subtype (name ?name))))))
 
-(defrule media-range-end-subtype
-	(char ?name 13|32|44|59) ; CR SP , ;
-	?s <- (subtype (name ?name) (value ?value))
-	?m <- (media-range (subtype ?s))
+(defrule http-media-range-end-subtype
+	(http-char ?name 13|32|44|59) ; CR SP , ;
+	?s <- (http-subtype (name ?name) (value ?value))
+	?m <- (http-media-range (subtype ?s))
 	=>
 	(retract ?s)
-	(modify ?m (subtype (make-instance of SUBTYPE (filename ?name) (value ?value)))))
+	(modify ?m (subtype (make-instance of HTTP-SUBTYPE (id ?name) (value ?value)))))
 
-(defrule media-range-detect-parameter
-	?c <- (char ?name 59) ; ;
-	?cth <- (media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight nil))
+(defrule http-media-range-detect-parameter
+	?c <- (http-char ?name 59) ; ;
+	?cth <- (http-media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight nil))
 	=>
 	(retract ?c)
-	(modify ?cth (parameters ?parameters (assert (parameter (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cth (parameters ?parameters (assert (http-parameter (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule media-range-detect-ows
-	?c <- (char ?name 32) ; SP
-	(media-range (name ?name) (type ?t) (subtype ?s) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+(defrule http-media-range-detect-ows
+	?c <- (http-char ?name 32) ; SP
+	(http-media-range (name ?name) (type ?t) (subtype ?s) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	(test (or
 		(and (eq ?t nil) (eq ?s nil))
 		(and (instancep ?t) (instancep ?s))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule media-range-end-parameter
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
-	?m <- (media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
+(defrule http-media-range-end-parameter
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?m <- (http-media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?m (parameters ?parameters (make-instance of PARAMETER (filename ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
+	(modify ?m (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
 
-(defrule media-range-end-weight
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
-	?m <- (media-range (name ?name) (weight ?w))
+(defrule http-media-range-end-weight
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (http-weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?m <- (http-media-range (name ?name) (weight ?w))
 	=>
 	(retract ?w)
-	(modify ?m (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+	(modify ?m (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
-(defrule accept-header-end-media-range
-	(char ?name 13|44) ; CR ,
-	?m <- (media-range (name ?name) (type ?type) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight ?weight&nil|:(instancep ?weight)))
-	?a <- (accept-header (name ?name) (media-ranges $?media-ranges ?m))
+(defrule http-accept-header-end-media-range
+	(http-char ?name 13|44) ; CR ,
+	?m <- (http-media-range (name ?name) (type ?type) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight ?weight&nil|:(instancep ?weight)))
+	?a <- (http-accept-header (name ?name) (media-ranges $?media-ranges ?m))
 	=>
 	(retract ?m)
-	(modify ?a (media-ranges ?media-ranges (make-instance of MEDIA-RANGE (filename ?name) (type ?type) (subtype ?subtype) (parameters ?parameters) (weight ?weight)))))
+	(modify ?a (media-ranges ?media-ranges (make-instance of HTTP-MEDIA-RANGE (id ?name) (type ?type) (subtype ?subtype) (parameters ?parameters) (weight ?weight)))))
 
-(defrule accept-header-start-next-media-range
-	?c <- (char ?name 44) ; ,
-	?a <- (accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
+(defrule http-accept-header-start-next-media-range
+	?c <- (http-char ?name 44) ; ,
+	?a <- (http-accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
 	=>
 	(retract ?c)
-	(modify ?a (media-ranges ?media-ranges (assert (media-range (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (media-ranges ?media-ranges (assert (http-media-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-accept-header
-	(char ?name 13) ; CR
-	?clh <- (accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-accept-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-accept-header (name ?name) (media-ranges $?media-ranges&:(instancep (nth$ (length$ ?media-ranges) ?media-ranges))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of ACCEPT-HEADER (filename ?name) (media-ranges ?media-ranges)))))
+	(modify ?fv (value (make-instance of HTTP-ACCEPT-HEADER (id ?name) (media-ranges ?media-ranges)))))
 
 ;   Accept-Encoding  = #( codings [ weight ] )
 ;   codings          = content-coding / "identity" / "*"
 ;   content-coding = token
 ;   weight = OWS ";" OWS "q=" qvalue
-(defrule detect-accept-encoding-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Accept-Encoding"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-accept-encoding-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Accept-Encoding"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (accept-encoding-header (name ?name) (codings (assert (coding (name ?name) (codings (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-accept-encoding-header (name ?name) (codings (assert (http-coding (name ?name) (codings (assert (http-token (name ?name))))))))))))
 
-(defrule accept-encoding-header-start-next-coding
-	?c <- (char ?name 44) ; ,
-	?a <- (accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
+(defrule http-accept-encoding-header-start-next-coding
+	?c <- (http-char ?name 44) ; ,
+	?a <- (http-accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
 	=>
 	(retract ?c)
-	(modify ?a (codings ?codings (assert (coding (name ?name) (codings (assert (token (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (codings ?codings (assert (http-coding (name ?name) (codings (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule coding-end-codings
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?t <- (token (value ?value&~""))
-	?c <- (coding (name ?name) (codings ?t))
+(defrule http-coding-end-codings
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (value ?value&~""))
+	?c <- (http-coding (name ?name) (codings ?t))
 	=>
 	(retract ?t)
 	(modify ?c (codings ?value)))
 
-(defrule coding-skip-ows-before-codings
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (value ""))
-	(coding (name ?name) (codings ?t))
+(defrule http-coding-skip-ows-before-codings
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (value ""))
+	(http-coding (name ?name) (codings ?t))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule coding-skip-ows-before-weight
-	?c <- (char ?name 9|32) ; HTAB SP
-	(coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
+(defrule http-coding-skip-ows-before-weight
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule coding-detect-weight
-	?ch <- (char ?name 59) ; ;
-	?co <- (coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
+(defrule http-coding-detect-weight
+	?ch <- (http-char ?name 59) ; ;
+	?co <- (http-coding (name ?name) (codings ?content-coding&:(stringp ?content-coding)) (weight nil))
 	=>
 	(retract ?ch)
-	(modify ?co (weight (assert (weight (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?co (weight (assert (http-weight (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule weight-ignore-ows-before-q
-	?c <- (char ?name 9|32) ; HTAB SP
-	(weight (name ?name) (q nil))
+(defrule http-weight-ignore-ows-before-q
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-weight (name ?name) (q nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule weight-detect-q
-	?c <- (char ?name 113) ; q
-	?w <- (weight (name ?name) (q nil))
+(defrule http-weight-detect-q
+	?c <- (http-char ?name 113) ; q
+	?w <- (http-weight (name ?name) (q nil))
 	=>
 	(retract ?c)
 	(modify ?w (q TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 	
-(defrule weight-detect-equals
-	?c <- (char ?name 61) ; =
-	?w <- (weight (name ?name) (q TRUE) (equals nil))
+(defrule http-weight-detect-equals
+	?c <- (http-char ?name 61) ; =
+	?w <- (http-weight (name ?name) (q TRUE) (equals nil))
 	=>
 	(retract ?c)
 	(modify ?w (equals TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule weight-detect-qvalue
-	(char ?name ?char&48|49) ; 0 1
-	?w <- (weight (name ?name) (equals TRUE) (qvalue nil))
+(defrule http-weight-detect-qvalue
+	(http-char ?name ?char&48|49) ; 0 1
+	?w <- (http-weight (name ?name) (equals TRUE) (qvalue nil))
 	=>
-	(modify ?w (qvalue (assert (qvalue (name ?name))))))
+	(modify ?w (qvalue (assert (http-qvalue (name ?name))))))
 
-(defrule qvalue-detect-first-digit
-	?c <- (char ?name ?char&48|49) ; 0 1
-	?q <- (qvalue (name ?name) (first nil))
+(defrule http-qvalue-detect-first-digit
+	?c <- (http-char ?name ?char&48|49) ; 0 1
+	?q <- (http-qvalue (name ?name) (first nil))
 	=>
 	(retract ?c)
 	(modify ?q (first (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule qvalue-detect-decimal
-	?c <- (char ?name 46) ; .
-	?q <- (qvalue (name ?name) (first "0"|"1") (decimal nil))
+(defrule http-qvalue-detect-decimal
+	?c <- (http-char ?name 46) ; .
+	?q <- (http-qvalue (name ?name) (first "0"|"1") (decimal nil))
 	=>
 	(retract ?c)
 	(modify ?q (decimal TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule qvalue-detect-digit-after-0
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?q <- (qvalue (name ?name) (first "0") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
+(defrule http-qvalue-detect-digit-after-0
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?q <- (http-qvalue (name ?name) (first "0") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
 	=>
 	(retract ?c)
 	(modify ?q (fraction (format nil "%s%c" ?fraction ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule qvalue-detect-0-after-1
-	?c <- (char ?name 48) ; 0
-	?q <- (qvalue (name ?name) (first "0"|"1") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
+(defrule http-qvalue-detect-0-after-1
+	?c <- (http-char ?name 48) ; 0
+	?q <- (http-qvalue (name ?name) (first "0"|"1") (decimal TRUE) (fraction ?fraction&:(> 3 (str-length ?fraction))))
 	=>
 	(retract ?c)
 	(modify ?q (fraction (format nil "%s%c" ?fraction 48)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; qvalue = ( "0" [ "." *3DIGIT ] ) / ( "1" [ "." *3"0" ] )
 
-(defrule weight-end-qvalue
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?q <- (qvalue (first ?first) (decimal ?decimal) (fraction ?fraction))
-	?w <- (weight (name ?name) (qvalue ?q))
+(defrule http-weight-end-qvalue
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?q <- (http-qvalue (first ?first) (decimal ?decimal) (fraction ?fraction))
+	?w <- (http-weight (name ?name) (qvalue ?q))
 	=>
 	(retract ?q)
-	(modify ?w (qvalue (make-instance of QVALUE (filename ?name) (first ?first) (decimal ?decimal) (fraction ?fraction)))))
+	(modify ?w (qvalue (make-instance of HTTP-QVALUE (id ?name) (first ?first) (decimal ?decimal) (fraction ?fraction)))))
 
-(defrule coding-end-weight
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
-	?c <- (coding (name ?name) (weight ?w))
+(defrule http-coding-end-weight
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (http-weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?c <- (http-coding (name ?name) (weight ?w))
 	=>
 	(retract ?w)
-	(modify ?c (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+	(modify ?c (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
-(defrule accept-encoding-header-end-coding
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?c <- (coding (codings ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
-	?a <- (accept-encoding-header (name ?name) (codings $?codings ?c))
+(defrule http-accept-encoding-header-end-coding
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?c <- (http-coding (codings ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?a <- (http-accept-encoding-header (name ?name) (codings $?codings ?c))
 	=>
 	(retract ?c)
-	(modify ?a (codings ?codings (make-instance of CODING (filename ?name) (codings ?value) (weight ?w)))))
+	(modify ?a (codings ?codings (make-instance of HTTP-CODING (id ?name) (codings ?value) (weight ?w)))))
 
-(defrule end-accept-encoding-header
-	(char ?name 9|13|32) ; HTAB CR SP
-	?clh <- (accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-accept-encoding-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?clh <- (http-accept-encoding-header (name ?name) (codings $?codings&:(instancep (nth$ (length$ ?codings) ?codings))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of ACCEPT-ENCODING-HEADER (filename ?name) (codings ?codings)))))
+	(modify ?fv (value (make-instance of HTTP-ACCEPT-ENCODING-HEADER (id ?name) (codings ?codings)))))
 
 ;   Accept-Charset = #( ( token / "*" ) [ weight ] )
 ;   weight = OWS ";" OWS "q=" qvalue
-(defrule detect-accept-charset-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Accept-Charset"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-accept-charset-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Accept-Charset"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (accept-charset-header (name ?name) (charsets (assert (charset (name ?name) (charset (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-accept-charset-header (name ?name) (charsets (assert (http-charset (name ?name) (charset (assert (http-token (name ?name))))))))))))
 
-(defrule accept-charset-header-start-next-charset
-	?c <- (char ?name 44) ; ,
-	?a <- (accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
-	=>
-	(retract ?c)
-	(modify ?a (charsets ?charsets (assert (charset (name ?name) (charset (assert (token (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
-
-(defrule charset-skip-ows-before-charset
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (value ""))
-	(charset (name ?name) (charset ?t))
+(defrule http-accept-charset-header-start-next-charset
+	?c <- (http-char ?name 44) ; ,
+	?a <- (http-accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (charsets ?charsets (assert (http-charset (name ?name) (charset (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule charset-end-charset
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?t <- (token (value ?value&~""))
-	?c <- (charset (name ?name) (charset ?t))
+(defrule http-charset-skip-ows-before-charset
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (value ""))
+	(http-charset (name ?name) (charset ?t))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-charset-end-charset
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (value ?value&~""))
+	?c <- (http-charset (name ?name) (charset ?t))
 	=>
 	(retract ?t)
 	(modify ?c (charset ?value)))
 
-(defrule charset-skip-ows-before-weight
-	?c <- (char ?name 9|32) ; HTAB SP
-	(charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
+(defrule http-charset-skip-ows-before-weight
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule charset-detect-weight
-	?ch <- (char ?name 59) ; ;
-	?c <- (charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
+(defrule http-charset-detect-weight
+	?ch <- (http-char ?name 59) ; ;
+	?c <- (http-charset (name ?name) (charset ?charset&:(stringp ?charset)) (weight nil))
 	=>
 	(retract ?ch)
-	(modify ?c (weight (assert (weight (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?c (weight (assert (http-weight (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule charset-end-weight
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
-	?c <- (charset (name ?name) (weight ?w))
+(defrule http-charset-end-weight
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (http-weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?c <- (http-charset (name ?name) (weight ?w))
 	=>
 	(retract ?w)
-	(modify ?c (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+	(modify ?c (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
-(defrule charset-skip-ows-after-weight
-	?ch <- (char ?name 9|32) ; HTAB SP
-	(charset (name ?name) (weight ?w&:(instancep ?w)))
+(defrule http-charset-skip-ows-after-weight
+	?ch <- (http-char ?name 9|32) ; HTAB SP
+	(http-charset (name ?name) (weight ?w&:(instancep ?w)))
 	=>
 	(retract ?ch)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule accept-charset-header-end-charset
-	(char ?name 13|44) ; CR ,
-	?c <- (charset (charset ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
-	?a <- (accept-charset-header (name ?name) (charsets $?charsets ?c))
+(defrule http-accept-charset-header-end-charset
+	(http-char ?name 13|44) ; CR ,
+	?c <- (http-charset (charset ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?a <- (http-accept-charset-header (name ?name) (charsets $?charsets ?c))
 	=>
 	(retract ?c)
-	(modify ?a (charsets ?charsets (make-instance of CHARSET (filename ?name) (charset ?value) (weight ?w)))))
+	(modify ?a (charsets ?charsets (make-instance of HTTP-CHARSET (id ?name) (charset ?value) (weight ?w)))))
 
-(defrule end-accept-charset-header
-	(char ?name 13) ; CR
-	?clh <- (accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-accept-charset-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-accept-charset-header (name ?name) (charsets $?charsets&:(instancep (nth$ (length$ ?charsets) ?charsets))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of ACCEPT-CHARSET-HEADER (filename ?name) (charsets ?charsets)))))
+	(modify ?fv (value (make-instance of HTTP-ACCEPT-CHARSET-HEADER (id ?name) (charsets ?charsets)))))
 
 ;   Upgrade          = #protocol
 ;  protocol         = protocol-name ["/" protocol-version]
 ;  protocol-name    = token
 ;  protocol-version = token
-(defrule detect-upgrade-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Upgrade"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-upgrade-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Upgrade"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (upgrade-header (name ?name))))))
+	(modify ?fv (value (assert (http-upgrade-header (name ?name))))))
 
-(defrule upgrade-header-detect-protocol
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?u <- (upgrade-header (name ?name) (protocols))
+(defrule http-upgrade-header-detect-protocol
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?u <- (http-upgrade-header (name ?name) (protocols))
 	=>
-	(modify ?u (protocols (assert (protocol (name ?name))))))
+	(modify ?u (protocols (assert (http-protocol (name ?name))))))
 
-(defrule protocol-detect-protocol-name
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?p <- (protocol (name ?name) (protocol-name nil))
+(defrule http-protocol-detect-protocol-name
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?p <- (http-protocol (name ?name) (protocol-name nil))
 	=>
-	(modify ?p (protocol-name (assert (token (name ?name))))))
+	(modify ?p (protocol-name (assert (http-token (name ?name))))))
 
-(defrule protocol-end-protocol-name
-	(char ?name 9|13|32|44|47) ; HTAB CR SP , /
-	?t <- (token (value ?value&~""))
-	?p <- (protocol (name ?name) (protocol-name ?t))
+(defrule http-protocol-end-protocol-name
+	(http-char ?name 9|13|32|44|47) ; HTAB CR SP , /
+	?t <- (http-token (value ?value&~""))
+	?p <- (http-protocol (name ?name) (protocol-name ?t))
 	=>
 	(retract ?t)
 	(modify ?p (protocol-name ?value)))
 
-(defrule protocol-start-protocol-version
-	?c <- (char ?name 47) ; /
-	?p <- (protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version nil))
+(defrule http-protocol-start-protocol-version
+	?c <- (http-char ?name 47) ; /
+	?p <- (http-protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version nil))
 	=>
 	(retract ?c)
-	(modify ?p (protocol-version (assert (token (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (protocol-version (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule protocol-end-protocol-version
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (token (value ?value&~""))
-	?p <- (protocol (name ?name) (protocol-version ?t))
+(defrule http-protocol-end-protocol-version
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-token (value ?value&~""))
+	?p <- (http-protocol (name ?name) (protocol-version ?t))
 	=>
 	(retract ?t)
 	(modify ?p (protocol-version ?value)))
 
-(defrule upgrade-header-end-protocol
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?p <- (protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version ?protocol-version&nil|:(stringp ?protocol-version)))
-	?u <- (upgrade-header (name ?name) (protocols $?protocols ?p))
+(defrule http-upgrade-header-end-protocol
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?p <- (http-protocol (name ?name) (protocol-name ?protocol-name&:(stringp ?protocol-name)) (protocol-version ?protocol-version&nil|:(stringp ?protocol-version)))
+	?u <- (http-upgrade-header (name ?name) (protocols $?protocols ?p))
 	=>
 	(retract ?p)
-	(modify ?u (protocols ?protocols (make-instance of PROTOCOL (filename ?name) (protocol-name ?protocol-name) (protocol-version ?protocol-version)))))
+	(modify ?u (protocols ?protocols (make-instance of HTTP-PROTOCOL (id ?name) (protocol-name ?protocol-name) (protocol-version ?protocol-version)))))
 
-(defrule upgrade-header-detect-next-protocol
-	?c <- (char ?name 44) ; ,
-	?u <- (upgrade-header (name ?name) (protocols $?protocols ?protocol&:(instancep ?protocol)))
+(defrule http-upgrade-header-detect-next-protocol
+	?c <- (http-char ?name 44) ; ,
+	?u <- (http-upgrade-header (name ?name) (protocols $?protocols ?protocol&:(instancep ?protocol)))
 	=>
 	(retract ?c)
-	(modify ?u (protocols ?protocols ?protocol (assert (protocol (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?u (protocols ?protocols ?protocol (assert (http-protocol (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule upgrade-header-skip-ows-after-protocol
-	?c <- (char ?name 9|32) ; HTAB SP
-	(upgrade-header (name ?name) (protocols $?protocols&:(= 0 (length$ ?protocols))|:(instancep (nth$ (length$ ?protocols) ?protocols))))
+(defrule http-upgrade-header-skip-ows-after-protocol
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-upgrade-header (name ?name) (protocols $?protocols&:(= 0 (length$ ?protocols))|:(instancep (nth$ (length$ ?protocols) ?protocols))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule upgrade-header-skip-ows-before-protocol
-	?c <- (char ?name 9|32) ; HTAB SP
-	?p <- (protocol (protocol-name nil))
-	(upgrade-header (name ?name) (protocols $?protocols ?p))
+(defrule http-upgrade-header-skip-ows-before-protocol
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?p <- (http-protocol (protocol-name nil))
+	(http-upgrade-header (name ?name) (protocols $?protocols ?p))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-upgrade-header
-	(char ?name 13) ; CR
-	?u <- (upgrade-header (protocols $?protocols&:(instancep (nth$ (length$ ?protocols) ?protocols))))
-	?f <- (field-value (name ?name) (value ?u))
+(defrule http-end-upgrade-header
+	(http-char ?name 13) ; CR
+	?u <- (http-upgrade-header (protocols $?protocols&:(instancep (nth$ (length$ ?protocols) ?protocols))))
+	?f <- (http-field-value (name ?name) (value ?u))
 	=>
 	(retract ?u)
-	(modify ?f (value (make-instance of UPGRADE-HEADER (filename ?name) (protocols ?protocols)))))
+	(modify ?f (value (make-instance of HTTP-UPGRADE-HEADER (id ?name) (protocols ?protocols)))))
 
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
-(defrule detect-via-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Via"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-via-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Via"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (via-header (name ?name))))))
+	(modify ?fv (value (assert (http-via-header (name ?name))))))
 
-(defrule via-header-value-skip-ows-before-received-protocol
-	?c <- (char ?name 9|32) ; HTAB SP
-	(via-header-value (name ?name) (received-protocol nil))
+(defrule http-via-header-value-skip-ows-before-received-protocol
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-via-header-value (name ?name) (received-protocol nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule via-header-detect-value
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?v <- (via-header (name ?name) (values $?values&:(= 0 (length$ ?values))|:(instancep (nth$ (length$ ?values) ?values))))
+(defrule http-via-header-detect-value
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?v <- (http-via-header (name ?name) (values $?values&:(= 0 (length$ ?values))|:(instancep (nth$ (length$ ?values) ?values))))
 	=>
-	(modify ?v (values ?values (assert (via-header-value (name ?name))))))
+	(modify ?v (values ?values (assert (http-via-header-value (name ?name))))))
 
-(defrule via-header-value-detect-received-protocol
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?v <- (via-header-value (name ?name) (received-protocol nil))
+(defrule http-via-header-value-detect-received-protocol
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?v <- (http-via-header-value (name ?name) (received-protocol nil))
 	=>
-	(modify ?v (received-protocol (assert (received-protocol (name ?name))))))
+	(modify ?v (received-protocol (assert (http-received-protocol (name ?name))))))
 
 ;  received-protocol = [ protocol-name "/" ] protocol-version
-(defrule received-protocol-detect-protocol-name
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?r <- (received-protocol (name ?name) (protocol-name nil) (protocol-version nil))
+(defrule http-received-protocol-detect-protocol-name
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?r <- (http-received-protocol (name ?name) (protocol-name nil) (protocol-version nil))
 	=>
-	(modify ?r (protocol-name (assert (token (name ?name))))))
+	(modify ?r (protocol-name (assert (http-token (name ?name))))))
 
-(defrule received-protocol-end-protocol-name-start-protocol-version
-	?c <- (char ?name 47) ; /
-	?t <- (token (value ?value&~""))
-	?r <- (received-protocol (name ?name) (protocol-name ?t))
+(defrule http-received-protocol-end-protocol-name-start-protocol-version
+	?c <- (http-char ?name 47) ; /
+	?t <- (http-token (value ?value&~""))
+	?r <- (http-received-protocol (name ?name) (protocol-name ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?r (protocol-name ?value) (protocol-version (assert (token (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (protocol-name ?value) (protocol-version (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule received-protocol-change-protocol-name-to-protocol-version
-	(char ?name 9|32) ; HTAB SP
-	?t <- (token)
-	?r <- (received-protocol (name ?name) (protocol-name ?t))
+(defrule http-received-protocol-change-protocol-name-to-protocol-version
+	(http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token)
+	?r <- (http-received-protocol (name ?name) (protocol-name ?t))
 	=>
 	(modify ?r (protocol-name nil) (protocol-version ?t)))
 
-(defrule via-header-value-end-received-protocol
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (value ?value))
-	?r <- (received-protocol (protocol-name ?protocol-name) (protocol-version ?t))
-	?v <- (via-header-value (name ?name) (received-protocol ?r))
+(defrule http-via-header-value-end-received-protocol
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (value ?value))
+	?r <- (http-received-protocol (protocol-name ?protocol-name) (protocol-version ?t))
+	?v <- (http-via-header-value (name ?name) (received-protocol ?r))
 	=>
 	(retract ?c ?t ?r)
-	(modify ?v (received-protocol (make-instance of RECEIVED-PROTOCOL (filename ?name) (protocol-name ?protocol-name) (protocol-version ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?v (received-protocol (make-instance of HTTP-RECEIVED-PROTOCOL (id ?name) (protocol-name ?protocol-name) (protocol-version ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule via-header-skip-extra-RWS-after-received-protocol
-	?c <- (char ?name 9|32) ; HTAB SP
-	?v <- (via-header-value (name ?name) (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by nil))
+(defrule http-via-header-skip-extra-RWS-after-received-protocol
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?v <- (http-via-header-value (name ?name) (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule via-header-value-detect-received-by
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?v <- (via-header-value (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
+(defrule http-via-header-value-detect-received-by
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?v <- (http-via-header-value (name ?name) (received-protocol ?r&:(instancep ?r)) (received-by nil))
 	=>
-	(modify ?v (received-by (assert (received-by (name ?name) (pseudonym (assert (token (name ?name)))))))))
+	(modify ?v (received-by (assert (http-received-by (name ?name) (pseudonym (assert (http-token (name ?name)))))))))
 
-(defrule received-by-end-pseudonym
-	(char ?name 9|13|32|44|58) ; HTAB CR SP , :
-	?t <- (token (name ?name) (value ?value))
-	?r <- (received-by (name ?name) (pseudonym ?t))
+(defrule http-received-by-end-pseudonym
+	(http-char ?name 9|13|32|44|58) ; HTAB CR SP , :
+	?t <- (http-token (name ?name) (value ?value))
+	?r <- (http-received-by (name ?name) (pseudonym ?t))
 	=>
 	(retract ?t)
 	(modify ?r (pseudonym ?value)))
 
-(defrule received-by-detect-port
-	?c <- (char ?name 58) ; :
-	?r <- (received-by (name ?name) (pseudonym ?p&:(stringp ?p)) (port nil))
+(defrule http-received-by-detect-port
+	?c <- (http-char ?name 58) ; :
+	?r <- (http-received-by (name ?name) (pseudonym ?p&:(stringp ?p)) (port nil))
 	=>
-	(modify ?r (port (assert (port (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (port (assert (http-port (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule received-by-end-port
-	(char ?name 9|13|32|44) ; HTAB CR SP
-	?p <- (port (value ?value))
-	?r <- (received-by (name ?name) (pseudonym ?pseudonym) (port ?p))
+(defrule http-received-by-end-port
+	(http-char ?name 9|13|32|44) ; HTAB CR SP
+	?p <- (http-port (value ?value))
+	?r <- (http-received-by (name ?name) (pseudonym ?pseudonym) (port ?p))
 	=>
 	(retract ?p)
-	(modify ?r (port (make-instance of PORT (filename ?name) (value ?value)))))
+	(modify ?r (port (make-instance of HTTP-PORT (id ?name) (value ?value)))))
 
-(defrule via-header-value-end-received-by
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?r <- (received-by (name ?name) (pseudonym ?pseudonym&:(stringp ?pseudonym)) (port ?port&nil|:(instancep ?port)))
-	?v <- (via-header-value (received-by ?r))
+(defrule http-via-header-value-end-received-by
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?r <- (http-received-by (name ?name) (pseudonym ?pseudonym&:(stringp ?pseudonym)) (port ?port&nil|:(instancep ?port)))
+	?v <- (http-via-header-value (received-by ?r))
 	=>
 	(retract ?r)
-	(modify ?v (received-by (make-instance of RECEIVED-BY (filename ?name) (pseudonym ?pseudonym) (port ?port)))))
+	(modify ?v (received-by (make-instance of HTTP-RECEIVED-BY (id ?name) (pseudonym ?pseudonym) (port ?port)))))
 
-(defrule via-header-value-detect-RWS-before-comment
-	?c <- (char ?name 9|32) ; HTAB SP
-	?v <- (via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil))
+(defrule http-via-header-value-detect-RWS-before-comment
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?v <- (http-via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil))
 	=>
 	(retract ?c)
 	(modify ?v (rws TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;   comment        = "(" *( ctext / quoted-pair / comment ) ")"
-(defrule via-header-value-detect-comment
-	?c <- (char ?name 40) ; (
-	?v <- (via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil) (rws TRUE))
+(defrule http-via-header-value-detect-comment
+	?c <- (http-char ?name 40) ; (
+	?v <- (http-via-header-value (name ?name) (received-by ?r&:(instancep ?r)) (comment nil) (rws TRUE))
 	=>
 	(retract ?c)
-	(modify ?v (comment (assert (comment (name ?name) (values "")))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?v (comment (assert (http-comment (name ?name) (values "")))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule add-ctext-to-comment
-	?ch <- (char ?name ?char&:(member$ ?char ?*ctext*))
-	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
-	(not (quoted-pair ?name))
+(defrule http-add-ctext-to-comment
+	?ch <- (http-char ?name ?char&:(member$ ?char ?*http-ctext*))
+	?co <- (http-comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?ch)
 	(modify ?co (values ?values (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule comment-end-comment
-	?c <- (char ?name 41) ; )
-	?c-inner <- (comment (name ?name) (values $?values-inner ?value&:(instancep ?value)|:(stringp ?value)))
-	?c-outer <- (comment (name ?name) (values $?values ?c-inner))
-	(not (quoted-pair ?name))
+(defrule http-comment-end-comment
+	?c <- (http-char ?name 41) ; )
+	?c-inner <- (http-comment (name ?name) (values $?values-inner ?value&:(instancep ?value)|:(stringp ?value)))
+	?c-outer <- (http-comment (name ?name) (values $?values ?c-inner))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?c ?c-inner)
-	(modify ?c-outer (values ?values (make-instance of COMMENT (filename ?name) (values ?values-inner ?value)) ""))
-	(assert (char ?name (get-char ?name))))
+	(modify ?c-outer (values ?values (make-instance of HTTP-COMMENT (id ?name) (values ?values-inner ?value)) ""))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule comment-detect-quoted-pair
-	?ch <- (char ?name 92) ; \
-	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
-	(not (quoted-pair ?name))
+(defrule http-comment-detect-quoted-pair
+	?ch <- (http-char ?name 92) ; \
+	?co <- (http-comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?ch)
-	(assert (quoted-pair ?name)
-		(char ?name (get-char ?name))))
+	(assert (http-quoted-pair ?name)
+		(http-char ?name (http-read ?name))))
 
-(defrule comment-add-quoted-pair
-	?ch <- (char ?name ?char)
-	?co <- (comment (name ?name) (values $?values ?value&:(stringp ?value)))
-	?q <- (quoted-pair ?name)
+(defrule http-comment-add-quoted-pair
+	?ch <- (http-char ?name ?char)
+	?co <- (http-comment (name ?name) (values $?values ?value&:(stringp ?value)))
+	?q <- (http-quoted-pair ?name)
 	(test (or
 		(= 9 ?char)
 		(= 32 ?char)
@@ -3090,49 +3124,49 @@
 	=>
 	(retract ?ch ?q)
 	(modify ?co (values ?values (format nil "%s%c%c" ?value "\\" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule add-comment-to-comment
-	?ch <- (char ?name 40) ; (
-	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
-	(not (quoted-pair ?name))
+(defrule http-add-comment-to-comment
+	?ch <- (http-char ?name 40) ; (
+	?co <- (http-comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?ch)
-	(modify ?co (values ?values ?value (assert (comment (name ?name) (values "")))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?co (values ?values ?value (assert (http-comment (name ?name) (values "")))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule via-header-value-end-comment
-	?ch <- (char ?name 41) ; )
-	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
-	?v <- (via-header-value (comment ?co))
+(defrule http-via-header-value-end-comment
+	?ch <- (http-char ?name 41) ; )
+	?co <- (http-comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	?v <- (http-via-header-value (comment ?co))
 	=>
 	(retract ?ch ?co)
-	(modify ?v (comment (make-instance of COMMENT (filename ?name) (values ?values ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?v (comment (make-instance of HTTP-COMMENT (id ?name) (values ?values ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule via-header-end-via-header-value
-	(char ?name 13|44) ; CR ,
-	?vhv <- (via-header-value (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by ?received-by&:(instancep ?received-by)) (comment ?comment&nil|:(instancep ?comment)))
-	?vh <- (via-header (name ?name) (values $?values ?vhv))
+(defrule http-via-header-end-via-header-value
+	(http-char ?name 13|44) ; CR ,
+	?vhv <- (http-via-header-value (received-protocol ?received-protocol&:(instancep ?received-protocol)) (received-by ?received-by&:(instancep ?received-by)) (comment ?comment&nil|:(instancep ?comment)))
+	?vh <- (http-via-header (name ?name) (values $?values ?vhv))
 	=>
 	(retract ?vhv)
-	(modify ?vh (values ?values (make-instance of VIA-HEADER-VALUE (filename ?name) (received-protocol ?received-protocol) (received-by ?received-by) (comment ?comment)))))
+	(modify ?vh (values ?values (make-instance of HTTP-VIA-HEADER-VALUE (id ?name) (received-protocol ?received-protocol) (received-by ?received-by) (comment ?comment)))))
 
-(defrule via-header-start-next-via-header-value
-	?c <- (char ?name 44) ; ,
-	?v <- (via-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+(defrule http-via-header-start-next-via-header-value
+	?c <- (http-char ?name 44) ; ,
+	?v <- (http-via-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
 	=>
 	(retract ?c)
-	(modify ?v (values ?values (assert (via-header-value (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?v (values ?values (assert (http-via-header-value (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-via-header
-	(char ?name 13) ; CR
-	?v <- (via-header (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
-	?f <- (field-value (name ?name) (value ?v))
+(defrule http-end-via-header
+	(http-char ?name 13) ; CR
+	?v <- (http-via-header (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?f <- (http-field-value (name ?name) (value ?v))
 	=>
 	(retract ?v)
-	(modify ?f (value (make-instance of VIA-HEADER (filename ?name) (values ?values)))))
+	(modify ?f (value (make-instance of HTTP-VIA-HEADER (id ?name) (values ?values)))))
 
 ;   Accept-Language = #( language-range [ weight ] )
 ;   language-range   = (1*8ALPHA *("-" 1*8alphanum)) / "*"
@@ -3142,245 +3176,245 @@
 ;   product         = token [ "/" product-version ]
 ;   product-version = token
 ;   comment         = "(" *( ctext / quoted-pair / comment ) ")"
-(defrule detect-user-agent-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "User-Agent"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-user-agent-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "User-Agent"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (product-header (name ?name) (values (assert (product (name ?name) (token (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-product-header (name ?name) (values (assert (http-product (name ?name) (token (assert (http-token (name ?name))))))))))))
 
-(defrule detect-server-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Server"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-server-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Server"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (product-header (name ?name) (values (assert (product (name ?name) (token (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-product-header (name ?name) (values (assert (http-product (name ?name) (token (assert (http-token (name ?name))))))))))))
 
-(defrule product-end-token-start-product-version
-	?c <- (char ?name 47) ; /
-	?t <- (token (name ?name) (value ?value&~""))
-	?p <- (product (name ?name) (token ?t))
+(defrule http-product-end-token-start-product-version
+	?c <- (http-char ?name 47) ; /
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?p <- (http-product (name ?name) (token ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?p (token ?value) (product-version (assert (token (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (token ?value) (product-version (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule product-end-token
-	(char ?name 9|13|32) ; HTAB CR SP
-	?t <- (token (name ?name) (value ?value&~""))
-	?p <- (product (name ?name) (token ?t))
+(defrule http-product-end-token
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?p <- (http-product (name ?name) (token ?t))
 	=>
 	(retract ?t)
 	(modify ?p (token ?value)))
 
-(defrule product-end-product-version
-	(char ?name 9|13|32) ; HTAB CR SP
-	?t <- (token (name ?name) (value ?value&~""))
-	?p <- (product (name ?name) (product-version ?t))
+(defrule http-product-end-product-version
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?p <- (http-product (name ?name) (product-version ?t))
 	=>
 	(retract ?t)
 	(modify ?p (product-version ?value)))
 
-(defrule product-header-end-product
-	(char ?name 9|13|32) ; HTAB CR SP
-	?p <- (product (name ?name) (token ?token&:(stringp ?token)) (product-version ?product-version&nil|:(stringp ?product-version)))
-	?ph <- (product-header (name ?name) (values $?values ?p))
+(defrule http-product-header-end-product
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?p <- (http-product (name ?name) (token ?token&:(stringp ?token)) (product-version ?product-version&nil|:(stringp ?product-version)))
+	?ph <- (http-product-header (name ?name) (values $?values ?p))
 	=>
 	(retract ?p)
-	(modify ?ph (values ?values (make-instance of PRODUCT (filename ?name) (token ?token) (product-version ?product-version)))))
+	(modify ?ph (values ?values (make-instance of HTTP-PRODUCT (id ?name) (token ?token) (product-version ?product-version)))))
 
 ; RWS is required between products and comments. It also absorbs any
 ; trailing OWS before the CR that ends the field line.
-(defrule product-header-detect-RWS
-	?c <- (char ?name 9|32) ; HTAB SP
-	?ph <- (product-header (name ?name) (values $?values ?v&:(instancep ?v)))
+(defrule http-product-header-detect-RWS
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?ph <- (http-product-header (name ?name) (values $?values ?v&:(instancep ?v)))
 	=>
 	(retract ?c)
 	(modify ?ph (rws TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule product-header-detect-next-product
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?ph <- (product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
+(defrule http-product-header-detect-next-product
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?ph <- (http-product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
 	=>
-	(modify ?ph (rws FALSE) (values ?values ?v (assert (product (name ?name) (token (assert (token (name ?name)))))))))
+	(modify ?ph (rws FALSE) (values ?values ?v (assert (http-product (name ?name) (token (assert (http-token (name ?name)))))))))
 
-(defrule product-header-detect-comment
-	?c <- (char ?name 40) ; (
-	?ph <- (product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
+(defrule http-product-header-detect-comment
+	?c <- (http-char ?name 40) ; (
+	?ph <- (http-product-header (name ?name) (rws TRUE) (values $?values ?v&:(instancep ?v)))
 	=>
 	(retract ?c)
-	(modify ?ph (rws FALSE) (values ?values ?v (assert (comment (name ?name) (values "")))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ph (rws FALSE) (values ?values ?v (assert (http-comment (name ?name) (values "")))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule product-header-end-comment
-	?ch <- (char ?name 41) ; )
-	?co <- (comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
-	?ph <- (product-header (name ?name) (values $?vs ?co))
-	(not (quoted-pair ?name))
+(defrule http-product-header-end-comment
+	?ch <- (http-char ?name 41) ; )
+	?co <- (http-comment (name ?name) (values $?values ?value&:(instancep ?value)|:(stringp ?value)))
+	?ph <- (http-product-header (name ?name) (values $?vs ?co))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?ch ?co)
-	(modify ?ph (values ?vs (make-instance of COMMENT (filename ?name) (values ?values ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ph (values ?vs (make-instance of HTTP-COMMENT (id ?name) (values ?values ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-user-agent-header
-	(char ?name 13) ; CR
-	?ph <- (product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
-	?fv <- (field-value (value ?ph))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "User-Agent"))
+(defrule http-end-user-agent-header
+	(http-char ?name 13) ; CR
+	?ph <- (http-product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?fv <- (http-field-value (value ?ph))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "User-Agent"))
 	=>
 	(retract ?ph)
-	(modify ?fv (value (make-instance of USER-AGENT-HEADER (filename ?name) (values ?values)))))
+	(modify ?fv (value (make-instance of HTTP-USER-AGENT-HEADER (id ?name) (values ?values)))))
 
-(defrule end-server-header
-	(char ?name 13) ; CR
-	?ph <- (product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
-	?fv <- (field-value (value ?ph))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Server"))
+(defrule http-end-server-header
+	(http-char ?name 13) ; CR
+	?ph <- (http-product-header (name ?name) (values $?values&:(instancep (nth$ (length$ ?values) ?values))))
+	?fv <- (http-field-value (value ?ph))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Server"))
 	=>
 	(retract ?ph)
-	(modify ?fv (value (make-instance of SERVER-HEADER (filename ?name) (values ?values)))))
+	(modify ?fv (value (make-instance of HTTP-SERVER-HEADER (id ?name) (values ?values)))))
 
-(defrule detect-accept-language-header
-	(char ?name ?char&:(member$ ?char (create$ ?*alpha* 42))) ; *
-	?o <- (object (is-a FIELD-NAME) (value "Accept-Language"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-accept-language-header
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-alpha* 42))) ; *
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Accept-Language"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (accept-language-header (name ?name) (language-ranges (assert (language-range (name ?name) (first-language (assert (language (name ?name))))))))))))
+	(modify ?fv (value (assert (http-accept-language-header (name ?name) (language-ranges (assert (http-language-range (name ?name) (first-language (assert (http-language (name ?name))))))))))))
 
-(defrule language-range-detect-first-language
-	(char ?name ?char&:(member$ ?char (create$ ?*alpha* 42))) ; *
-	?lr <- (language-range (name ?name) (first-language nil))
+(defrule http-language-range-detect-first-language
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-alpha* 42))) ; *
+	?lr <- (http-language-range (name ?name) (first-language nil))
 	=>
-	(modify ?lr (first-language (assert (language (name ?name))))))
+	(modify ?lr (first-language (assert (http-language (name ?name))))))
 
-(defrule language-range-detect-asterisk
-	?c <- (char ?name 42) ; *
-	?l <- (language (value ""))
-	?lr <- (language-range (name ?name) (first-language ?l))
+(defrule http-language-range-detect-asterisk
+	?c <- (http-char ?name 42) ; *
+	?l <- (http-language (value ""))
+	?lr <- (http-language-range (name ?name) (first-language ?l))
 	=>
 	(retract ?c)
 	(modify ?l (value "*"))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-build-first-language
-	?c <- (char ?name ?char&:(member$ ?char ?*alpha*))
-	?l <- (language (value ?value&~"*"))
-	?lr <- (language-range (name ?name) (first-language ?l))
+(defrule http-language-range-build-first-language
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alpha*))
+	?l <- (http-language (value ?value&~"*"))
+	?lr <- (http-language-range (name ?name) (first-language ?l))
 	=>
 	(retract ?c)
 	(modify ?l (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-end-first-language
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?l <- (language (value ?value&:(< 0 (str-length ?value))))
-	?lr <- (language-range (name ?name) (first-language ?l))
+(defrule http-language-range-end-first-language
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?l <- (http-language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (http-language-range (name ?name) (first-language ?l))
 	=>
 	(retract ?l)
-	(modify ?lr (first-language (make-instance of LANGUAGE (filename ?name) (value ?value)))))
+	(modify ?lr (first-language (make-instance of HTTP-LANGUAGE (id ?name) (value ?value)))))
 
-(defrule language-range-end-first-language-and-detect-next-language
-	?c <- (char ?name 45) ; -
-	?l <- (language (value ?value&:(< 0 (str-length ?value))))
-	?lr <- (language-range (name ?name) (first-language ?l))
+(defrule http-language-range-end-first-language-and-detect-next-language
+	?c <- (http-char ?name 45) ; -
+	?l <- (http-language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (http-language-range (name ?name) (first-language ?l))
 	=>
 	(retract ?c ?l)
-	(modify ?lr (first-language (make-instance of LANGUAGE (filename ?name) (value ?value))) (languages (assert (language (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?lr (first-language (make-instance of HTTP-LANGUAGE (id ?name) (value ?value))) (languages (assert (http-language (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-end-weight
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
-	?l <- (language-range (name ?name) (weight ?w))
+(defrule http-language-range-end-weight
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (http-weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?l <- (http-language-range (name ?name) (weight ?w))
 	=>
 	(retract ?w)
-	(modify ?l (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+	(modify ?l (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
-(defrule language-range-end-language
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?l <- (language (value ?value&:(< 0 (str-length ?value))))
-	?lr <- (language-range (name ?name) (languages $?languages ?l))
+(defrule http-language-range-end-language
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?l <- (http-language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (http-language-range (name ?name) (languages $?languages ?l))
 	=>
 	(retract ?l)
-	(modify ?lr (languages ?languages (make-instance of LANGUAGE (filename ?name) (value ?value)))))
+	(modify ?lr (languages ?languages (make-instance of HTTP-LANGUAGE (id ?name) (value ?value)))))
 
-(defrule language-range-end-language-and-detect-next-language
-	?c <- (char ?name 45) ; -
-	?l <- (language (value ?value&:(< 0 (str-length ?value))))
-	?lr <- (language-range (name ?name) (languages $?languages ?l))
+(defrule http-language-range-end-language-and-detect-next-language
+	?c <- (http-char ?name 45) ; -
+	?l <- (http-language (value ?value&:(< 0 (str-length ?value))))
+	?lr <- (http-language-range (name ?name) (languages $?languages ?l))
 	=>
 	(retract ?c)
-	(modify ?lr (languages ?languages (make-instance of LANGUAGE (filename ?name) (value ?value)) (assert (language (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?lr (languages ?languages (make-instance of HTTP-LANGUAGE (id ?name) (value ?value)) (assert (http-language (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-build-language
-	?c <- (char ?name ?char&:(member$ ?char ?*alphanum*))
-	?l <- (language (name ?name) (value ?value))
-	?lr <- (language-range (languages $? ?l))
+(defrule http-language-range-build-language
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alphanum*))
+	?l <- (http-language (name ?name) (value ?value))
+	?lr <- (http-language-range (languages $? ?l))
 	=>
 	(retract ?c)
 	(modify ?l (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-ignore-ows-before-weight
-	?c <- (char ?name 9|32) ; HTAB SP
-	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
+(defrule http-language-range-ignore-ows-before-weight
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?l <- (http-language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-ignore-ows-after-weight
-	?c <- (char ?name 9|32) ; HTAB SP
-	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&:(instancep ?weight)))
+(defrule http-language-range-ignore-ows-after-weight
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?l <- (http-language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&:(instancep ?weight)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule language-range-detect-weight
-	?c <- (char ?name 59) ; ;
-	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
+(defrule http-language-range-detect-weight
+	?c <- (http-char ?name 59) ; ;
+	?l <- (http-language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
 	=>
 	(retract ?c)
-	(modify ?l (weight (assert (weight (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?l (weight (assert (http-weight (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule accept-language-header-end-language-range
-	(char ?name 13|44) ; CR ,
-	?l <- (language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&nil|:(instancep ?weight)))
-	?a <- (accept-language-header (language-ranges $?language-ranges ?l))
+(defrule http-accept-language-header-end-language-range
+	(http-char ?name 13|44) ; CR ,
+	?l <- (http-language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight ?weight&nil|:(instancep ?weight)))
+	?a <- (http-accept-language-header (language-ranges $?language-ranges ?l))
 	=>
 	(retract ?l)
-	(modify ?a (language-ranges ?language-ranges (make-instance of LANGUAGE-RANGE (filename ?name) (first-language ?first-language) (languages ?languages) (weight ?weight)))))
+	(modify ?a (language-ranges ?language-ranges (make-instance of HTTP-LANGUAGE-RANGE (id ?name) (first-language ?first-language) (languages ?languages) (weight ?weight)))))
 
-(defrule accept-language-header-ignore-ows-between-language-ranges
-	?c <- (char ?name 9|32) ; HTAB SP
-	?l <- (language-range (first-language nil))
-	?a <- (accept-language-header (name ?name) (language-ranges $?language-ranges ?l))
+(defrule http-accept-language-header-ignore-ows-between-language-ranges
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?l <- (http-language-range (first-language nil))
+	?a <- (http-accept-language-header (name ?name) (language-ranges $?language-ranges ?l))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule accept-language-header-start-next-language-range
-	?c <- (char ?name 44) ; ,
-	?a <- (accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
+(defrule http-accept-language-header-start-next-language-range
+	?c <- (http-char ?name 44) ; ,
+	?a <- (http-accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
 	=>
 	(retract ?c)
-	(modify ?a (language-ranges ?language-ranges (assert (language-range (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (language-ranges ?language-ranges (assert (http-language-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-accept-language-header
-	(char ?name 13) ; CR
-	?clh <- (accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-accept-language-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-accept-language-header (name ?name) (language-ranges $?language-ranges&:(instancep (nth$ (length$ ?language-ranges) ?language-ranges))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of ACCEPT-LANGUAGE-HEADER (filename ?name) (language-ranges ?language-ranges)))))
+	(modify ?fv (value (make-instance of HTTP-ACCEPT-LANGUAGE-HEADER (id ?name) (language-ranges ?language-ranges)))))
 
 ;RWS = 1*( SP / HTAB )
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
@@ -3390,175 +3424,175 @@
 ;  received-by       = pseudonym [ ":" port ]
 ;  pseudonym         = token
 
-(defrule detect-content-length-header
-	(char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (object (is-a FIELD-NAME) (value "Content-Length"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-content-length-header
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Content-Length"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (content-length-header (name ?name))))))
+	(modify ?fv (value (assert (http-content-length-header (name ?name))))))
 
 ;   Max-Forwards = 1*DIGIT
-(defrule detect-max-forwards-header
-	(char ?name ?char&:(member$ ?char ?*digit*))
-	?o <- (object (is-a FIELD-NAME) (value "Max-Forwards"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-max-forwards-header
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Max-Forwards"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (max-forwards-header (name ?name))))))
+	(modify ?fv (value (assert (http-max-forwards-header (name ?name))))))
 
 ;   Content-Type = media-type
 ;     media-type = type "/" subtype parameters
 ;     type       = token
 ;     subtype    = token
 ;          token = 1*tchar
-(defrule detect-content-type-header-type
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Content-Type"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-content-type-header-type
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Content-Type"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (content-type-header (name ?name) (type (assert (type (name ?name)))))))))
+	(modify ?fv (value (assert (http-content-type-header (name ?name) (type (assert (http-type (name ?name)))))))))
 
-(defrule detect-host-header
-	(char ?name ?char&:(member$ ?char (create$ 91 ?*reg-name*))) ; [
-	?o <- (object (is-a FIELD-NAME) (value "Host"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-host-header
+	(http-char ?name ?char&:(member$ ?char (create$ 91 ?*http-reg-name*))) ; [
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Host"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (host-header (name ?name) (uri-host (assert (host (name ?name)))))))))
+	(modify ?fv (value (assert (http-host-header (name ?name) (uri-host (assert (http-host (name ?name)))))))))
 
-(defrule build-type
-	?c <- (char ?name ?char&:(member$ ?char ?*tchar*))
-	?t <- (type (name ?name) (value ?type))
+(defrule http-build-type
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?t <- (http-type (name ?name) (value ?type))
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?type ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule content-type-end-type
-	?c <- (char ?name 47) ; /
-	?t <- (type (name ?name) (value ?value))
-	?ct <- (content-type-header (type ?t))
+(defrule http-content-type-end-type
+	?c <- (http-char ?name 47) ; /
+	?t <- (http-type (name ?name) (value ?value))
+	?ct <- (http-content-type-header (type ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?ct (type (make-instance of TYPE (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?ct (type (make-instance of HTTP-TYPE (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule content-type-detect-subtype
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?c <- (content-type-header (name ?name) (type ?t&:(instancep ?t)) (subtype nil))
+(defrule http-content-type-detect-subtype
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?c <- (http-content-type-header (name ?name) (type ?t&:(instancep ?t)) (subtype nil))
 	=>
-	(modify ?c (subtype (assert (subtype (name ?name))))))
+	(modify ?c (subtype (assert (http-subtype (name ?name))))))
 
-(defrule build-subtype
-	?c <- (char ?name ?char&:(member$ ?char ?*tchar*))
-	?s <- (subtype (name ?name) (value ?subtype))
+(defrule http-build-subtype
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?s <- (http-subtype (name ?name) (value ?subtype))
 	=>
 	(retract ?c)
 	(modify ?s (value (format nil "%s%c" ?subtype ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule content-type-end-subtype
-	(char ?name 13|32|59) ; CR SP ;
-	?s <- (subtype (name ?name) (value ?value))
-	?c <- (content-type-header (subtype ?s))
+(defrule http-content-type-end-subtype
+	(http-char ?name 13|32|59) ; CR SP ;
+	?s <- (http-subtype (name ?name) (value ?value))
+	?c <- (http-content-type-header (subtype ?s))
 	=>
 	(retract ?s)
-	(modify ?c (subtype (make-instance of SUBTYPE (filename ?name) (value ?value)))))
+	(modify ?c (subtype (make-instance of HTTP-SUBTYPE (id ?name) (value ?value)))))
 
-(defrule content-type-detect-parameter
-	?c <- (char ?name 59) ; ;
-	?cth <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+(defrule http-content-type-detect-parameter
+	?c <- (http-char ?name 59) ; ;
+	?cth <- (http-content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c)
-	(modify ?cth (parameters ?parameters (assert (parameter (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cth (parameters ?parameters (assert (http-parameter (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule content-type-detect-ows
-	?c <- (char ?name 32) ; SP
-	(content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+(defrule http-content-type-detect-ows
+	?c <- (http-char ?name 32) ; SP
+	(http-content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule parameter-detect-ows
-	?c <- (char ?name 32) ; SP
-	(parameter (name ?name) (parameter-name nil))
+(defrule http-parameter-detect-ows
+	?c <- (http-char ?name 32) ; SP
+	(http-parameter (name ?name) (parameter-name nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule parameter-detect-parameter-name
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?p <- (parameter (name ?name) (parameter-name nil))
+(defrule http-parameter-detect-parameter-name
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?p <- (http-parameter (name ?name) (parameter-name nil))
 	=>
-	(modify ?p (parameter-name (assert (token (name ?name))))))
+	(modify ?p (parameter-name (assert (http-token (name ?name))))))
 
-(defrule build-token
-	?c <- (char ?name ?char&:(member$ ?char ?*tchar*))
-	?t <- (token (name ?name) (value ?value))
+(defrule http-build-token
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?t <- (http-token (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule parameter-end-parameter-name
-	?c <- (char ?name 61) ; =
-	?t <- (token (name ?name) (value ?value&~""&~"q"))
-	?p <- (parameter (parameter-name ?t))
+(defrule http-parameter-end-parameter-name
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token (name ?name) (value ?value&~""&~"q"))
+	?p <- (http-parameter (parameter-name ?t))
 	=>
 	(retract ?c ?t)
 	(modify ?p (parameter-name ?value))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule media-range-parameter-change-to-weight
-	?c <- (char ?name 61) ; =
-	?t <- (token (name ?name) (value "q"))
-	?p <- (parameter (parameter-name ?t))
-	?m <- (media-range (parameters $?parameters ?p))
+(defrule http-media-range-parameter-change-to-weight
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token (name ?name) (value "q"))
+	?p <- (http-parameter (parameter-name ?t))
+	?m <- (http-media-range (parameters $?parameters ?p))
 	=>
 	(retract ?c ?t ?p)
-	(modify ?m (parameters ?parameters) (weight (assert (weight (name ?name) (q TRUE) (equals TRUE)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?m (parameters ?parameters) (weight (assert (http-weight (name ?name) (q TRUE) (equals TRUE)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule parameter-detect-parameter-value-token
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?p <- (parameter (name ?name) (parameter-name ?parameter-name&:(stringp ?parameter-name)) (parameter-value nil))
+(defrule http-parameter-detect-parameter-value-token
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?p <- (http-parameter (name ?name) (parameter-name ?parameter-name&:(stringp ?parameter-name)) (parameter-value nil))
 	=>
-	(modify ?p (parameter-value (assert (token (name ?name))))))
+	(modify ?p (parameter-value (assert (http-token (name ?name))))))
 
-(defrule parameter-end-parameter-value-token
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?t <- (token (name ?name) (value ?value&~""))
-	?p <- (parameter (parameter-value ?t))
+(defrule http-parameter-end-parameter-value-token
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?p <- (http-parameter (parameter-value ?t))
 	=>
 	(retract ?t)
 	(modify ?p (parameter-value ?value)))
 
-(defrule parameter-detect-parameter-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?p <- (parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
+(defrule http-parameter-detect-parameter-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?p <- (http-parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
 	=>
 	(retract ?c)
-	(modify ?p (parameter-value (assert (quoted-string (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (parameter-value (assert (http-quoted-string (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule quoted-string-detect-quoted-pair
-	?c <- (char ?name 92) ; \
-	?q <- (quoted-string (name ?name) (value ?value))
-	(not (quoted-pair ?name))
+(defrule http-quoted-string-detect-quoted-pair
+	?c <- (http-char ?name 92) ; \
+	?q <- (http-quoted-string (name ?name) (value ?value))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?c)
-	(assert (quoted-pair ?name)
-		(char ?name (get-char ?name))))
+	(assert (http-quoted-pair ?name)
+		(http-char ?name (http-read ?name))))
 
 ;   quoted-string = DQUOTE *( qdtext / quoted-pair ) DQUOTE
 ;        qdtext   = HTAB / SP / "!" / %x23-5B / %x5D-7E / obs-text
-(defrule build-quoted-string
-	?c <- (char ?name ?char)
-	?q <- (quoted-string (name ?name) (value ?value))
-	(not (quoted-pair ?name))
+(defrule http-build-quoted-string
+	?c <- (http-char ?name ?char)
+	?q <- (http-quoted-string (name ?name) (value ?value))
+	(not (http-quoted-pair ?name))
 	(test (or
 		(= ?char 9) ; HTAB
 		(= ?char 32) ; SP
@@ -3569,13 +3603,13 @@
 	=>
 	(retract ?c)
 	(modify ?q (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;   quoted-pair = "\" ( HTAB / SP / VCHAR / obs-text )
-(defrule build-quoted-string-quoted-pair
-	?c <- (char ?name ?char)
-	?qp <- (quoted-pair ?name)
-	?q <- (quoted-string (name ?name) (value ?value))
+(defrule http-build-quoted-string-quoted-pair
+	?c <- (http-char ?name ?char)
+	?qp <- (http-quoted-pair ?name)
+	?q <- (http-quoted-string (name ?name) (value ?value))
 	(test (or
 		(= ?char 9) ; HTAB
 		(= ?char 32) ; SP
@@ -3584,104 +3618,104 @@
 	=>
 	(retract ?c ?qp)
 	(modify ?q (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule parameter-end-parameter-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
-	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?q))
-	(not (quoted-pair ?name))
+(defrule http-parameter-end-parameter-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?q <- (http-quoted-string (name ?name) (value ?value&:(stringp ?value)))
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?q))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?c ?q)
-	(modify ?p (parameter-value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (parameter-value (make-instance of HTTP-QUOTED-STRING (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule content-type-header-end-parameter
-	(char ?name 9|13|32|59) ; HTAB CR SP ;
-	?p <- (parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
-	?c <- (content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
+(defrule http-content-type-header-end-parameter
+	(http-char ?name 9|13|32|59) ; HTAB CR SP ;
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?c <- (http-content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?c (parameters ?parameters (make-instance of PARAMETER (filename ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
+	(modify ?c (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
 
-(defrule parameter-detect-parameter-value-token
-	(char ?name ?char&:(member$ ?char (create$ ?*tchar*)))
-	?p <- (parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
+(defrule http-parameter-detect-parameter-value-token
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-tchar*)))
+	?p <- (http-parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
 	=>
-	(modify ?p (parameter-value (assert (token (name ?name))))))
+	(modify ?p (parameter-value (assert (http-token (name ?name))))))
 
-(defrule host-header-end-host
-	(char ?name 13|32|58) ; CR SP :
-	?h <- (host (value ?value&:(instancep ?value)))
-	?hh <- (host-header (name ?name) (uri-host ?h))
+(defrule http-host-header-end-host
+	(http-char ?name 13|32|58) ; CR SP :
+	?h <- (http-host (value ?value&:(instancep ?value)))
+	?hh <- (http-host-header (name ?name) (uri-host ?h))
 	=>
 	(retract ?h)
-	(modify ?hh (uri-host (make-instance of HOST (filename ?name) (value ?value)))))
+	(modify ?hh (uri-host (make-instance of HTTP-HOST (id ?name) (value ?value)))))
 
-(defrule host-header-detect-port
-	?c <- (char ?name 58)
-	?hh <- (host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port nil))
+(defrule http-host-header-detect-port
+	?c <- (http-char ?name 58)
+	?hh <- (http-host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port nil))
 	=>
 	(retract ?c)
-	(modify ?hh (port (assert (port (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?hh (port (assert (http-port (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule host-header-end-port
-	(char ?name 13|32) ; CR SP
-	?p <- (port (value ?value))
-	?hh <- (host-header (name ?name) (port ?p))
+(defrule http-host-header-end-port
+	(http-char ?name 13|32) ; CR SP
+	?p <- (http-port (value ?value))
+	?hh <- (http-host-header (name ?name) (port ?p))
 	=>
 	(retract ?p)
-	(modify ?hh (port (make-instance of PORT (filename ?name) (value ?value)))))
+	(modify ?hh (port (make-instance of HTTP-PORT (id ?name) (value ?value)))))
 
-(defrule build-content-length-header
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?clh <- (content-length-header (name ?name) (value ?content-length-header))
+(defrule http-build-content-length-header
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?clh <- (http-content-length-header (name ?name) (value ?content-length-header))
 	=>
 	(retract ?c)
 	(modify ?clh (value (format nil "%s%c" ?content-length-header ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-max-forwards-header
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?mfh <- (max-forwards-header (name ?name) (value ?max-forwards-header))
+(defrule http-build-max-forwards-header
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?mfh <- (http-max-forwards-header (name ?name) (value ?max-forwards-header))
 	=>
 	(retract ?c)
 	(modify ?mfh (value (format nil "%s%c" ?max-forwards-header ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule unknown-header-allow-ows
-	?c <- (char ?name ?char&9|32) ; HTAB SP
-	?u <- (unknown-header (name ?name) (value ?unknown-header&~"") (possible-ows ?possible-ows))
-	?f <- (field-value (value ?u))
+(defrule http-unknown-header-allow-ows
+	?c <- (http-char ?name ?char&9|32) ; HTAB SP
+	?u <- (http-unknown-header (name ?name) (value ?unknown-header&~"") (possible-ows ?possible-ows))
+	?f <- (http-field-value (value ?u))
 	=>
 	(retract ?c)
 	(modify ?u (possible-ows (format nil "%s%c" ?possible-ows ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-unknown-header
-	(char ?name 13)
-	?u <- (unknown-header (name ?name) (value ?value))
-	?fv <- (field-value (value ?u))
+(defrule http-end-unknown-header
+	(http-char ?name 13)
+	?u <- (http-unknown-header (name ?name) (value ?value))
+	?fv <- (http-field-value (value ?u))
 	=>
 	(retract ?u)
-	(modify ?fv (value (make-instance of UNKNOWN-HEADER (filename ?name) (value ?value)))))
+	(modify ?fv (value (make-instance of HTTP-UNKNOWN-HEADER (id ?name) (value ?value)))))
 
-(defrule end-content-length-header
-	(char ?name 13|32) ; CR SP
-	?clh <- (content-length-header (name ?name) (value ?content-length-header))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-content-length-header
+	(http-char ?name 13|32) ; CR SP
+	?clh <- (http-content-length-header (name ?name) (value ?content-length-header))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of CONTENT-LENGTH-HEADER (filename ?name) (value ?content-length-header)))))
+	(modify ?fv (value (make-instance of HTTP-CONTENT-LENGTH-HEADER (id ?name) (value ?content-length-header)))))
 
-(defrule end-max-forwards-header
-	(char ?name 9|13|32) ; HTAB CR SP
-	?mfh <- (max-forwards-header (name ?name) (value ?max-forwards-header))
-	?fv <- (field-value (value ?mfh))
+(defrule http-end-max-forwards-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?mfh <- (http-max-forwards-header (name ?name) (value ?max-forwards-header))
+	?fv <- (http-field-value (value ?mfh))
 	=>
 	(retract ?mfh)
-	(modify ?fv (value (make-instance of MAX-FORWARDS-HEADER (filename ?name) (value ?max-forwards-header)))))
+	(modify ?fv (value (make-instance of HTTP-MAX-FORWARDS-HEADER (id ?name) (value ?max-forwards-header)))))
 
 ;   Date                = HTTP-date
 ;   Last-Modified       = HTTP-date
@@ -3697,267 +3731,267 @@
 ;                / %s"Friday" / %s"Saturday" / %s"Sunday"
 ; The three forms are told apart by what follows the day name:
 ; "," after 3 letters -> IMF-fixdate, "," after a full name -> rfc850-date, SP after 3 letters -> asctime-date
-(defrule detect-http-date-header
-	(char ?name 70|77|83|84|87) ; F M S T W
-	?o <- (object (is-a FIELD-NAME) (value "Date"|"Last-Modified"|"If-Modified-Since"|"If-Unmodified-Since"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-http-date-header
+	(http-char ?name 70|77|83|84|87) ; F M S T W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Date"|"Last-Modified"|"If-Modified-Since"|"If-Unmodified-Since"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name)))))))))
+	(modify ?fv (value (assert (http-date-header (name ?name) (http-date (assert (http-day-name (name ?name)))))))))
 
-(defrule build-day-name
-	?c <- (char ?name ?char&77|111|110|100|97|121|84|117|101|115|87|104|114|70|105|83|116) ; M o n d a y T u e s W h r F i S t
-	?d <- (day-name (name ?name) (value ?value&:(> 9 (str-length ?value))))
+(defrule http-build-day-name
+	?c <- (http-char ?name ?char&77|111|110|100|97|121|84|117|101|115|87|104|114|70|105|83|116) ; M o n d a y T u e s W h r F i S t
+	?d <- (http-day-name (name ?name) (value ?value&:(> 9 (str-length ?value))))
 	=>
 	(retract ?c)
 	(modify ?d (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule day-name-end-imf-fixdate
-	?c <- (char ?name 44) ; ,
-	?d <- (day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
+(defrule http-day-name-end-imf-fixdate
+	?c <- (http-char ?name 44) ; ,
+	?d <- (http-day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
 	?h <- (http-date-header (name ?name) (http-date ?d))
 	=>
 	(retract ?c ?d)
-	(modify ?h (http-date (assert (rfc1123-date (name ?name) (wkday (make-instance of WKDAY (filename ?name) (value ?value)))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (http-date (assert (http-rfc1123-date (name ?name) (wkday (make-instance of HTTP-WKDAY (id ?name) (value ?value)))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule day-name-end-rfc850-date
-	?c <- (char ?name 44) ; ,
-	?d <- (day-name (name ?name) (value ?value&"Monday"|"Tuesday"|"Wednesday"|"Thursday"|"Friday"|"Saturday"|"Sunday"))
+(defrule http-day-name-end-rfc850-date
+	?c <- (http-char ?name 44) ; ,
+	?d <- (http-day-name (name ?name) (value ?value&"Monday"|"Tuesday"|"Wednesday"|"Thursday"|"Friday"|"Saturday"|"Sunday"))
 	?h <- (http-date-header (name ?name) (http-date ?d))
 	=>
 	(retract ?c ?d)
-	(modify ?h (http-date (assert (rfc850-date (name ?name) (day-name-l (make-instance of DAY-NAME-L (filename ?name) (value ?value)))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (http-date (assert (http-rfc850-date (name ?name) (day-name-l (make-instance of HTTP-DAY-NAME-L (id ?name) (value ?value)))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule day-name-end-asctime-date
-	?c <- (char ?name 32) ; SP
-	?d <- (day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
+(defrule http-day-name-end-asctime-date
+	?c <- (http-char ?name 32) ; SP
+	?d <- (http-day-name (name ?name) (value ?value&"Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"|"Sun"))
 	?h <- (http-date-header (name ?name) (http-date ?d))
 	=>
 	(retract ?c ?d)
-	(modify ?h (http-date (assert (asctime-date (name ?name) (day-name (make-instance of WKDAY (filename ?name) (value ?value))) (date3 (assert (date3 (name ?name) (month (assert (month (name ?name)))))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (http-date (assert (http-asctime-date (name ?name) (day-name (make-instance of HTTP-WKDAY (id ?name) (value ?value))) (date3 (assert (http-date3 (name ?name) (month (assert (http-month (name ?name)))))))))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; IMF-fixdate: the rfc1123-date rules above carry the fact through "GMT"
 (defrule http-date-header-end-rfc1123-date
-	(char ?name 9|13|32) ; HTAB CR SP
-	?r <- (rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?r <- (http-rfc1123-date (name ?name) (wkday ?wkday) (date1 ?date1) (time ?time) (GMT "GMT"))
 	?h <- (http-date-header (name ?name) (http-date ?r))
 	=>
 	(retract ?r)
-	(modify ?h (http-date (make-instance of RFC1123-DATE (filename ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
+	(modify ?h (http-date (make-instance of HTTP-RFC1123-DATE (id ?name) (wkday ?wkday) (date1 ?date1) (time ?time)))))
 
 ;   rfc850-date  = day-name-l "," SP date2 SP time-of-day SP GMT
 ;   date2        = day "-" month "-" 2DIGIT
 ;                ; e.g., 02-Jun-82
-(defrule rfc850-date-start-date2
-	?c <- (char ?name 32) ; SP
-	?r <- (rfc850-date (name ?name) (day-name-l ?d&:(instancep ?d)) (date2 nil))
+(defrule http-rfc850-date-start-date2
+	?c <- (http-char ?name 32) ; SP
+	?r <- (http-rfc850-date (name ?name) (day-name-l ?d&:(instancep ?d)) (date2 nil))
 	=>
 	(retract ?c)
-	(modify ?r (date2 (assert (date2 (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (date2 (assert (http-date2 (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date2-build-day
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date2 (name ?name) (day ?day&:(> 2 (str-length ?day))))
+(defrule http-date2-build-day
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date2 (name ?name) (day ?day&:(> 2 (str-length ?day))))
 	=>
 	(retract ?c)
 	(modify ?d (day (format nil "%s%c" ?day ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date2-end-day-start-month
-	?c <- (char ?name 45) ; -
-	?d <- (date2 (name ?name) (day ?day&:(= 2 (str-length ?day))) (month nil))
+(defrule http-date2-end-day-start-month
+	?c <- (http-char ?name 45) ; -
+	?d <- (http-date2 (name ?name) (day ?day&:(= 2 (str-length ?day))) (month nil))
 	=>
 	(retract ?c)
-	(modify ?d (month (assert (month (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?d (month (assert (http-month (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date2-end-month
-	?c <- (char ?name 45) ; -
-	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
-	?d <- (date2 (name ?name) (month ?m))
+(defrule http-date2-end-month
+	?c <- (http-char ?name 45) ; -
+	?m <- (http-month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (http-date2 (name ?name) (month ?m))
 	=>
 	(retract ?c ?m)
-	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?d (month (make-instance of HTTP-MONTH (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date2-build-year
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date2 (name ?name) (month ?m&:(instancep ?m)) (year ?year&:(> 2 (str-length ?year))))
+(defrule http-date2-build-year
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date2 (name ?name) (month ?m&:(instancep ?m)) (year ?year&:(> 2 (str-length ?year))))
 	=>
 	(retract ?c)
 	(modify ?d (year (format nil "%s%c" ?year ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc850-date-end-date2
-	(char ?name 32) ; SP
-	?d <- (date2 (day ?day) (month ?month) (year ?year&:(= 2 (str-length ?year))))
-	?r <- (rfc850-date (name ?name) (date2 ?d))
+(defrule http-rfc850-date-end-date2
+	(http-char ?name 32) ; SP
+	?d <- (http-date2 (day ?day) (month ?month) (year ?year&:(= 2 (str-length ?year))))
+	?r <- (http-rfc850-date (name ?name) (date2 ?d))
 	=>
 	(retract ?d)
-	(modify ?r (date2 (make-instance of DATE2 (filename ?name) (day ?day) (month ?month) (year ?year)))))
+	(modify ?r (date2 (make-instance of HTTP-DATE2 (id ?name) (day ?day) (month ?month) (year ?year)))))
 
-(defrule rfc850-date-start-time
-	?c <- (char ?name 32) ; SP
-	?r <- (rfc850-date (name ?name) (date2 ?d&:(instancep ?d)) (time nil))
+(defrule http-rfc850-date-start-time
+	?c <- (http-char ?name 32) ; SP
+	?r <- (http-rfc850-date (name ?name) (date2 ?d&:(instancep ?d)) (time nil))
 	=>
 	(retract ?c)
-	(modify ?r (time (assert (time (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (time (assert (http-time (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc850-date-end-time
-	?c <- (char ?name 32) ; SP
-	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
-	?r <- (rfc850-date (name ?name) (time ?t))
+(defrule http-rfc850-date-end-time
+	?c <- (http-char ?name 32) ; SP
+	?t <- (http-time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?r <- (http-rfc850-date (name ?name) (time ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?r (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (time (make-instance of HTTP-TIME (id ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule rfc850-date-expect-GMT
-	?c <- (char ?name ?char&71|77|84) ; G M T
-	?r <- (rfc850-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
+(defrule http-rfc850-date-expect-GMT
+	?c <- (http-char ?name ?char&71|77|84) ; G M T
+	?r <- (http-rfc850-date (name ?name) (time ?t&:(instancep ?t)) (GMT ?GMT&:(> 3 (str-length ?GMT))))
 	=>
 	(retract ?c)
 	(modify ?r (GMT (format nil "%s%c" ?GMT ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-date-header-end-rfc850-date
-	(char ?name 9|13|32) ; HTAB CR SP
-	?r <- (rfc850-date (name ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time) (GMT "GMT"))
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?r <- (http-rfc850-date (name ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time) (GMT "GMT"))
 	?h <- (http-date-header (name ?name) (http-date ?r))
 	=>
 	(retract ?r)
-	(modify ?h (http-date (make-instance of RFC850-DATE (filename ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time)))))
+	(modify ?h (http-date (make-instance of HTTP-RFC850-DATE (id ?name) (day-name-l ?day-name-l) (date2 ?date2) (time ?time)))))
 
 ;   asctime-date = day-name SP date3 SP time-of-day SP year
 ;   date3        = month SP ( 2DIGIT / ( SP 1DIGIT ))
 ;                ; e.g., Jun  2
-(defrule date3-end-month
-	?c <- (char ?name 32) ; SP
-	?m <- (month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
-	?d <- (date3 (name ?name) (month ?m))
+(defrule http-date3-end-month
+	?c <- (http-char ?name 32) ; SP
+	?m <- (http-month (value ?value&"Jan"|"Feb"|"Mar"|"Apr"|"May"|"Jun"|"Jul"|"Aug"|"Sep"|"Oct"|"Nov"|"Dec"))
+	?d <- (http-date3 (name ?name) (month ?m))
 	=>
 	(retract ?c ?m)
-	(modify ?d (month (make-instance of MONTH (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?d (month (make-instance of HTTP-MONTH (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date3-detect-padding
-	?c <- (char ?name 32) ; SP
-	?d <- (date3 (name ?name) (month ?m&:(instancep ?m)) (day "") (padded FALSE))
+(defrule http-date3-detect-padding
+	?c <- (http-char ?name 32) ; SP
+	?d <- (http-date3 (name ?name) (month ?m&:(instancep ?m)) (day "") (padded FALSE))
 	=>
 	(retract ?c)
 	(modify ?d (padded TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date3-build-2digit-day
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date3 (name ?name) (month ?m&:(instancep ?m)) (day ?day&:(> 2 (str-length ?day))) (padded FALSE))
+(defrule http-date3-build-2digit-day
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date3 (name ?name) (month ?m&:(instancep ?m)) (day ?day&:(> 2 (str-length ?day))) (padded FALSE))
 	=>
 	(retract ?c)
 	(modify ?d (day (format nil "%s%c" ?day ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule date3-build-1digit-day
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?d <- (date3 (name ?name) (day "") (padded TRUE))
+(defrule http-date3-build-1digit-day
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-date3 (name ?name) (day "") (padded TRUE))
 	=>
 	(retract ?c)
 	(modify ?d (day (format nil "%c" ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule asctime-date-end-date3-2digit
-	(char ?name 32) ; SP
-	?d <- (date3 (month ?month) (day ?day&:(= 2 (str-length ?day))) (padded FALSE))
-	?a <- (asctime-date (name ?name) (date3 ?d))
+(defrule http-asctime-date-end-date3-2digit
+	(http-char ?name 32) ; SP
+	?d <- (http-date3 (month ?month) (day ?day&:(= 2 (str-length ?day))) (padded FALSE))
+	?a <- (http-asctime-date (name ?name) (date3 ?d))
 	=>
 	(retract ?d)
-	(modify ?a (date3 (make-instance of DATE3 (filename ?name) (month ?month) (day ?day) (padded FALSE)))))
+	(modify ?a (date3 (make-instance of HTTP-DATE3 (id ?name) (month ?month) (day ?day) (padded FALSE)))))
 
-(defrule asctime-date-end-date3-1digit
-	(char ?name 32) ; SP
-	?d <- (date3 (month ?month) (day ?day&:(= 1 (str-length ?day))) (padded TRUE))
-	?a <- (asctime-date (name ?name) (date3 ?d))
+(defrule http-asctime-date-end-date3-1digit
+	(http-char ?name 32) ; SP
+	?d <- (http-date3 (month ?month) (day ?day&:(= 1 (str-length ?day))) (padded TRUE))
+	?a <- (http-asctime-date (name ?name) (date3 ?d))
 	=>
 	(retract ?d)
-	(modify ?a (date3 (make-instance of DATE3 (filename ?name) (month ?month) (day ?day) (padded TRUE)))))
+	(modify ?a (date3 (make-instance of HTTP-DATE3 (id ?name) (month ?month) (day ?day) (padded TRUE)))))
 
-(defrule asctime-date-start-time
-	?c <- (char ?name 32) ; SP
-	?a <- (asctime-date (name ?name) (date3 ?d&:(instancep ?d)) (time nil))
+(defrule http-asctime-date-start-time
+	?c <- (http-char ?name 32) ; SP
+	?a <- (http-asctime-date (name ?name) (date3 ?d&:(instancep ?d)) (time nil))
 	=>
 	(retract ?c)
-	(modify ?a (time (assert (time (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (time (assert (http-time (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule asctime-date-end-time
-	?c <- (char ?name 32) ; SP
-	?t <- (time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
-	?a <- (asctime-date (name ?name) (time ?t))
+(defrule http-asctime-date-end-time
+	?c <- (http-char ?name 32) ; SP
+	?t <- (http-time (name ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third&:(= 2 (str-length ?third))))
+	?a <- (http-asctime-date (name ?name) (time ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?a (time (make-instance of TIME (filename ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (time (make-instance of HTTP-TIME (id ?name) (first-2digit ?first) (second-2digit ?second) (third-2digit ?third))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule asctime-date-build-year
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?a <- (asctime-date (name ?name) (time ?t&:(instancep ?t)) (year ?year&:(> 4 (str-length ?year))))
+(defrule http-asctime-date-build-year
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?a <- (http-asctime-date (name ?name) (time ?t&:(instancep ?t)) (year ?year&:(> 4 (str-length ?year))))
 	=>
 	(retract ?c)
 	(modify ?a (year (format nil "%s%c" ?year ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-date-header-end-asctime-date
-	(char ?name 9|13|32) ; HTAB CR SP
-	?a <- (asctime-date (name ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year&:(= 4 (str-length ?year))))
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?a <- (http-asctime-date (name ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year&:(= 4 (str-length ?year))))
 	?h <- (http-date-header (name ?name) (http-date ?a))
 	=>
 	(retract ?a)
-	(modify ?h (http-date (make-instance of ASCTIME-DATE (filename ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year)))))
+	(modify ?h (http-date (make-instance of HTTP-ASCTIME-DATE (id ?name) (day-name ?day-name) (date3 ?date3) (time ?time) (year ?year)))))
 
-(defrule end-date-header
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule http-end-date-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
 	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Date"))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Date"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of DATE-HEADER (filename ?name) (http-date ?d)))))
+	(modify ?fv (value (make-instance of HTTP-DATE (id ?name) (http-date ?d)))))
 
-(defrule end-last-modified-header
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule http-end-last-modified-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
 	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Last-Modified"))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Last-Modified"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of LAST-MODIFIED-HEADER (filename ?name) (http-date ?d)))))
+	(modify ?fv (value (make-instance of HTTP-LAST-MODIFIED-HEADER (id ?name) (http-date ?d)))))
 
-(defrule end-if-modified-since-header
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule http-end-if-modified-since-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
 	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "If-Modified-Since"))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "If-Modified-Since"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of IF-MODIFIED-SINCE-HEADER (filename ?name) (http-date ?d)))))
+	(modify ?fv (value (make-instance of HTTP-IF-MODIFIED-SINCE-HEADER (id ?name) (http-date ?d)))))
 
-(defrule end-if-unmodified-since-header
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule http-end-if-unmodified-since-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
 	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "If-Unmodified-Since"))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "If-Unmodified-Since"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of IF-UNMODIFIED-SINCE-HEADER (filename ?name) (http-date ?d)))))
+	(modify ?fv (value (make-instance of HTTP-IF-UNMODIFIED-SINCE-HEADER (id ?name) (http-date ?d)))))
 
 ;   ETag          = entity-tag
 ;   entity-tag    = [ weak ] opaque-tag
@@ -3967,33 +4001,33 @@
 ; The entity-tag fact is built by rules keyed only on the fact itself, so the
 ; same builder serves ETag, If-Match, If-None-Match and If-Range. Only the
 ; rule that closes the tag differs per owning header.
-(defrule entity-tag-detect-weak
-	?c <- (char ?name 87) ; W
-	?e <- (entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
+(defrule http-entity-tag-detect-weak
+	?c <- (http-char ?name 87) ; W
+	?e <- (http-entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
 	=>
 	(retract ?c)
 	(modify ?e (weak "W"))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-end-weak
-	?c <- (char ?name 47) ; /
-	?e <- (entity-tag (name ?name) (weak "W") (opaque-tag nil))
+(defrule http-entity-tag-end-weak
+	?c <- (http-char ?name 47) ; /
+	?e <- (http-entity-tag (name ?name) (weak "W") (opaque-tag nil))
 	=>
 	(retract ?c)
 	(modify ?e (weak TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-start-opaque-tag
-	?c <- (char ?name 34) ; "
-	?e <- (entity-tag (name ?name) (weak FALSE|TRUE) (opaque-tag nil))
+(defrule http-entity-tag-start-opaque-tag
+	?c <- (http-char ?name 34) ; "
+	?e <- (http-entity-tag (name ?name) (weak FALSE|TRUE) (opaque-tag nil))
 	=>
 	(retract ?c)
 	(modify ?e (opaque-tag ""))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-opaque-tag
-	?c <- (char ?name ?char)
-	?e <- (entity-tag (name ?name) (opaque-tag ?value&:(stringp ?value)))
+(defrule http-build-opaque-tag
+	?c <- (http-char ?name ?char)
+	?e <- (http-entity-tag (name ?name) (opaque-tag ?value&:(stringp ?value)))
 	(test (or
 		(= ?char 33) ; !
 		(and (>= ?char 35) (<= ?char 126)) ; %x23-7E
@@ -4001,204 +4035,204 @@
 	=>
 	(retract ?c)
 	(modify ?e (opaque-tag (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; ETag = entity-tag
-(defrule detect-etag-header
-	(char ?name 34|87) ; " W
-	?o <- (object (is-a FIELD-NAME) (value "ETag"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-etag-header
+	(http-char ?name 34|87) ; " W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "ETag"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (etag-header (name ?name) (entity-tag (assert (entity-tag (name ?name)))))))))
+	(modify ?fv (value (assert (http-etag-header (name ?name) (entity-tag (assert (http-entity-tag (name ?name)))))))))
 
-(defrule etag-header-end-entity-tag
-	?c <- (char ?name 34) ; "
-	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
-	?h <- (etag-header (name ?name) (entity-tag ?e))
+(defrule http-etag-header-end-entity-tag
+	?c <- (http-char ?name 34) ; "
+	?e <- (http-entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (http-etag-header (name ?name) (entity-tag ?e))
 	=>
 	(retract ?c ?e)
-	(modify ?h (entity-tag (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (entity-tag (make-instance of HTTP-ENTITY-TAG (id ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule etag-header-skip-ows-after-entity-tag
-	?c <- (char ?name 9|32) ; HTAB SP
-	(etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
+(defrule http-etag-header-skip-ows-after-entity-tag
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-etag-header
-	(char ?name 13) ; CR
-	?h <- (etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
-	?fv <- (field-value (value ?h))
+(defrule http-end-etag-header
+	(http-char ?name 13) ; CR
+	?h <- (http-etag-header (name ?name) (entity-tag ?e&:(instancep ?e)))
+	?fv <- (http-field-value (value ?h))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of ETAG-HEADER (filename ?name) (entity-tag ?e)))))
+	(modify ?fv (value (make-instance of HTTP-ETAG-HEADER (id ?name) (entity-tag ?e)))))
 
 ;   If-Match      = "*" / #entity-tag
 ;   If-None-Match = "*" / #entity-tag
-(defrule detect-entity-tag-list-header
-	(char ?name 34|87) ; " W
-	?o <- (object (is-a FIELD-NAME) (value "If-Match"|"If-None-Match"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-entity-tag-list-header
+	(http-char ?name 34|87) ; " W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "If-Match"|"If-None-Match"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (entity-tag-list-header (name ?name) (entity-tags (assert (entity-tag (name ?name)))))))))
+	(modify ?fv (value (assert (http-entity-tag-list-header (name ?name) (entity-tags (assert (http-entity-tag (name ?name)))))))))
 
-(defrule detect-entity-tag-list-header-star
-	?c <- (char ?name 42) ; *
-	?o <- (object (is-a FIELD-NAME) (value "If-Match"|"If-None-Match"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-entity-tag-list-header-star
+	?c <- (http-char ?name 42) ; *
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "If-Match"|"If-None-Match"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
 	(retract ?c)
-	(modify ?fv (value (assert (entity-tag-list-header (name ?name) (entity-tags "*")))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?fv (value (assert (http-entity-tag-list-header (name ?name) (entity-tags "*")))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-list-header-end-entity-tag
-	?c <- (char ?name 34) ; "
-	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
-	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
+(defrule http-entity-tag-list-header-end-entity-tag
+	?c <- (http-char ?name 34) ; "
+	?e <- (http-entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
 	=>
 	(retract ?c ?e)
-	(modify ?h (entity-tags ?entity-tags (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (entity-tags ?entity-tags (make-instance of HTTP-ENTITY-TAG (id ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-list-header-detect-next-entity-tag
-	?c <- (char ?name 44) ; ,
-	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&:(instancep ?e)))
+(defrule http-entity-tag-list-header-detect-next-entity-tag
+	?c <- (http-char ?name 44) ; ,
+	?h <- (http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&:(instancep ?e)))
 	=>
 	(retract ?c)
-	(modify ?h (entity-tags ?entity-tags ?e (assert (entity-tag (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (entity-tags ?entity-tags ?e (assert (http-entity-tag (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-list-header-skip-ows-before-entity-tag
-	?c <- (char ?name 9|32) ; HTAB SP
-	?e <- (entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
-	(entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
+(defrule http-entity-tag-list-header-skip-ows-before-entity-tag
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?e <- (http-entity-tag (name ?name) (weak FALSE) (opaque-tag nil))
+	(http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule entity-tag-list-header-skip-ows-after-entity-tag
-	?c <- (char ?name 9|32) ; HTAB SP
-	(entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+(defrule http-entity-tag-list-header-skip-ows-after-entity-tag
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-if-match-header
-	(char ?name 13) ; CR
-	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "If-Match"))
+(defrule http-end-if-match-header
+	(http-char ?name 13) ; CR
+	?h <- (http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "If-Match"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of IF-MATCH-HEADER (filename ?name) (entity-tags ?entity-tags ?e)))))
+	(modify ?fv (value (make-instance of HTTP-IF-MATCH-HEADER (id ?name) (entity-tags ?entity-tags ?e)))))
 
-(defrule end-if-none-match-header
-	(char ?name 13) ; CR
-	?h <- (entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
-	?fv <- (field-value (value ?h))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "If-None-Match"))
+(defrule http-end-if-none-match-header
+	(http-char ?name 13) ; CR
+	?h <- (http-entity-tag-list-header (name ?name) (entity-tags $?entity-tags ?e&"*"|:(instancep ?e)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "If-None-Match"))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of IF-NONE-MATCH-HEADER (filename ?name) (entity-tags ?entity-tags ?e)))))
+	(modify ?fv (value (make-instance of HTTP-IF-NONE-MATCH-HEADER (id ?name) (entity-tags ?entity-tags ?e)))))
 
 ;   If-Range = entity-tag / HTTP-date
 ; The first character picks the branch: DQUOTE is an entity-tag, F M S T start
 ; a day name. W is ambiguous (W/"..." or Wed,...), so it is consumed and the
 ; next character decides.
-(defrule detect-if-range-header-entity-tag
-	(char ?name 34) ; "
-	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-if-range-header-entity-tag
+	(http-char ?name 34) ; "
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "If-Range"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (if-range-header (name ?name) (value (assert (entity-tag (name ?name)))))))))
+	(modify ?fv (value (assert (http-if-range-header (name ?name) (value (assert (http-entity-tag (name ?name)))))))))
 
-(defrule detect-if-range-header-http-date
-	(char ?name 70|77|83|84) ; F M S T
-	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-if-range-header-http-date
+	(http-char ?name 70|77|83|84) ; F M S T
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "If-Range"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (if-range-header (name ?name) (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name))))))))))))
+	(modify ?fv (value (assert (http-if-range-header (name ?name) (value (assert (http-date-header (name ?name) (http-date (assert (http-day-name (name ?name))))))))))))
 
-(defrule detect-if-range-header-W
-	?c <- (char ?name 87) ; W
-	?o <- (object (is-a FIELD-NAME) (value "If-Range"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
-	=>
-	(retract ?c)
-	(modify ?fv (value (assert (if-range-header (name ?name) (value W)))))
-	(assert (char ?name (get-char ?name))))
-
-(defrule if-range-header-W-is-weak-entity-tag
-	?c <- (char ?name 47) ; /
-	?h <- (if-range-header (name ?name) (value W))
+(defrule http-detect-if-range-header-W
+	?c <- (http-char ?name 87) ; W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "If-Range"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
 	(retract ?c)
-	(modify ?h (value (assert (entity-tag (name ?name) (weak TRUE)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?fv (value (assert (http-if-range-header (name ?name) (value W)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule if-range-header-W-is-day-name
-	(char ?name 101) ; e
-	?h <- (if-range-header (name ?name) (value W))
+(defrule http-if-range-header-W-is-weak-entity-tag
+	?c <- (http-char ?name 47) ; /
+	?h <- (http-if-range-header (name ?name) (value W))
 	=>
-	(modify ?h (value (assert (http-date-header (name ?name) (http-date (assert (day-name (name ?name) (value "W")))))))))
+	(retract ?c)
+	(modify ?h (value (assert (http-entity-tag (name ?name) (weak TRUE)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule if-range-header-end-entity-tag
-	?c <- (char ?name 34) ; "
-	?e <- (entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
-	?h <- (if-range-header (name ?name) (value ?e))
+(defrule http-if-range-header-W-is-day-name
+	(http-char ?name 101) ; e
+	?h <- (http-if-range-header (name ?name) (value W))
+	=>
+	(modify ?h (value (assert (http-date-header (name ?name) (http-date (assert (http-day-name (name ?name) (value "W")))))))))
+
+(defrule http-if-range-header-end-entity-tag
+	?c <- (http-char ?name 34) ; "
+	?e <- (http-entity-tag (name ?name) (weak ?weak) (opaque-tag ?value&:(stringp ?value)))
+	?h <- (http-if-range-header (name ?name) (value ?e))
 	=>
 	(retract ?c ?e)
-	(modify ?h (value (make-instance of ENTITY-TAG (filename ?name) (weak ?weak) (opaque-tag ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (value (make-instance of HTTP-ENTITY-TAG (id ?name) (weak ?weak) (opaque-tag ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule if-range-header-end-http-date
-	(char ?name 9|13|32) ; HTAB CR SP
+(defrule http-if-range-header-end-http-date
+	(http-char ?name 9|13|32) ; HTAB CR SP
 	?d <- (http-date-header (name ?name) (http-date ?date&:(instancep ?date)))
-	?h <- (if-range-header (name ?name) (value ?d))
+	?h <- (http-if-range-header (name ?name) (value ?d))
 	=>
 	(retract ?d)
 	(modify ?h (value ?date)))
 
-(defrule if-range-header-skip-ows-after-value
-	?c <- (char ?name 9|32) ; HTAB SP
-	(if-range-header (name ?name) (value ?v&:(instancep ?v)))
+(defrule http-if-range-header-skip-ows-after-value
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-if-range-header (name ?name) (value ?v&:(instancep ?v)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-if-range-header
-	(char ?name 13) ; CR
-	?h <- (if-range-header (name ?name) (value ?v&:(instancep ?v)))
-	?fv <- (field-value (value ?h))
+(defrule http-end-if-range-header
+	(http-char ?name 13) ; CR
+	?h <- (http-if-range-header (name ?name) (value ?v&:(instancep ?v)))
+	?fv <- (http-field-value (value ?h))
 	=>
 	(retract ?h)
-	(modify ?fv (value (make-instance of IF-RANGE-HEADER (filename ?name) (value ?v)))))
+	(modify ?fv (value (make-instance of HTTP-IF-RANGE-HEADER (id ?name) (value ?v)))))
 
-(defrule end-content-type-header
-	(char ?name 13)
-	?cth <- (content-type-header (name ?name) (type ?type&:(instancep ?type)) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
-	?f <- (field-value (value ?cth))
+(defrule http-end-content-type-header
+	(http-char ?name 13)
+	?cth <- (http-content-type-header (name ?name) (type ?type&:(instancep ?type)) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?f <- (http-field-value (value ?cth))
 	=>
 	(retract ?cth)
-	(modify ?f (value (make-instance of CONTENT-TYPE-HEADER (filename ?name) (type ?type) (subtype ?subtype) (parameters ?parameters)))))
+	(modify ?f (value (make-instance of HTTP-CONTENT-TYPE-HEADER (id ?name) (type ?type) (subtype ?subtype) (parameters ?parameters)))))
 
-(defrule end-host-header
-	(char ?name 13|32) ; CR SP
-	?hh <- (host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port ?p&nil|:(instancep ?p)))
-	?f <- (field-value (value ?hh))
+(defrule http-end-host-header
+	(http-char ?name 13|32) ; CR SP
+	?hh <- (http-host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port ?p&nil|:(instancep ?p)))
+	?f <- (http-field-value (value ?hh))
 	=>
 	(retract ?hh)
-	(modify ?f (value (make-instance of HOST-HEADER (filename ?name) (uri-host ?h) (port ?p)))))
+	(modify ?f (value (make-instance of HTTP-HOST-HEADER (id ?name) (uri-host ?h) (port ?p)))))
 
 ;
 ;  Proxy-Authorization = credentials
@@ -4206,237 +4240,237 @@
 ;  auth-scheme = token
 ;  token68 = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"="
 ;  auth-param = token BWS "=" BWS ( token / quoted-string )
-(defrule detect-proxy-authorization-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Proxy-Authorization"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-proxy-authorization-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Proxy-Authorization"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (proxy-authorization-header (name ?name) (auth-scheme (assert (token (name ?name)))))))))
+	(modify ?fv (value (assert (http-proxy-authorization-header (name ?name) (auth-scheme (assert (http-token (name ?name)))))))))
 
-(defrule proxy-authorization-header-end-auth-scheme
-	(char ?name 9|13|32) ; HTAB CR SP
-	?t <- (token (value ?value))
-	?p <- (proxy-authorization-header (name ?name) (auth-scheme ?t))
+(defrule http-proxy-authorization-header-end-auth-scheme
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?t <- (http-token (value ?value))
+	?p <- (http-proxy-authorization-header (name ?name) (auth-scheme ?t))
 	=>
 	(retract ?t)
 	(modify ?p (auth-scheme ?value))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule proxy-authorization-detect-second-part-after-auth-scheme
-	?c <- (char ?name 32) ; SP
-	?p <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
+(defrule http-proxy-authorization-detect-second-part-after-auth-scheme
+	?c <- (http-char ?name 32) ; SP
+	?p <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
 	=>
 	(retract ?c)
-	(modify ?p (second-part (assert (token68 (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?p (second-part (assert (http-token68 (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule proxy-authorization-skip-sp-after-auth-scheme
-	?c <- (char ?name 32) ; SP
-	?t <- (token68 (name ?name) (value ""))
-	(proxy-authorization-header (name ?name) (second-part ?t))
+(defrule http-proxy-authorization-skip-sp-after-auth-scheme
+	?c <- (http-char ?name 32) ; SP
+	?t <- (http-token68 (name ?name) (value ""))
+	(http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-token68
-	?c <- (char ?name ?char&:(member$ ?char ?*token68*))
-	?t <- (token68 (name ?name) (value ?value) (equals 0))
+(defrule http-build-token68
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-token68*))
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0))
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule token68-detect-equals
-	?c <- (char ?name 61) ; =
-	?t <- (token68 (name ?name) (value ?value) (equals ?equals))
+(defrule http-token68-detect-equals
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token68 (name ?name) (value ?value) (equals ?equals))
 	=>
 	(retract ?c)
 	(modify ?t (equals (+ 1 ?equals)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule proxy-authorization-end-token68
-	(char ?name 9|13|32) ; HTAB CR SP
-	?t <- (token68 (name ?name) (value ?value&~"") (equals ?equals))
-	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+(defrule http-proxy-authorization-end-token68
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?t <- (http-token68 (name ?name) (value ?value&~"") (equals ?equals))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
-	(modify ?p (second-part (make-instance of TOKEN68 (filename ?name) (value ?value) (equals ?equals)))))
+	(modify ?p (second-part (make-instance of HTTP-TOKEN68 (id ?name) (value ?value) (equals ?equals)))))
 
-(defrule proxy-authorization-change-token68-to-auth-param
-	(char ?name ?char&~:(member$ ?char ?*token68*)&:(member$ ?char ?*tchar*))
-	?t <- (token68 (name ?name) (value ?value) (equals 0))
-	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+(defrule http-proxy-authorization-change-token68-to-auth-param
+	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*))
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
-	(modify ?p (second-part (assert (auth-param (name ?name) (left-side (assert (token (name ?name) (value ?value)))))))))
+	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name) (value ?value)))))))))
 
-(defrule proxy-authorization-change-token68-to-auth-param-after-equals
-	(char ?name ?char&~:(member$ ?char ?*token68*)&:(member$ ?char ?*tchar*))
-	?t <- (token68 (name ?name) (value ?value&~:(str-index "/" ?value)) (equals 1))
-	?p <- (proxy-authorization-header (name ?name) (second-part ?t))
+(defrule http-proxy-authorization-change-token68-to-auth-param-after-equals
+	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*))
+	?t <- (http-token68 (name ?name) (value ?value&~:(str-index "/" ?value)) (equals 1))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
-	(modify ?p (second-part (assert (auth-param (name ?name) (left-side ?value) (right-side (assert (token (name ?name)))))))))
+	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side ?value) (right-side (assert (http-token (name ?name)))))))))
 
-(defrule auth-param-end-left-side
-	?c <- (char ?name 61) ; =
-	?t <- (token (value ?value))
-	?a <- (auth-param (name ?name) (left-side ?t))
+(defrule http-auth-param-end-left-side
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token (value ?value))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?a (left-side ?value) (right-side (assert (token (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?a (left-side ?value) (right-side (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule auth-param-end-left-side
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (token (value ?value))
-	?a <- (auth-param (name ?name) (right-side ?t))
+(defrule http-auth-param-end-left-side
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-token (value ?value))
+	?a <- (http-auth-param (name ?name) (right-side ?t))
 	=>
 	(retract ?t)
 	(modify ?a (right-side ?value)))
 
-(defrule proxy-authorization-header-end-auth-param
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?a <- (auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)))
-	?p <- (proxy-authorization-header (name ?name) (second-part $?auth-params ?a))
+(defrule http-proxy-authorization-header-end-auth-param
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part $?auth-params ?a))
 	=>
 	(retract ?a)
-	(modify ?p (second-part ?auth-params (make-instance of AUTH-PARAM (filename ?name) (left-side ?left-side) (right-side ?right-side)))))
+	(modify ?p (second-part ?auth-params (make-instance of HTTP-AUTH-PARAM (id ?name) (left-side ?left-side) (right-side ?right-side)))))
 
-(defrule proxy-authorization-header-detext-next-auth-param
-	?c <- (char ?name 44) ; ,
-	?auth-param <- (object (is-a AUTH-PARAM))
-	?p <- (proxy-authorization-header (name ?name) (second-part $?auth-params ?auth-param))
+(defrule http-proxy-authorization-header-detext-next-auth-param
+	?c <- (http-char ?name 44) ; ,
+	?auth-param <- (object (is-a HTTP-AUTH-PARAM))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part $?auth-params ?auth-param))
 	=>
 	(retract ?c)
-	(modify ?p (second-part ?auth-params ?auth-param (assert (auth-param (name ?name) (left-side (assert (token (name ?name)))))))))
+	(modify ?p (second-part ?auth-params ?auth-param (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name)))))))))
 
-(defrule proxy-authorization-header-skip-ows-after-auth-param
-	?c <- (char ?name 9|32) ; HTAB SP
-	?clh <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+(defrule http-proxy-authorization-header-skip-ows-after-auth-param
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-proxy-authorization-header
-	(char ?name 13) ; CR
-	?clh <- (proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-proxy-authorization-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of PROXY-AUTHORIZATION-HEADER (filename ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
+	(modify ?fv (value (make-instance of HTTP-PROXY-AUTHORIZATION-HEADER (id ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
 
 ;   TE                 = #t-codings
 ;  t-codings          = "trailers" / ( transfer-coding [ weight ] )
 ;  transfer-coding    = token *( OWS ";" OWS transfer-parameter )
 ;  transfer-parameter = token BWS "=" BWS ( token / quoted-string )
 
-(defrule detect-te-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "TE"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-te-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "TE"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (te-header (name ?name) (t-codings (assert (t-coding (name ?name) (value (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-te-header (name ?name) (t-codings (assert (http-t-coding (name ?name) (value (assert (http-token (name ?name))))))))))))
 
-(defrule t-coding-end-value
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?t <- (token (name ?name) (value ?value))
-	?t-coding <- (t-coding (name ?name) (value ?t))
+(defrule http-t-coding-end-value
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (name ?name) (value ?value))
+	?t-coding <- (http-t-coding (name ?name) (value ?t))
 	=>
 	(retract ?t)
 	(modify ?t-coding (value ?value)))
 
-(defrule t-coding-ignore-ows-before-weight
-	?c <- (char ?name 9|32) ; HTAB SP
-	?l <- (t-coding (name ?name) (value ?value&:(stringp ?value)) (weight nil))
+(defrule http-t-coding-ignore-ows-before-weight
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?l <- (http-t-coding (name ?name) (value ?value&:(stringp ?value)) (weight nil))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule t-coding-detect-weight
-	?c <- (char ?name 59) ; ;
-	?t <- (t-coding (name ?name) (value ?value&:(stringp ?value)&~"trailers") (weight nil))
+(defrule http-t-coding-detect-weight
+	?c <- (http-char ?name 59) ; ;
+	?t <- (http-t-coding (name ?name) (value ?value&:(stringp ?value)&~"trailers") (weight nil))
 	=>
 	(retract ?c)
-	(modify ?t (weight (assert (weight (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?t (weight (assert (http-weight (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule t-coding-end-weight
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?w <- (weight (name ?name) (qvalue ?q&:(instancep ?q)))
-	?t <- (t-coding (name ?name) (weight ?w))
+(defrule http-t-coding-end-weight
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?w <- (http-weight (name ?name) (qvalue ?q&:(instancep ?q)))
+	?t <- (http-t-coding (name ?name) (weight ?w))
 	=>
 	(retract ?w)
-	(modify ?t (weight (make-instance of WEIGHT (filename ?name) (qvalue ?q)))))
+	(modify ?t (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
-(defrule te-header-end-t-coding
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (t-coding (name ?name) (value ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
-	?te <- (te-header (t-codings $?t-codings ?t))
+(defrule http-te-header-end-t-coding
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-t-coding (name ?name) (value ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
+	?te <- (http-te-header (t-codings $?t-codings ?t))
 	=>
 	(retract ?t)
-	(modify ?te (t-codings ?t-codings (make-instance of T-CODING (filename ?name) (value ?value) (weight ?w)))))
+	(modify ?te (t-codings ?t-codings (make-instance of HTTP-T-CODING (id ?name) (value ?value) (weight ?w)))))
 
-(defrule te-header-detect-next-t-coding
-	?c <- (char ?name 44) ; ,
-	?t <- (te-header (name ?name) (t-codings $?t-codings ?t-coding&:(instancep ?t-coding)))
+(defrule http-te-header-detect-next-t-coding
+	?c <- (http-char ?name 44) ; ,
+	?t <- (http-te-header (name ?name) (t-codings $?t-codings ?t-coding&:(instancep ?t-coding)))
 	=>
 	(retract ?c)
-	(modify ?t (t-codings ?t-codings ?t-coding (assert (t-coding (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?t (t-codings ?t-codings ?t-coding (assert (http-t-coding (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule te-header-ignore-ows-before-next-t-coding
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (t-coding (name ?name) (value nil))
-	?te <- (te-header (t-codings $?t-codings ?t))
+(defrule http-te-header-ignore-ows-before-next-t-coding
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-t-coding (name ?name) (value nil))
+	?te <- (http-te-header (t-codings $?t-codings ?t))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule te-header-ignore-ows-after-last-t-coding
-	?c <- (char ?name 9|32) ; HTAB SP
-	?clh <- (te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
+(defrule http-te-header-ignore-ows-after-last-t-coding
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?clh <- (http-te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule te-header-detect-next-t-coding-value
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?t <- (t-coding (name ?name) (value nil))
+(defrule http-te-header-detect-next-t-coding-value
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?t <- (http-t-coding (name ?name) (value nil))
 	=>
-	(modify ?t (value (assert (token (name ?name))))))
+	(modify ?t (value (assert (http-token (name ?name))))))
 
-(defrule end-te-header
-	(char ?name 13) ; CR
-	?clh <- (te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
-	?fv <- (field-value (value ?clh))
+(defrule http-end-te-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-te-header (name ?name) (t-codings $?t-codings&:(instancep (nth$ (length$ ?t-codings) ?t-codings))))
+	?fv <- (http-field-value (value ?clh))
 	=>
 	(retract ?clh)
-	(modify ?fv (value (make-instance of TE-HEADER (filename ?name) (t-codings ?t-codings)))))
+	(modify ?fv (value (make-instance of HTTP-TE-HEADER (id ?name) (t-codings ?t-codings)))))
 
 ; range-set = range-spec *( OWS "," OWS range-spec )
 ; range-spec = int-range / suffix-range / other-range
 ; range-unit = token
 ; ranges-specifier = range-unit "=" range-set
 ;  Range = ranges-specifier
-(defrule detect-range-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Range"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-range-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Range"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (range-header (name ?name) (ranges-specifier (assert (ranges-specifier (name ?name) (range-unit (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-range-header (name ?name) (ranges-specifier (assert (http-ranges-specifier (name ?name) (range-unit (assert (http-token (name ?name))))))))))))
 
-(defrule ranges-specifier-end-range-unit
-	?c <- (char ?name 61) ; =
-	?t <- (token (name ?name) (value ?value))
-	?r <- (ranges-specifier (name ?name) (range-unit ?t))
+(defrule http-ranges-specifier-end-range-unit
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token (name ?name) (value ?value))
+	?r <- (http-ranges-specifier (name ?name) (range-unit ?t))
 	=>
 	(retract ?c ?t)
-	(modify ?r (range-unit ?value) (range-set (assert (range-set (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (range-unit ?value) (range-set (assert (http-range-set (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; int-range = first-pos "-" [ last-pos ]
 ; other-range = 1*( %x21-2B ; '!'-'+'
@@ -4447,328 +4481,328 @@
 ; first-pos = 1*DIGIT
 ; last-pos = 1*DIGIT
 ; suffix-length = 1*DIGIT
-(defrule range-set-detect-first-range-spec
-	(char ?name ?char&:(member$ ?char ?*other-range*))
-	?r <- (range-set (name ?name) (range-specs))
+(defrule http-range-set-detect-first-range-spec
+	(http-char ?name ?char&:(member$ ?char ?*http-other-range*))
+	?r <- (http-range-set (name ?name) (range-specs))
 	=>
-	(modify ?r (range-specs (assert (range-spec (name ?name))))))
+	(modify ?r (range-specs (assert (http-range-spec (name ?name))))))
 
-(defrule range-spec-detect-int-range
-	(char ?name ?char&:(member$ ?char ?*digit*))
-	?r <- (range-spec (name ?name) (value nil))
+(defrule http-range-spec-detect-int-range
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?r <- (http-range-spec (name ?name) (value nil))
 	=>
-	(modify ?r (value (assert (int-range (name ?name))))))
+	(modify ?r (value (assert (http-int-range (name ?name))))))
 
-(defrule range-spec-int-range-change-to-other-range-during-first-pos
-	(char ?name ?char&~45&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
-	?i <- (int-range (first-pos ?first-pos&~"") (last-pos nil))
-	?r <- (range-spec (name ?name) (value ?i))
-	=>
-	(retract ?i)
-	(modify ?r (value (assert (other-range (name ?name) (value ?first-pos))))))
-
-(defrule range-spec-int-range-change-to-other-range-during-last-pos
-	(char ?name ?char&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
-	?i <- (int-range (first-pos ?first-pos) (last-pos ?last-pos&~nil))
-	?r <- (range-spec (name ?name) (value ?i))
+(defrule http-range-spec-int-range-change-to-other-range-during-first-pos
+	(http-char ?name ?char&~45&~:(member$ ?char ?*http-digit*)&:(member$ ?char ?*http-other-range*))
+	?i <- (http-int-range (first-pos ?first-pos&~"") (last-pos nil))
+	?r <- (http-range-spec (name ?name) (value ?i))
 	=>
 	(retract ?i)
-	(modify ?r (value (assert (other-range (name ?name) (value (format nil "%s-%s" ?first-pos ?last-pos)))))))
+	(modify ?r (value (assert (http-other-range (name ?name) (value ?first-pos))))))
 
-(defrule range-spec-suffix-range-change-to-other-range
-	(char ?name ?char&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*))
-	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
-	?r <- (range-spec (value ?o))
+(defrule http-range-spec-int-range-change-to-other-range-during-last-pos
+	(http-char ?name ?char&~:(member$ ?char ?*http-digit*)&:(member$ ?char ?*http-other-range*))
+	?i <- (http-int-range (first-pos ?first-pos) (last-pos ?last-pos&~nil))
+	?r <- (http-range-spec (name ?name) (value ?i))
+	=>
+	(retract ?i)
+	(modify ?r (value (assert (http-other-range (name ?name) (value (format nil "%s-%s" ?first-pos ?last-pos)))))))
+
+(defrule http-range-spec-suffix-range-change-to-other-range
+	(http-char ?name ?char&~:(member$ ?char ?*http-digit*)&:(member$ ?char ?*http-other-range*))
+	?s <- (http-suffix-range (name ?name) (suffix-length ?suffix-length))
+	?r <- (http-range-spec (value ?o))
 	=>
 	(retract ?s)
-	(modify ?r (value (assert (other-range (name ?name) (value (format nil "-%s" ?suffix-length)))))))
+	(modify ?r (value (assert (http-other-range (name ?name) (value (format nil "-%s" ?suffix-length)))))))
 
-(defrule range-spec-detect-suffix-range
-	?c <- (char ?name 45) ; -
-	?r <- (range-spec (name ?name) (value nil))
+(defrule http-range-spec-detect-suffix-range
+	?c <- (http-char ?name 45) ; -
+	?r <- (http-range-spec (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?r (value (assert (suffix-range (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (value (assert (http-suffix-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule range-spec-detect-other-range
-	?c <- (char ?name ?char&~45&~:(member$ ?char ?*digit*)&:(member$ ?char ?*other-range*)) ; -
-	?r <- (range-spec (name ?name) (value nil))
+(defrule http-range-spec-detect-other-range
+	?c <- (http-char ?name ?char&~45&~:(member$ ?char ?*http-digit*)&:(member$ ?char ?*http-other-range*)) ; -
+	?r <- (http-range-spec (name ?name) (value nil))
 	=>
 	(retract ?c)
-	(modify ?r (value (assert (other-range (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (value (assert (http-other-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-other-range
-	?c <- (char ?name ?char&:(member$ ?char ?*other-range*))
-	?o <- (other-range (name ?name) (value ?value))
+(defrule http-build-other-range
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-other-range*))
+	?o <- (http-other-range (name ?name) (value ?value))
 	=>
 	(retract ?c)
 	(modify ?o (value (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-other-range
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?o <- (other-range (name ?name) (value ?value))
-	?r <- (range-spec (value ?o))
+(defrule http-end-other-range
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?o <- (http-other-range (name ?name) (value ?value))
+	?r <- (http-range-spec (value ?o))
 	=>
 	(retract ?o)
-	(modify ?r (value (make-instance of OTHER-RANGE (filename ?name) (value ?value)))))
+	(modify ?r (value (make-instance of HTTP-OTHER-RANGE (id ?name) (value ?value)))))
 
-(defrule build-suffix-range
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
+(defrule http-build-suffix-range
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?s <- (http-suffix-range (name ?name) (suffix-length ?suffix-length))
 	=>
 	(retract ?c)
 	(modify ?s (suffix-length (format nil "%s%c" ?suffix-length ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-suffix-range
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?s <- (suffix-range (name ?name) (suffix-length ?suffix-length))
-	?r <- (range-spec (value ?s))
+(defrule http-end-suffix-range
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?s <- (http-suffix-range (name ?name) (suffix-length ?suffix-length))
+	?r <- (http-range-spec (value ?s))
 	=>
 	(retract ?s)
-	(modify ?r (value (make-instance of SUFFIX-RANGE (filename ?name) (suffix-length ?suffix-length)))))
+	(modify ?r (value (make-instance of HTTP-SUFFIX-RANGE (id ?name) (suffix-length ?suffix-length)))))
 
-(defrule int-range-build-first-pos
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?i <- (int-range (name ?name) (first-pos ?value) (last-pos nil))
+(defrule http-int-range-build-first-pos
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?i <- (http-int-range (name ?name) (first-pos ?value) (last-pos nil))
 	=>
 	(retract ?c)
 	(modify ?i (first-pos (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule int-range-detect-last-pos
-	?c <- (char ?name 45) ; -
-	?i <- (int-range (name ?name) (first-pos ?value) (last-pos nil))
+(defrule http-int-range-detect-last-pos
+	?c <- (http-char ?name 45) ; -
+	?i <- (http-int-range (name ?name) (first-pos ?value) (last-pos nil))
 	=>
 	(retract ?c)
 	(modify ?i (last-pos ""))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule int-range-build-last-pos
-	?c <- (char ?name ?char&:(member$ ?char ?*digit*))
-	?i <- (int-range (name ?name) (last-pos ?value&~nil))
+(defrule http-int-range-build-last-pos
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?i <- (http-int-range (name ?name) (last-pos ?value&~nil))
 	=>
 	(retract ?c)
 	(modify ?i (last-pos (format nil "%s%c" ?value ?char)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-int-range
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?i <- (int-range (name ?name) (first-pos ?first-pos) (last-pos ?last-pos&~nil))
-	?r <- (range-spec (value ?i))
+(defrule http-end-int-range
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?i <- (http-int-range (name ?name) (first-pos ?first-pos) (last-pos ?last-pos&~nil))
+	?r <- (http-range-spec (value ?i))
 	=>
 	(retract ?i)
-	(modify ?r (value (make-instance of INT-RANGE (filename ?name) (first-pos ?first-pos) (last-pos ?last-pos)))))
+	(modify ?r (value (make-instance of HTTP-INT-RANGE (id ?name) (first-pos ?first-pos) (last-pos ?last-pos)))))
 
-(defrule end-range-spec
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?r <- (range-spec (value ?value&:(instancep ?value)))
-	?range-set <- (range-set (range-specs $?range-specs ?r))
+(defrule http-end-range-spec
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?r <- (http-range-spec (value ?value&:(instancep ?value)))
+	?range-set <- (http-range-set (range-specs $?range-specs ?r))
 	=>
 	(retract ?r)
-	(modify ?range-set (range-specs ?range-specs (make-instance of RANGE-SPEC (filename ?name) (value ?value)))))
+	(modify ?range-set (range-specs ?range-specs (make-instance of HTTP-RANGE-SPEC (id ?name) (value ?value)))))
 
-(defrule range-set-skip-ows-after-range-spec
-	?c <- (char ?name 9|32) ; HTAB SP
-	(range-set (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+(defrule http-range-set-skip-ows-after-range-spec
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-range-set (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule range-set-detect-next-range-spec
-	?c <- (char ?name 44)
-	?r <- (range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+(defrule http-range-set-detect-next-range-spec
+	?c <- (http-char ?name 44)
+	?r <- (http-range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
 	=>
 	(retract ?c)
-	(modify ?r (range-specs ?range-specs ?range-spec (assert (range-spec (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?r (range-specs ?range-specs ?range-spec (assert (http-range-spec (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule range-set-skip-ows-before-next-range-spec
-	?c <- (char ?name 9|32) ; HTAB SP
-	?r <- (range-spec (value nil))
-	(range-set (range-specs $?range-specs ?r))
+(defrule http-range-set-skip-ows-before-next-range-spec
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?r <- (http-range-spec (value nil))
+	(http-range-set (range-specs $?range-specs ?r))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-range-set
-	(char ?name 13) ; CR
-	?r <- (range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
-	?ranges-specifier <- (ranges-specifier (range-set ?r))
+(defrule http-end-range-set
+	(http-char ?name 13) ; CR
+	?r <- (http-range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+	?ranges-specifier <- (http-ranges-specifier (range-set ?r))
 	=>
 	(retract ?r)
-	(modify ?ranges-specifier (range-set (make-instance of RANGE-SET (filename ?name) (range-specs ?range-specs ?range-spec)))))
+	(modify ?ranges-specifier (range-set (make-instance of HTTP-RANGE-SET (id ?name) (range-specs ?range-specs ?range-spec)))))
 
-(defrule end-ranges-specifier
-	(char ?name 13) ; CR
-	?ranges-specifier <- (ranges-specifier (range-unit ?u&:(stringp ?u)) (range-set ?r&:(instancep ?r)))
-	?range-header <- (range-header (name ?name) (ranges-specifier ?ranges-specifier))
+(defrule http-end-ranges-specifier
+	(http-char ?name 13) ; CR
+	?ranges-specifier <- (http-ranges-specifier (range-unit ?u&:(stringp ?u)) (range-set ?r&:(instancep ?r)))
+	?range-header <- (http-range-header (name ?name) (ranges-specifier ?ranges-specifier))
 	=>
 	(retract ?ranges-specifier)
-	(modify ?range-header (ranges-specifier (make-instance of RANGES-SPECIFIER (filename ?name) (range-unit ?u) (range-set ?r)))))
+	(modify ?range-header (ranges-specifier (make-instance of HTTP-RANGES-SPECIFIER (id ?name) (range-unit ?u) (range-set ?r)))))
 
-(defrule end-range-header
-	(char ?name 13) ; CR
-	?r <- (range-header (name ?name) (ranges-specifier ?ranges-specifier&:(instancep ?ranges-specifier)))
-	?fv <- (field-value (value ?r))
+(defrule http-end-range-header
+	(http-char ?name 13) ; CR
+	?r <- (http-range-header (name ?name) (ranges-specifier ?ranges-specifier&:(instancep ?ranges-specifier)))
+	?fv <- (http-field-value (value ?r))
 	=>
 	(retract ?r)
-	(modify ?fv (value (make-instance of RANGE-HEADER (filename ?name) (ranges-specifier ?ranges-specifier)))))
+	(modify ?fv (value (make-instance of HTTP-RANGE-HEADER (id ?name) (ranges-specifier ?ranges-specifier)))))
 
-(defrule ignore-ows-at-end-of-field-value
-	?c <- (char ?name 9|32) ; HTAB SP
-	(field-value (name ?name) (value ?v&:(instancep ?v)))
+(defrule http-ignore-ows-at-end-of-field-value
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-field-value (name ?name) (value ?v&:(instancep ?v)))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-field-value
-	?c <- (char ?name 13) ; CR
-	?fv <- (field-value (name ?name) (value ?v&:(instancep ?v)))
-	?fl <- (field-line (field-value ?fv))
+(defrule http-end-field-value
+	?c <- (http-char ?name 13) ; CR
+	?fv <- (http-field-value (name ?name) (value ?v&:(instancep ?v)))
+	?fl <- (http-field-line (field-value ?fv))
 	=>
 	(retract ?c ?fv)
-	(modify ?fl (field-value (make-instance of FIELD-VALUE (filename ?name) (value ?v))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?fl (field-value (make-instance of HTTP-FIELD-VALUE (id ?name) (value ?v))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-field-line
-	?c <- (char ?name 10) ; LF
-	?f <- (field-line (field-name ?field-name) (field-value ?field-value&:(instancep ?field-value)))
+(defrule http-end-field-line
+	?c <- (http-char ?name 10) ; LF
+	?f <- (http-field-line (field-name ?field-name) (field-value ?field-value&:(instancep ?field-value)))
 	?h <- (http-message (name ?name) (field-lines $?field-lines ?f))
 	=>
 	(retract ?c ?f)
-	(modify ?h (field-lines ?field-lines (make-instance of FIELD-LINE (filename ?name) (field-name ?field-name) (field-value ?field-value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (field-lines ?field-lines (make-instance of HTTP-FIELD-LINE (id ?name) (field-name ?field-name) (field-value ?field-value))))
+	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-message-detect-message-body
-	?c <- (char ?name 13) ; CR
+	?c <- (http-char ?name 13) ; CR
 	?h <- (http-message (name ?name) (start-line ?start-line&:(instancep ?start-line)) (field-lines $?field-lines&:(= 0 (length$ ?field-lines))|:(instancep (nth$ (length$ ?field-lines) ?field-lines))) (message-body nil))
 	=>
 	(retract ?c)
-	(modify ?h (message-body (assert (message-body (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?h (message-body (assert (http-message-body (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
 ;   Expect      = #expectation
 ;    expectation = token [ "=" ( token / quoted-string ) parameters ]
 ;     parameters = *( OWS ";" OWS [ parameter ] )
-(defrule detect-expect-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Expect"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-expect-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Expect"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (expect-header (name ?name) (expectations (assert (expectation (name ?name) (token (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-expect-header (name ?name) (expectations (assert (http-expectation (name ?name) (token (assert (http-token (name ?name))))))))))))
 
-(defrule expect-header-skip-ows-before-expectation
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (name ?name) (value ""))
-	?e <- (expectation (name ?name) (token ?t))
-	(expect-header (name ?name) (expectations $?expectations ?e))
+(defrule http-expect-header-skip-ows-before-expectation
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?e <- (http-expectation (name ?name) (token ?t))
+	(http-expect-header (name ?name) (expectations $?expectations ?e))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expectation-end-token
-	(char ?name 9|13|32|44|59|61) ; HTAB CR SP , ; =
-	?t <- (token (name ?name) (value ?value&~""))
-	?e <- (expectation (name ?name) (token ?t))
+(defrule http-expectation-end-token
+	(http-char ?name 9|13|32|44|59|61) ; HTAB CR SP , ; =
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?e <- (http-expectation (name ?name) (token ?t))
 	=>
 	(retract ?t)
 	(modify ?e (token ?value)))
 
-(defrule expectation-detect-equals
-	?c <- (char ?name 61) ; =
-	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
+(defrule http-expectation-detect-equals
+	?c <- (http-char ?name 61) ; =
+	?e <- (http-expectation (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
 	=>
 	(retract ?c)
 	(modify ?e (equals TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expectation-detect-value-token
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?e <- (expectation (name ?name) (equals TRUE) (value nil))
+(defrule http-expectation-detect-value-token
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?e <- (http-expectation (name ?name) (equals TRUE) (value nil))
 	=>
-	(modify ?e (value (assert (token (name ?name))))))
+	(modify ?e (value (assert (http-token (name ?name))))))
 
-(defrule expectation-end-value-token
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?t <- (token (name ?name) (value ?value&~""))
-	?e <- (expectation (name ?name) (value ?t))
+(defrule http-expectation-end-value-token
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?e <- (http-expectation (name ?name) (value ?t))
 	=>
 	(retract ?t)
 	(modify ?e (value ?value)))
 
-(defrule expectation-detect-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?e <- (expectation (name ?name) (equals TRUE) (value nil))
+(defrule http-expectation-detect-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?e <- (http-expectation (name ?name) (equals TRUE) (value nil))
 	=>
 	(retract ?c)
-	(modify ?e (value (assert (quoted-string (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?e (value (assert (http-quoted-string (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expectation-end-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
-	?e <- (expectation (name ?name) (value ?q))
-	(not (quoted-pair ?name))
+(defrule http-expectation-end-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?q <- (http-quoted-string (name ?name) (value ?value&:(stringp ?value)))
+	?e <- (http-expectation (name ?name) (value ?q))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?c ?q)
-	(modify ?e (value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?e (value (make-instance of HTTP-QUOTED-STRING (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expectation-detect-parameter
-	?c <- (char ?name 59) ; ;
-	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+(defrule http-expectation-detect-parameter
+	?c <- (http-char ?name 59) ; ;
+	?e <- (http-expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
 	=>
 	(retract ?c)
-	(modify ?e (parameters ?parameters (assert (parameter (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?e (parameters ?parameters (assert (http-parameter (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expectation-end-parameter
-	(char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?p <- (parameter (parameter-name ?pn&:(stringp ?pn)) (parameter-value ?pv&:(stringp ?pv)|:(instancep ?pv)))
-	?e <- (expectation (name ?name) (parameters $?parameters ?p))
+(defrule http-expectation-end-parameter
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?p <- (http-parameter (parameter-name ?pn&:(stringp ?pn)) (parameter-value ?pv&:(stringp ?pv)|:(instancep ?pv)))
+	?e <- (http-expectation (name ?name) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?e (parameters ?parameters (make-instance of PARAMETER (filename ?name) (parameter-name ?pn) (parameter-value ?pv)))))
+	(modify ?e (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?pn) (parameter-value ?pv)))))
 
-(defrule expect-header-end-expectation
-	(char ?name 13|44) ; CR ,
-	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
-	?eh <- (expect-header (name ?name) (expectations $?expectations ?e))
+(defrule http-expect-header-end-expectation
+	(http-char ?name 13|44) ; CR ,
+	?e <- (http-expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?eh <- (http-expect-header (name ?name) (expectations $?expectations ?e))
 	=>
 	(retract ?e)
-	(modify ?eh (expectations ?expectations (make-instance of EXPECTATION (filename ?name) (token ?token) (value ?value) (parameters ?parameters)))))
+	(modify ?eh (expectations ?expectations (make-instance of HTTP-EXPECTATION (id ?name) (token ?token) (value ?value) (parameters ?parameters)))))
 
 ; OWS is allowed after a completed expectation, both before the "," that
 ; starts the next one and before the ";" that starts a parameter, so the
 ; expectation is not ended here -- only the whitespace is consumed.
-(defrule expectation-skip-ows-after-token
-	?c <- (char ?name 9|32) ; HTAB SP
-	?e <- (expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
-	(expect-header (name ?name) (expectations $?expectations ?e))
+(defrule http-expectation-skip-ows-after-token
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?e <- (http-expectation (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	(http-expect-header (name ?name) (expectations $?expectations ?e))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule expect-header-detect-next-expectation
-	?c <- (char ?name 44) ; ,
-	?eh <- (expect-header (name ?name) (expectations $?expectations ?e&:(instancep ?e)))
+(defrule http-expect-header-detect-next-expectation
+	?c <- (http-char ?name 44) ; ,
+	?eh <- (http-expect-header (name ?name) (expectations $?expectations ?e&:(instancep ?e)))
 	=>
 	(retract ?c)
-	(modify ?eh (expectations ?expectations ?e (assert (expectation (name ?name) (token (assert (token (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?eh (expectations ?expectations ?e (assert (http-expectation (name ?name) (token (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-expect-header
-	(char ?name 13) ; CR
-	?eh <- (expect-header (name ?name) (expectations $?expectations&:(instancep (nth$ (length$ ?expectations) ?expectations))))
-	?fv <- (field-value (value ?eh))
+(defrule http-end-expect-header
+	(http-char ?name 13) ; CR
+	?eh <- (http-expect-header (name ?name) (expectations $?expectations&:(instancep (nth$ (length$ ?expectations) ?expectations))))
+	?fv <- (http-field-value (value ?eh))
 	=>
 	(retract ?eh)
-	(modify ?fv (value (make-instance of EXPECT-HEADER (filename ?name) (expectations ?expectations)))))
+	(modify ?fv (value (make-instance of HTTP-EXPECT-HEADER (id ?name) (expectations ?expectations)))))
 
 ;   Cache-Control   = #cache-directive
 ;    cache-directive = token [ "=" ( token / quoted-string ) ]
@@ -4777,262 +4811,275 @@
 ;    extension-pragma = token [ "=" ( token / quoted-string ) ]
 ; Pragma (RFC 9111 5.4, deprecated) shares the cache-directive grammar, so the
 ; same cache-control-header fact and rules build both; only the end rule differs.
-(defrule detect-cache-control-header
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?o <- (object (is-a FIELD-NAME) (value "Cache-Control"|"Pragma"))
-	?fv <- (field-value (name ?name) (value nil))
-	?fl <- (field-line (field-name =(instance-name ?o)) (field-value ?fv))
+(defrule http-detect-cache-control-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Cache-Control"|"Pragma"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
-	(modify ?fv (value (assert (cache-control-header (name ?name) (cache-directives (assert (cache-directive (name ?name) (token (assert (token (name ?name))))))))))))
+	(modify ?fv (value (assert (http-cache-control-header (name ?name) (cache-directives (assert (http-cache-directive (name ?name) (token (assert (http-token (name ?name))))))))))))
 
-(defrule cache-control-header-skip-ows-before-cache-directive
-	?c <- (char ?name 9|32) ; HTAB SP
-	?t <- (token (name ?name) (value ""))
-	?cd <- (cache-directive (name ?name) (token ?t))
-	(cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+(defrule http-cache-control-header-skip-ows-before-cache-directive
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?cd <- (http-cache-directive (name ?name) (token ?t))
+	(http-cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cache-directive-end-token
-	(char ?name 9|13|32|44|61) ; HTAB CR SP , =
-	?t <- (token (name ?name) (value ?value&~""))
-	?cd <- (cache-directive (name ?name) (token ?t))
+(defrule http-cache-directive-end-token
+	(http-char ?name 9|13|32|44|61) ; HTAB CR SP , =
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?cd <- (http-cache-directive (name ?name) (token ?t))
 	=>
 	(retract ?t)
 	(modify ?cd (token ?value)))
 
-(defrule cache-directive-detect-equals
-	?c <- (char ?name 61) ; =
-	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
+(defrule http-cache-directive-detect-equals
+	?c <- (http-char ?name 61) ; =
+	?cd <- (http-cache-directive (name ?name) (token ?token&:(stringp ?token)) (equals FALSE))
 	=>
 	(retract ?c)
 	(modify ?cd (equals TRUE))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cache-directive-detect-value-token
-	(char ?name ?char&:(member$ ?char ?*tchar*))
-	?cd <- (cache-directive (name ?name) (equals TRUE) (value nil))
+(defrule http-cache-directive-detect-value-token
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?cd <- (http-cache-directive (name ?name) (equals TRUE) (value nil))
 	=>
-	(modify ?cd (value (assert (token (name ?name))))))
+	(modify ?cd (value (assert (http-token (name ?name))))))
 
-(defrule cache-directive-end-value-token
-	(char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (token (name ?name) (value ?value&~""))
-	?cd <- (cache-directive (name ?name) (value ?t))
+(defrule http-cache-directive-end-value-token
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?cd <- (http-cache-directive (name ?name) (value ?t))
 	=>
 	(retract ?t)
 	(modify ?cd (value ?value)))
 
-(defrule cache-directive-detect-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?cd <- (cache-directive (name ?name) (equals TRUE) (value nil))
+(defrule http-cache-directive-detect-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?cd <- (http-cache-directive (name ?name) (equals TRUE) (value nil))
 	=>
 	(retract ?c)
-	(modify ?cd (value (assert (quoted-string (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cd (value (assert (http-quoted-string (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cache-directive-end-value-quoted-string
-	?c <- (char ?name 34) ; "
-	?q <- (quoted-string (name ?name) (value ?value&:(stringp ?value)))
-	?cd <- (cache-directive (name ?name) (value ?q))
-	(not (quoted-pair ?name))
+(defrule http-cache-directive-end-value-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?q <- (http-quoted-string (name ?name) (value ?value&:(stringp ?value)))
+	?cd <- (http-cache-directive (name ?name) (value ?q))
+	(not (http-quoted-pair ?name))
 	=>
 	(retract ?c ?q)
-	(modify ?cd (value (make-instance of QUOTED-STRING (filename ?name) (value ?value))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cd (value (make-instance of HTTP-QUOTED-STRING (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
 
 ; OWS is allowed after a completed cache-directive, before the "," that starts
 ; the next one, so the directive is not ended here -- only the whitespace is
 ; consumed.
-(defrule cache-directive-skip-ows-after-token
-	?c <- (char ?name 9|32) ; HTAB SP
-	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
-	(cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+(defrule http-cache-directive-skip-ows-after-token
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?cd <- (http-cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
+	(http-cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
 	=>
 	(retract ?c)
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule cache-control-header-end-cache-directive
-	(char ?name 13|44) ; CR ,
-	?cd <- (cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
-	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
+(defrule http-cache-control-header-end-cache-directive
+	(http-char ?name 13|44) ; CR ,
+	?cd <- (http-cache-directive (name ?name) (token ?token&:(stringp ?token)) (value ?value&nil|:(stringp ?value)|:(instancep ?value)) (equals ?equals&:(or (eq ?equals FALSE) (neq ?value nil))))
+	?cch <- (http-cache-control-header (name ?name) (cache-directives $?cache-directives ?cd))
 	=>
 	(retract ?cd)
-	(modify ?cch (cache-directives ?cache-directives (make-instance of CACHE-DIRECTIVE (filename ?name) (token ?token) (value ?value)))))
+	(modify ?cch (cache-directives ?cache-directives (make-instance of HTTP-CACHE-DIRECTIVE (id ?name) (token ?token) (value ?value)))))
 
-(defrule cache-control-header-detect-next-cache-directive
-	?c <- (char ?name 44) ; ,
-	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives ?cd&:(instancep ?cd)))
+(defrule http-cache-control-header-detect-next-cache-directive
+	?c <- (http-char ?name 44) ; ,
+	?cch <- (http-cache-control-header (name ?name) (cache-directives $?cache-directives ?cd&:(instancep ?cd)))
 	=>
 	(retract ?c)
-	(modify ?cch (cache-directives ?cache-directives ?cd (assert (cache-directive (name ?name) (token (assert (token (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?cch (cache-directives ?cache-directives ?cd (assert (http-cache-directive (name ?name) (token (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule end-cache-control-header
-	(char ?name 13) ; CR
-	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
-	?fv <- (field-value (value ?cch))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Cache-Control"))
+(defrule http-end-cache-control-header
+	(http-char ?name 13) ; CR
+	?cch <- (http-cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
+	?fv <- (http-field-value (value ?cch))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Cache-Control"))
 	=>
 	(retract ?cch)
-	(modify ?fv (value (make-instance of CACHE-CONTROL-HEADER (filename ?name) (cache-directives ?cache-directives)))))
+	(modify ?fv (value (make-instance of HTTP-CACHE-CONTROL-HEADER (id ?name) (cache-directives ?cache-directives)))))
 
-(defrule end-pragma-header
-	(char ?name 13) ; CR
-	?cch <- (cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
-	?fv <- (field-value (value ?cch))
-	(field-line (field-name ?fn) (field-value ?fv))
-	(object (is-a FIELD-NAME) (name ?fn) (value "Pragma"))
+(defrule http-end-pragma-header
+	(http-char ?name 13) ; CR
+	?cch <- (http-cache-control-header (name ?name) (cache-directives $?cache-directives&:(instancep (nth$ (length$ ?cache-directives) ?cache-directives))))
+	?fv <- (http-field-value (value ?cch))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Pragma"))
 	=>
 	(retract ?cch)
-	(modify ?fv (value (make-instance of PRAGMA-HEADER (filename ?name) (cache-directives ?cache-directives)))))
+	(modify ?fv (value (make-instance of HTTP-PRAGMA-HEADER (id ?name) (cache-directives ?cache-directives)))))
 
-(defrule message-body-set-length-remaining
-	(char ?name 10) ; LF
-	?m <- (message-body (name ?name) (length-remaining nil))
-	(object (is-a CONTENT-LENGTH-HEADER) (filename ?name) (value ?value&~"0"))
+(defrule http-message-body-set-length-remaining
+	(http-char ?name 10) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining nil))
+	(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value ?value&~"0"))
 	=>
 	(modify ?m (length-remaining (string-to-field ?value))))
 
-(defrule message-body-determine-empty
-	?c <- (char ?name 10) ; LF
-	?m <- (message-body (name ?name) (length-remaining nil))
+(defrule http-message-body-determine-empty
+	?c <- (http-char ?name 10) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining nil))
 	(or
-		(not (object (is-a CONTENT-LENGTH-HEADER) (filename ?name)))
-		(object (is-a CONTENT-LENGTH-HEADER) (filename ?name) (value "0")))
+		(not (object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name)))
+		(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value "0")))
 	=>
 	(retract ?c)
 	(modify ?m (length-remaining 0))
-	(assert (char ?name (get-char ?name))))
+	;; the message is complete: a -1 char ends it here, and the stream stays where it is (a socket has no EOF)
+	(assert (http-char ?name -1)))
 
-(defrule message-body-detect-application-octet-stream
-	?c <- (char ?name 10) ; LF
-	?m <- (message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
+(defrule http-message-body-leave-application-json
+	"a JSON body stays on the stream for COOLJSON, which reads it after http-done"
+	?c <- (http-char ?name 10) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
+	(object (is-a HTTP-TYPE) (id ?name) (value "application"))
+	(object (is-a HTTP-SUBTYPE) (id ?name) (value "json"))
+	=>
+	(retract ?c)
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
+
+(defrule http-message-body-detect-application-octet-stream
+	?c <- (http-char ?name 10) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
 	(or
-		(not (object (is-a CONTENT-TYPE-HEADER) (filename ?name)))
+		(not (object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name)))
 		(and
-			(object (is-a TYPE) (filename ?name) (value "application"))
-			(object (is-a SUBTYPE) (filename ?name) (value "octet-stream")))
+			(object (is-a HTTP-TYPE) (id ?name) (value "application"))
+			(object (is-a HTTP-SUBTYPE) (id ?name) (value "octet-stream")))
 		(and
-			(object (is-a TYPE) (filename ?name) (value ?type))
-			(object (is-a SUBTYPE) (filename ?name) (value ?subtype))
-			(not (supported-content-type ?type ?subtype))))
+			(object (is-a HTTP-TYPE) (id ?name) (value ?type))
+			(object (is-a HTTP-SUBTYPE) (id ?name) (value ?subtype))
+			(not (http-supported-content-type ?type ?subtype))))
 	=>
 	(retract ?c)
-	(modify ?m (value (assert (octet-stream (name ?name)))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?m (value (assert (http-octet-stream (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule message-body-detect-application-x-www-form-urlencoded
-	?c <- (char ?name 10) ; LF
-	?m <- (message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
-	(object (is-a TYPE) (filename ?name) (value "application"))
-	(object (is-a SUBTYPE) (filename ?name) (value "x-www-form-urlencoded"))
+(defrule http-message-body-detect-application-x-www-form-urlencoded
+	?c <- (http-char ?name 10) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
+	(object (is-a HTTP-TYPE) (id ?name) (value "application"))
+	(object (is-a HTTP-SUBTYPE) (id ?name) (value "x-www-form-urlencoded"))
 	=>
 	(retract ?c)
-	(modify ?m (value (assert (x-www-form-urlencoded (name ?name) (sequences (assert (sequence (name ?name))))))))
-	(assert (char ?name (get-char ?name))))
+	(modify ?m (value (assert (http-x-www-form-urlencoded (name ?name) (sequences (assert (http-sequence (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
 
-(defrule build-octet-stream
-	?c <- (char ?name ?char)
-	?o <- (octet-stream (name ?name) (value ?value))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?o))
+(defrule http-build-octet-stream
+	?c <- (http-char ?name ?char)
+	?o <- (http-octet-stream (name ?name) (value ?value))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?o))
 	=>
 	(retract ?c)
 	(modify ?o (value (format nil "%s%c" ?value ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
 
-(defrule x-www-form-urlencoded-build-name-string
-	?c <- (char ?name ?char&~61) ; =
-	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string nil))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+(defrule http-x-www-form-urlencoded-build-name-string
+	?c <- (http-char ?name ?char&~61) ; =
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (name-string (format nil "%s%c" ?name-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
 
-(defrule x-www-form-urlencoded-end-name-string
-	?c <- (char ?name 61) ; =
-	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string nil))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+(defrule http-x-www-form-urlencoded-end-name-string
+	?c <- (http-char ?name 61) ; =
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (value-string ""))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
 
-(defrule x-www-form-urlencoded-build-value-string
-	?c <- (char ?name ?char&~38) ; &
-	?sequence <- (sequence (name ?name) (value-string ?value-string&~nil))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+(defrule http-x-www-form-urlencoded-build-value-string
+	?c <- (http-char ?name ?char&~38) ; &
+	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (value-string (format nil "%s%c" ?value-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
 
-(defrule x-www-form-urlencoded-end-sequence-and-start-next-sequence
-	?c <- (char ?name 38) ; &
-	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+(defrule http-x-www-form-urlencoded-end-sequence-and-start-next-sequence
+	?c <- (http-char ?name 38) ; &
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
 	=>
 	(retract ?c ?sequence)
-	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)) (assert (sequence (name ?name)))))
+	(modify ?x (sequences ?sequences (make-instance of HTTP-SEQUENCE (id ?name) (name-string ?name-string) (value-string ?value-string)) (assert (http-sequence (name ?name)))))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (char ?name (get-char ?name))))
+	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
 
-(defrule end-octet-stream
-	(char ?name -1)
-	?o <- (octet-stream (name ?name) (value ?value))
-	?m <- (message-body (length-remaining 0) (value ?o))
+(defrule http-end-octet-stream
+	(http-char ?name -1)
+	?o <- (http-octet-stream (name ?name) (value ?value))
+	?m <- (http-message-body (length-remaining 0) (value ?o))
 	=>
 	(retract ?o)
-	(modify ?m (value (make-instance of OCTET-STREAM (filename ?name) (value ?value)))))
+	(modify ?m (value (make-instance of HTTP-OCTET-STREAM (id ?name) (value ?value)))))
 
-(defrule x-www-form-urlencoded-end-sequence
-	(char ?name -1)
-	?sequence <- (sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
-	?x <- (x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (message-body (length-remaining 0) (value ?x))
+(defrule http-x-www-form-urlencoded-end-sequence
+	(http-char ?name -1)
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining 0) (value ?x))
 	=>
 	(retract ?sequence)
-	(modify ?x (sequences ?sequences (make-instance of SEQUENCE (filename ?name) (name-string ?name-string) (value-string ?value-string)))))
+	(modify ?x (sequences ?sequences (make-instance of HTTP-SEQUENCE (id ?name) (name-string ?name-string) (value-string ?value-string)))))
 
-(defrule end-x-www-form-urlencoded
-	(char ?name -1)
-	?x <- (x-www-form-urlencoded (name ?name) (sequences $?sequences&:(= 0 (length$ ?sequences))|:(instancep (nth$ (length$ ?sequences) ?sequences))))
-	?m <- (message-body (length-remaining 0) (value ?x))
+(defrule http-end-x-www-form-urlencoded
+	(http-char ?name -1)
+	?x <- (http-x-www-form-urlencoded (name ?name) (sequences $?sequences&:(= 0 (length$ ?sequences))|:(instancep (nth$ (length$ ?sequences) ?sequences))))
+	?m <- (http-message-body (length-remaining 0) (value ?x))
 	=>
 	(retract ?x)
-	(modify ?m (value (make-instance of X-WWW-FORM-URLENCODED (filename ?name) (sequences ?sequences)))))
+	(modify ?m (value (make-instance of HTTP-X-WWW-FORM-URLENCODED (id ?name) (sequences ?sequences)))))
 
 (defrule http-message-end-message-body
-	(char ?name -1)
-	?m <- (message-body (value ?value&nil|:(instancep ?value)) (length-remaining 0))
+	(http-char ?name -1)
+	?m <- (http-message-body (value ?value&nil|:(instancep ?value)) (length-remaining 0))
 	?h <- (http-message (name ?name) (message-body ?m))
 	=>
 	(retract ?m)
-	(modify ?h (message-body (make-instance of MESSAGE-BODY (filename ?name) (value ?value)))))
+	(modify ?h (message-body (make-instance of HTTP-MESSAGE-BODY (id ?name) (value ?value)))))
 
-(defrule end-http-message
-	(char ?name -1)
+(defrule http-end-http-message
+	?c <- (http-char ?name -1)
 	;(start ?name ?start)
 	?h <- (http-message (name ?name) (start-line ?s) (field-lines $?f) (message-body ?m&:(instancep ?m)))
+	?st <- (http-stream (id ?name) (stream ?stream))
 =>
 ;(println ?name ": " (- (time) ?start))
-(retract ?h)
-(make-instance of HTTP-MESSAGE (filename ?name) (start-line ?s) (field-lines $?f) (message-body ?m)))
+(retract ?h ?c ?st)
+(assert (http-done (id ?name) (stream ?stream) (message (make-instance of HTTP-MESSAGE (id ?name) (start-line ?s) (field-lines $?f) (message-body ?m))))))
 
 ; Serializes a quoted-string value, re-escaping the DQUOTE and "\" that
 ; quoted-pair strips out when the value is parsed.
-(deffunction print-quoted-string (?t ?value)
+(deffunction http-print-quoted-string (?t ?value)
 	(printout ?t "\"")
 	(bind ?i 1)
 	(while (<= ?i (str-length ?value))
@@ -5042,35 +5089,47 @@
 		(bind ?i (+ ?i 1)))
 	(printout ?t "\""))
 
-(defmessage-handler METHOD pprint primary (?t)
+(defmessage-handler HTTP-METHOD pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler PARAMETER pprint primary (?t)
+(defmessage-handler HTTP-PARAMETER pprint primary (?t)
 (if (instancep ?self:parameter-value)
 then (printout ?t ?self:parameter-name "=")
-     (print-quoted-string ?t (send ?self:parameter-value get-value))
+     (http-print-quoted-string ?t (send ?self:parameter-value get-value))
 else (if (eq "charset" (lowcase ?self:parameter-name))
      then (printout ?t (lowcase ?self:parameter-name) "=" (lowcase ?self:parameter-value))
      else (printout ?t ?self:parameter-name "=" ?self:parameter-value))))
 
-(defmessage-handler SEGMENT pprint primary (?t)
+(defmessage-handler HTTP-SEGMENT pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler SCHEME pprint primary (?t)
+(defmessage-handler HTTP-SCHEME pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler USERINFO pprint primary (?t)
+(defmessage-handler HTTP-USERINFO pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler HOST pprint primary (?t)
+(defmessage-handler HTTP-DEC-OCTET pprint primary (?t)
+(printout ?t ?self:value))
+
+(defmessage-handler HTTP-IPV4ADDRESS pprint primary (?t)
+(send ?self:first-octet pprint ?t)
+(printout ?t ".")
+(send ?self:second-octet pprint ?t)
+(printout ?t ".")
+(send ?self:third-octet pprint ?t)
+(printout ?t ".")
+(send ?self:fourth-octet pprint ?t))
+
+(defmessage-handler HTTP-HOST pprint primary (?t)
 (send ?self:value pprint ?t))
 
-(defmessage-handler IP-LITERAL pprint primary (?t)
+(defmessage-handler HTTP-IP-LITERAL pprint primary (?t)
 (printout ?t "[")
 (send ?self:value pprint ?t)
 (printout ?t "]"))
 
-(defmessage-handler IPV6ADDRESS pprint primary (?t)
+(defmessage-handler HTTP-IPV6ADDRESS pprint primary (?t)
 (if (neq ?self:parts nil) then
 (bind ?parts ?self:parts)
 (bind ?len (length$ ?parts))
@@ -5082,19 +5141,19 @@ else (if (eq "charset" (lowcase ?self:parameter-name))
 (if (< ?i ?len) then (printout ?t ":") else (printout ?t))
 else (printout ?t ":") (if (= 1 ?len) then (printout ?t ":"))))))
 
-(defmessage-handler H16 pprint primary (?t)
+(defmessage-handler HTTP-H16 pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler REG-NAME pprint primary (?t)
+(defmessage-handler HTTP-REG-NAME pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler PORT pprint primary (?t)
+(defmessage-handler HTTP-PORT pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler QUERY pprint primary (?t)
+(defmessage-handler HTTP-QUERY pprint primary (?t)
 (printout ?t "?" ?self:value))
 
-(defmessage-handler PATH-ABSOLUTE pprint primary (?t)
+(defmessage-handler HTTP-PATH-ABSOLUTE pprint primary (?t)
 (printout ?t "/")
 (if (neq ?self:segments nil) then
 (bind ?segs ?self:segments)
@@ -5105,7 +5164,7 @@ else (printout ?t ":") (if (= 1 ?len) then (printout ?t ":"))))))
 (send ?seg pprint ?t)
 (if (< ?i ?len) then (printout ?t "/") else (printout ?t)))))
 
-(defmessage-handler PATH-ABEMPTY pprint primary (?t)
+(defmessage-handler HTTP-PATH-ABEMPTY pprint primary (?t)
 (printout ?t "/")
 (if (neq ?self:segments nil) then
 (bind ?segs ?self:segments)
@@ -5116,7 +5175,7 @@ else (printout ?t ":") (if (= 1 ?len) then (printout ?t ":"))))))
 (send ?seg pprint ?t)
 (if (< ?i ?len) then (printout ?t "/") else (printout ?t)))))
 
-(defmessage-handler ORIGIN-FORM pprint primary (?t)
+(defmessage-handler HTTP-ORIGIN-FORM pprint primary (?t)
 (printout ?t "/")
 (if (neq ?self:segments nil) then
 (bind ?segs ?self:segments)
@@ -5129,7 +5188,7 @@ else (printout ?t ":") (if (= 1 ?len) then (printout ?t ":"))))))
 (if (neq ?self:query nil) then
 (send ?self:query pprint ?t)))
 
-(defmessage-handler AUTHORITY pprint primary (?t)
+(defmessage-handler HTTP-AUTHORITY pprint primary (?t)
 (if (neq ?self:userinfo nil)
 then (send ?self:userinfo pprint ?t) (printout ?t "@"))
 (if (neq ?self:host nil)
@@ -5137,32 +5196,32 @@ then (send ?self:host pprint ?t))
 (if (neq ?self:port nil)
 then (printout ?t ":") (send ?self:port pprint ?t)))
 
-(defmessage-handler AUTHORITY-FORM pprint primary (?t)
+(defmessage-handler HTTP-AUTHORITY-FORM pprint primary (?t)
 (if (neq ?self:uri-host nil)
 then (send ?self:uri-host pprint ?t))
 (if (neq ?self:port nil)
 then (printout ?t ":") (send ?self:port pprint ?t)))
 
-(defmessage-handler HIER-PART pprint primary (?t)
+(defmessage-handler HTTP-HIER-PART pprint primary (?t)
 (if (neq ?self:authority nil)
 then (printout ?t "//") (send ?self:authority pprint ?t))
 (if (neq ?self:path nil)
 then (send ?self:path pprint ?t)))
 
-(defmessage-handler ABSOLUTE-URI pprint primary (?t)
+(defmessage-handler HTTP-ABSOLUTE-URI pprint primary (?t)
 (send ?self:scheme pprint ?t)
 (printout ?t ":")
 (send ?self:hier-part pprint ?t)
 (if (neq ?self:query nil)
 then (send ?self:query pprint ?t)))
 
-(defmessage-handler ASTERISK-FORM pprint primary (?t)
+(defmessage-handler HTTP-ASTERISK-FORM pprint primary (?t)
 (printout ?t "*"))
 
 (defmessage-handler HTTP-VERSION pprint primary (?t)
 (printout ?t "HTTP/" ?self:major "." ?self:minor))
 
-(defmessage-handler REQUEST-LINE pprint primary (?t)
+(defmessage-handler HTTP-REQUEST-LINE pprint primary (?t)
 (send ?self:method pprint ?t)
 (printout ?t " ")
 (send ?self:request-target pprint ?t)
@@ -5170,28 +5229,28 @@ then (send ?self:query pprint ?t)))
 (send ?self:http-version pprint ?t)
 (printout ?t crlf))
 
-(defmessage-handler STATUS-LINE pprint primary (?t)
+(defmessage-handler HTTP-STATUS-LINE pprint primary (?t)
 (send ?self:http-version pprint ?t)
 (printout ?t " " ?self:status-code " ")
 (send ?self:reason-phrase pprint ?t)
 (printout ?t crlf))
 
-(defmessage-handler REASON-PHRASE pprint primary (?t)
+(defmessage-handler HTTP-REASON-PHRASE pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler FIELD-LINE pprint primary (?t)
+(defmessage-handler HTTP-FIELD-LINE pprint primary (?t)
 (send ?self:field-name pprint ?t)
 (printout ?t ": ")
 (send ?self:field-value pprint ?t)
 (printout ?t crlf))
 
-(defmessage-handler FIELD-NAME pprint primary (?t)
+(defmessage-handler HTTP-FIELD-NAME pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler FIELD-VALUE pprint primary (?t)
+(defmessage-handler HTTP-FIELD-VALUE pprint primary (?t)
 (send ?self:value pprint ?t))
 
-(defmessage-handler MESSAGE-BODY pprint primary (?t)
+(defmessage-handler HTTP-MESSAGE-BODY pprint primary (?t)
 (if (neq ?self:value nil)
 then (send ?self:value pprint ?t)))
 
@@ -5204,30 +5263,30 @@ then (foreach ?f ?self:field-lines
 (if (neq ?self:message-body nil)
 then (send ?self:message-body pprint ?t)))
 
-(defmessage-handler UNKNOWN-HEADER pprint primary (?t)
+(defmessage-handler HTTP-UNKNOWN-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler ACCEPT-ENCODING-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ACCEPT-ENCODING-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:codings
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:codings)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler ACCEPT-CHARSET-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ACCEPT-CHARSET-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:charsets
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:charsets)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler CONTENT-LENGTH-HEADER pprint primary (?t)
+(defmessage-handler HTTP-CONTENT-LENGTH-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler MAX-FORWARDS-HEADER pprint primary (?t)
+(defmessage-handler HTTP-MAX-FORWARDS-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler CONTENT-TYPE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-CONTENT-TYPE-HEADER pprint primary (?t)
 (send ?self:type pprint ?t)
 (printout ?t "/")
 (send ?self:subtype pprint ?t)
@@ -5236,19 +5295,19 @@ then (foreach ?f ?self:parameters
      (printout ?t ";")
      (send ?f pprint ?t))))
 
-(defmessage-handler HOST-HEADER pprint primary (?t)
+(defmessage-handler HTTP-HOST-HEADER pprint primary (?t)
 (send ?self:uri-host pprint ?t)
 (if (neq ?self:port nil)
 then (printout ?t ":") (send ?self:port pprint ?t)))
 
-(defmessage-handler VIA-HEADER pprint primary (?t)
+(defmessage-handler HTTP-VIA-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:values
      (bind ?i (+ ?i 1))
 	(send ?f pprint ?t)
         (if (< ?i (length$ ?self:values)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler VIA-HEADER-VALUE pprint primary (?t)
+(defmessage-handler HTTP-VIA-HEADER-VALUE pprint primary (?t)
 	(send ?self:received-protocol pprint ?t)
 	(printout ?t " ")
 	(send ?self:received-by pprint ?t)
@@ -5256,17 +5315,17 @@ then (printout ?t ":") (send ?self:port pprint ?t)))
 		(printout ?t " ")
 		(send ?self:comment pprint ?t)))
 
-(defmessage-handler RECEIVED-PROTOCOL pprint primary (?t)
+(defmessage-handler HTTP-RECEIVED-PROTOCOL pprint primary (?t)
 	(if (neq ?self:protocol-name nil)
 		then (printout ?t ?self:protocol-name "/"))
 	(printout ?t ?self:protocol-version))
 
-(defmessage-handler RECEIVED-BY pprint primary (?t)
+(defmessage-handler HTTP-RECEIVED-BY pprint primary (?t)
 	(printout ?t ?self:pseudonym)
 	(if (neq ?self:port nil)
 		then (printout ?t ":" ?self:port)))
 
-(defmessage-handler COMMENT pprint primary (?t)
+(defmessage-handler HTTP-COMMENT pprint primary (?t)
 	(printout ?t "(")
 	(foreach ?f ?self:values
 		(if (stringp ?f)
@@ -5274,28 +5333,28 @@ then (printout ?t ":") (send ?self:port pprint ?t)))
 			else (send ?f pprint ?t)))
 	(printout ?t ")"))
 
-(defmessage-handler PRODUCT-HEADER pprint primary (?t)
+(defmessage-handler HTTP-PRODUCT-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:values
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:values)) then (printout ?t " ") else (printout ?t))))
 
-(defmessage-handler PRODUCT pprint primary (?t)
+(defmessage-handler HTTP-PRODUCT pprint primary (?t)
 	(printout ?t ?self:token)
 	(if (neq ?self:product-version nil)
 		then (printout ?t "/" ?self:product-version)))
 
-(defmessage-handler TYPE pprint primary (?t)
+(defmessage-handler HTTP-TYPE pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler SUBTYPE pprint primary (?t)
+(defmessage-handler HTTP-SUBTYPE pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler OCTET-STREAM pprint primary (?t)
+(defmessage-handler HTTP-OCTET-STREAM pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler X-WWW-FORM-URLENCODED pprint primary (?t)
+(defmessage-handler HTTP-X-WWW-FORM-URLENCODED pprint primary (?t)
 (if (neq ?self:sequences nil)
 then (bind ?len (length$ ?self:sequences))
    (bind ?i 0)
@@ -5304,36 +5363,36 @@ then (bind ?len (length$ ?self:sequences))
      (send ?f pprint ?t)
      (if (< ?i ?len) then (printout ?t "&") else (printout ?t)))))
 
-(defmessage-handler SEQUENCE pprint primary (?t)
+(defmessage-handler HTTP-SEQUENCE pprint primary (?t)
 (printout ?t ?self:name-string "=" ?self:value-string))
 
-(defmessage-handler CODING pprint primary (?t)
+(defmessage-handler HTTP-CODING pprint primary (?t)
 (printout ?t ?self:codings)
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
 
-(defmessage-handler CHARSET pprint primary (?t)
+(defmessage-handler HTTP-CHARSET pprint primary (?t)
 (printout ?t ?self:charset)
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
 
-(defmessage-handler WEIGHT pprint primary (?t)
+(defmessage-handler HTTP-WEIGHT pprint primary (?t)
 (printout ?t "q=")
 (send ?self:qvalue pprint ?t))
 
-(defmessage-handler QVALUE pprint primary (?t)
+(defmessage-handler HTTP-QVALUE pprint primary (?t)
 (printout ?t ?self:first)
 (if (neq ?self:decimal nil)
 then (printout ?t "." ?self:fraction)))
 
-(defmessage-handler ACCEPT-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ACCEPT-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:media-ranges
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:media-ranges)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler MEDIA-RANGE pprint primary (?t)
+(defmessage-handler HTTP-MEDIA-RANGE pprint primary (?t)
 	(send ?self:type pprint ?t)
 	(printout ?t "/")
 	(send ?self:subtype pprint ?t)
@@ -5346,14 +5405,14 @@ then (printout ?t "." ?self:fraction)))
 	     (printout ?t ";")
 	     (send ?self:weight pprint ?t)))
 
-(defmessage-handler ACCEPT-LANGUAGE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ACCEPT-LANGUAGE-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:language-ranges
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:language-ranges)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler LANGUAGE-RANGE pprint primary (?t)
+(defmessage-handler HTTP-LANGUAGE-RANGE pprint primary (?t)
 	(send ?self:first-language pprint ?t)
 	(bind ?i 0)
 	(if (<> 0 (length$ ?self:languages))
@@ -5368,112 +5427,112 @@ then (printout ?t "." ?self:fraction)))
 	     (printout ?t ";")
 	     (send ?self:weight pprint ?t)))
 
-(defmessage-handler LANGUAGE pprint primary (?t)
+(defmessage-handler HTTP-LANGUAGE pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler ALLOW-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ALLOW-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:methods
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:methods)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler TOKEN-LIST-HEADER pprint primary (?t)
+(defmessage-handler HTTP-TOKEN-LIST-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:tokens
      (bind ?i (+ ?i 1))
      (printout ?t ?f)
      (if (< ?i (length$ ?self:tokens)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler EXPECT-HEADER pprint primary (?t)
+(defmessage-handler HTTP-EXPECT-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:expectations
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:expectations)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler EXPECTATION pprint primary (?t)
+(defmessage-handler HTTP-EXPECTATION pprint primary (?t)
 	(printout ?t ?self:token)
 	(if (neq ?self:value nil)
 	then
 	     (printout ?t "=")
 	     (if (instancep ?self:value)
-	     then (print-quoted-string ?t (send ?self:value get-value))
+	     then (http-print-quoted-string ?t (send ?self:value get-value))
 	     else (printout ?t ?self:value)))
 	(foreach ?f ?self:parameters
 	     (printout ?t ";")
 	     (send ?f pprint ?t)))
 
-(defmessage-handler CACHE-DIRECTIVE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-CACHE-DIRECTIVE-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:cache-directives
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:cache-directives)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler CACHE-DIRECTIVE pprint primary (?t)
+(defmessage-handler HTTP-CACHE-DIRECTIVE pprint primary (?t)
 	(printout ?t ?self:token)
 	(if (neq ?self:value nil)
 	then
 	     (printout ?t "=")
 	     (if (instancep ?self:value)
-	     then (print-quoted-string ?t (send ?self:value get-value))
+	     then (http-print-quoted-string ?t (send ?self:value get-value))
 	     else (printout ?t ?self:value))))
 
-(defmessage-handler TE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-TE-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:t-codings
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:t-codings)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler T-CODING pprint primary (?t)
+(defmessage-handler HTTP-T-CODING pprint primary (?t)
 (printout ?t ?self:value)
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
 
-(defmessage-handler RANGE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-RANGE-HEADER pprint primary (?t)
 (send ?self:ranges-specifier pprint ?t))
 
-(defmessage-handler RANGES-SPECIFIER pprint primary (?t)
+(defmessage-handler HTTP-RANGES-SPECIFIER pprint primary (?t)
 (printout ?t ?self:range-unit "=")
 (send ?self:range-set pprint ?t))
 
-(defmessage-handler RANGE-UNIT pprint primary (?t)
+(defmessage-handler HTTP-RANGE-UNIT pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler RANGE-SET pprint primary (?t)
+(defmessage-handler HTTP-RANGE-SET pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:range-specs
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:range-specs)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler RANGE-SPEC pprint primary (?t)
+(defmessage-handler HTTP-RANGE-SPEC pprint primary (?t)
 (send ?self:value pprint ?t))
 
-(defmessage-handler INT-RANGE pprint primary (?t)
+(defmessage-handler HTTP-INT-RANGE pprint primary (?t)
 (printout ?t ?self:first-pos "-" ?self:last-pos))
 
-(defmessage-handler SUFFIX-RANGE pprint primary (?t)
+(defmessage-handler HTTP-SUFFIX-RANGE pprint primary (?t)
 (printout ?t "-" ?self:suffix-length))
 
-(defmessage-handler OTHER-RANGE pprint primary (?t)
+(defmessage-handler HTTP-OTHER-RANGE pprint primary (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler UPGRADE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-UPGRADE-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:protocols
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:protocols)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler PROTOCOL pprint primary (?t)
+(defmessage-handler HTTP-PROTOCOL pprint primary (?t)
 	(printout ?t ?self:protocol-name)
 	(if (neq ?self:protocol-version nil)
 		then (printout ?t "/" ?self:protocol-version)))
 
-(defmessage-handler PROXY-AUTHORIZATION-HEADER pprint primary (?t)
+(defmessage-handler HTTP-PROXY-AUTHORIZATION-HEADER pprint primary (?t)
 	(printout ?t ?self:auth-scheme " ")
 	(bind ?i 0)
 	(foreach ?f ?self:second-part
@@ -5481,59 +5540,59 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 		(send ?f pprint ?t)
 		(if (< ?i (length$ ?self:second-part)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler TOKEN68 pprint primary (?t)
+(defmessage-handler HTTP-TOKEN68 pprint primary (?t)
 	(printout ?t ?self:value)
 	(bind ?i 0)
 	(while (< ?i ?self:equals)
 		(bind ?i (+ 1 ?i))
 		(printout ?t "=")))
 
-(defmessage-handler AUTH-PARAM pprint primary (?t)
+(defmessage-handler HTTP-AUTH-PARAM pprint primary (?t)
 	(printout ?t ?self:left-side "=" ?self:right-side))
 
-(defmessage-handler COOKIE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-COOKIE-HEADER pprint primary (?t)
 	(bind ?i 0)
 	(foreach ?f ?self:cookie-pairs
 		(bind ?i (+ ?i 1))
 		(send ?f pprint ?t)
 		(if (< ?i (length$ ?self:cookie-pairs)) then (printout ?t "; ") else (printout ?t))))
 
-(defmessage-handler COOKIE-PAIR pprint primary (?t)
+(defmessage-handler HTTP-COOKIE-PAIR pprint primary (?t)
 (printout ?t ?self:cookie-name "=")
 (if ?self:cookie-value-quoted then (printout ?t "\""))
 (printout ?t ?self:cookie-value)
 (if ?self:cookie-value-quoted then (printout ?t "\"")))
 
-(defmessage-handler SET-COOKIE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-SET-COOKIE-HEADER pprint primary (?t)
 	(send ?self:cookie-pair pprint ?t)
 	(bind ?i 0)
 	(foreach ?f ?self:cookie-avs
 		(printout ?t "; ")
 		(send ?f pprint ?t)))
 
-(defmessage-handler COOKIE-AV pprint primary (?t)
+(defmessage-handler HTTP-COOKIE-AV pprint primary (?t)
 	(send ?self:value pprint ?t))
 
-(defmessage-handler SECURE-AV pprint primary (?t)
+(defmessage-handler HTTP-SECURE-AV pprint primary (?t)
 (printout ?t "Secure"))
 
-(defmessage-handler MAX-AGE-AV pprint (?t)
+(defmessage-handler HTTP-MAX-AGE-AV pprint (?t)
 (printout ?t "Max-Age=" ?self:value))
 
-(defmessage-handler PATH-AV pprint (?t)
+(defmessage-handler HTTP-PATH-AV pprint (?t)
 (printout ?t "Path=" ?self:value))
 
-(defmessage-handler HTTPONLY-AV pprint (?t)
+(defmessage-handler HTTP-HTTPONLY-AV pprint (?t)
 (printout ?t "HttpOnly"))
 
-(defmessage-handler EXTENSION-AV pprint (?t)
+(defmessage-handler HTTP-EXTENSION-AV pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler EXPIRES-AV pprint (?t)
+(defmessage-handler HTTP-EXPIRES-AV pprint (?t)
 (printout ?t "Expires=")
 (send ?self:rfc1123-date pprint ?t))
 
-(defmessage-handler RFC1123-DATE pprint (?t)
+(defmessage-handler HTTP-RFC1123-DATE pprint (?t)
 (send ?self:wkday pprint ?t)
 (printout ?t ", ")
 (send ?self:date1 pprint ?t)
@@ -5544,27 +5603,27 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (defmessage-handler HTTP-DATE-HEADER pprint primary (?t)
 (send ?self:http-date pprint ?t))
 
-(defmessage-handler ENTITY-TAG pprint primary (?t)
+(defmessage-handler HTTP-ENTITY-TAG pprint primary (?t)
 (if ?self:weak then (printout ?t "W/"))
 (printout ?t "\"" ?self:opaque-tag "\""))
 
-(defmessage-handler ETAG-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ETAG-HEADER pprint primary (?t)
 (send ?self:entity-tag pprint ?t))
 
-(defmessage-handler ENTITY-TAG-LIST-HEADER pprint primary (?t)
+(defmessage-handler HTTP-ENTITY-TAG-LIST-HEADER pprint primary (?t)
 (bind ?i 0)
 (foreach ?f ?self:entity-tags
      (bind ?i (+ ?i 1))
      (if (stringp ?f) then (printout ?t ?f) else (send ?f pprint ?t))
      (if (< ?i (length$ ?self:entity-tags)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler IF-RANGE-HEADER pprint primary (?t)
+(defmessage-handler HTTP-IF-RANGE-HEADER pprint primary (?t)
 (send ?self:value pprint ?t))
 
-(defmessage-handler DAY-NAME-L pprint (?t)
+(defmessage-handler HTTP-DAY-NAME-L pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler RFC850-DATE pprint (?t)
+(defmessage-handler HTTP-RFC850-DATE pprint (?t)
 (send ?self:day-name-l pprint ?t)
 (printout ?t ", ")
 (send ?self:date2 pprint ?t)
@@ -5572,12 +5631,12 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (send ?self:time pprint ?t)
 (printout ?t " GMT"))
 
-(defmessage-handler DATE2 pprint (?t)
+(defmessage-handler HTTP-DATE2 pprint (?t)
 (printout ?t ?self:day "-")
 (send ?self:month pprint ?t)
 (printout ?t "-" ?self:year))
 
-(defmessage-handler ASCTIME-DATE pprint (?t)
+(defmessage-handler HTTP-ASCTIME-DATE pprint (?t)
 (send ?self:day-name pprint ?t)
 (printout ?t " ")
 (send ?self:date3 pprint ?t)
@@ -5585,50 +5644,50 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (send ?self:time pprint ?t)
 (printout ?t " " ?self:year))
 
-(defmessage-handler DATE3 pprint (?t)
+(defmessage-handler HTTP-DATE3 pprint (?t)
 (send ?self:month pprint ?t)
 (printout ?t " ")
 (if ?self:padded then (printout ?t " "))
 (printout ?t ?self:day))
 
-(defmessage-handler WKDAY pprint (?t)
+(defmessage-handler HTTP-WKDAY pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler DATE1 pprint (?t)
+(defmessage-handler HTTP-DATE1 pprint (?t)
 (printout ?t ?self:first-2digit " ")
 (send ?self:month pprint ?t)
 (printout ?t " " ?self:last-4digit))
 
-(defmessage-handler MONTH pprint (?t)
+(defmessage-handler HTTP-MONTH pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler TIME pprint (?t)
+(defmessage-handler HTTP-TIME pprint (?t)
 (printout ?t ?self:first-2digit ":" ?self:second-2digit ":" ?self:third-2digit))
 
-(defmessage-handler DOMAIN-AV pprint (?t)
+(defmessage-handler HTTP-DOMAIN-AV pprint (?t)
 (printout ?t "Domain=")
 (send ?self:subdomain pprint ?t))
 
-(defmessage-handler SUBDOMAIN pprint (?t)
+(defmessage-handler HTTP-SUBDOMAIN pprint (?t)
 	(foreach ?f ?self:ldh-labels
 		(send ?f pprint ?t))
 	(send ?self:top-label pprint ?t))
 
-(defmessage-handler TOP-LABEL pprint (?t)
+(defmessage-handler HTTP-TOP-LABEL pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler LDH-LABEL pprint (?t)
+(defmessage-handler HTTP-LDH-LABEL pprint (?t)
 (printout ?t ?self:value))
 
-(defmessage-handler SAMESITE-AV pprint (?t)
+(defmessage-handler HTTP-SAMESITE-AV pprint (?t)
 (printout ?t "SameSite=")
 (send ?self:value pprint ?t))
 
-(defmessage-handler LAX pprint (?t)
+(defmessage-handler HTTP-LAX pprint (?t)
 (printout ?t "Lax"))
 
-(defmessage-handler STRICT pprint (?t)
+(defmessage-handler HTTP-STRICT pprint (?t)
 (printout ?t "Strict"))
 
-(defmessage-handler NONE pprint (?t)
+(defmessage-handler HTTP-NONE pprint (?t)
 (printout ?t "None"))
