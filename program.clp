@@ -179,6 +179,16 @@
 	(slot second-digit (default ""))
 	(slot third-digit (default "")))
 
+(deffunction http-dec-octet-accepts-digit (?first ?second ?third ?char)
+	"whether a dec-octet holding these digits so far may take the digit ?char next"
+	(if (eq ?first "") then TRUE
+	else (if (eq ?second "") then (neq ?first "0")
+	else (if (neq ?third "") then FALSE
+	else (if (eq ?first "1") then TRUE
+	else (if (neq ?first "2") then FALSE
+	else (if (eq ?second "5") then (>= 53 ?char) ; 0-5
+	else (neq FALSE (member$ ?second (create$ "0" "1" "2" "3" "4"))))))))))
+
 ;       reg-name    = *( unreserved / pct-encoded / sub-delims )
 (deftemplate http-reg-name
 	(slot name)
@@ -1031,7 +1041,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-authority-change-host-port-to-userinfo
-	(http-char ?name ?char&:(not (member$ ?char ?*http-digit*)))
+	(http-char ?name ?char&~32&~47&:(not (member$ ?char ?*http-digit*))) ; SP /
 	?r <- (object (is-a HTTP-REG-NAME) (value ?reg-name))
 	?h <- (object (is-a HTTP-HOST) (value =(instance-name ?r)))
 	?p <- (http-port (value ?port))
@@ -1104,37 +1114,67 @@
 
 (defrule http-ipv6address-detect-ipv4address
 	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
-	?i <- (http-ipv6address (name ?name) (parts $?parts&:(> 7 (length$ ?parts))&:(> 0 (length$ ?parts))&:(instancep (nth$ (length$ ?parts) ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts)) ":"))
+	?i <- (http-ipv6address (name ?name) (parts $?parts&:(> 7 (length$ ?parts))&:(< 0 (length$ ?parts))&:(instancep (nth$ (length$ ?parts) ?parts))|:(eq "::" (nth$ (length$ ?parts) ?parts)) ":"))
 	=>
 	(modify ?i (parts ?parts (assert (http-ipv4address (name ?name) (octets (assert (http-dec-octet (name ?name)))))))))
 
-(defrule http-ipv6address-change-ipv4address-to-h16
-	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+(defrule http-ipv6address-detect-last-h16
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?i <- (http-ipv6address (name ?name) (parts $?parts&:(= 7 (length$ ?parts))&:(instancep (nth$ 7 ?parts)) ":"))
+	=>
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name))))))
+
+(defrule http-ipv6address-change-one-digit-ipv4address-to-h16
+	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ""))
+	(http-char ?name ?char&93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first "" "" ?char))) ; ]
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
-	(or
-		(http-char ?name ?char&:(member$ ?char ?*http-hex-without-dig*))
-		(http-char ?name 93) ; ]
-		(and
-			(http-neq nil ?third)
-			(http-char ?name ?char&:(member$ ?char ?*http-hexdig*))))
 	=>
 	(retract ?octet ?i4)
-	(bind ?value "")
-	(if (neq nil ?first)
-		then (bind ?value (str-cat ?value ?first)))
-	(if (neq nil ?second)
-		then (bind ?value (str-cat ?value ?second)))
-	(if (neq nil ?third)
-		then (bind ?value (str-cat ?value ?third)))
-	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value ?value))))))
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value ?first))))))
+
+(defrule http-ipv6address-change-two-digit-ipv4address-to-h16
+	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second&~"") (third-digit ""))
+	(http-char ?name ?char&93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first ?second "" ?char))) ; ]
+	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
+	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
+	=>
+	(retract ?octet ?i4)
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value (str-cat ?first ?second)))))))
+
+(defrule http-ipv6address-change-three-digit-ipv4address-to-h16
+	(http-char ?name ?char&93|:(member$ ?char ?*http-hexdig*)) ; ]
+	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third&~""))
+	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
+	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
+	=>
+	(retract ?octet ?i4)
+	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value (str-cat ?first ?second ?third)))))))
+
+(defrule http-ipv6address-change-ipv4address-octet-to-h16
+	(http-char ?name 58) ; :
+	?i4 <- (http-ipv4address (name ?name) (octets ?octet&:(instancep ?octet)))
+	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
+	=>
+	(retract ?i4)
+	(modify ?i (parts ?parts (make-instance of HTTP-H16 (id ?name) (value (send ?octet get-value)))))
+	(unmake-instance ?octet))
+
+(defrule http-ipv6address-end-dec-octet
+	(http-char ?name 93) ; ]
+	?o <- (http-dec-octet (name ?name) (first-digit ?first&~"") (second-digit ?second) (third-digit ?third))
+	?i4 <- (http-ipv4address (name ?name) (octets ?a ?b ?c ?o))
+	(http-ipv6address (name ?name) (parts $? ?i4))
+	=>
+	(retract ?o)
+	(modify ?i4 (octets ?a ?b ?c (make-instance of HTTP-DEC-OCTET (id ?name) (value (str-cat ?first ?second ?third))))))
 
 (defrule http-ipv6address-end-ipv4address
 	(http-char ?name 93) ; ]
 	?i4 <- (http-ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
 	?i6 <- (http-ipv6address (parts $?parts ?i4))
 	=>
-	(retract ?i6)
+	(retract ?i4)
 	(modify ?i6 (parts ?parts (make-instance of HTTP-IPV4ADDRESS (id ?name) (first-octet ?first) (second-octet ?second) (third-octet ?third) (fourth-octet ?fourth)))))
 
 (defrule http-continue-h16
@@ -1176,6 +1216,14 @@
 	=>
 	(retract ?i6)
 	(modify ?il (value (make-instance of HTTP-IPV6ADDRESS (id ?name) (parts ?parts)))))
+
+(defrule http-end-ipv6address-after-double-colon
+	(http-char ?name 93) ; ]
+	?i6 <- (http-ipv6address (name ?name) (parts $?parts "::" ":"))
+	?il <- (http-ip-literal (value ?i6))
+	=>
+	(retract ?i6)
+	(modify ?il (value (make-instance of HTTP-IPV6ADDRESS (id ?name) (parts ?parts "::")))))
 	
 (defrule http-end-ipliteral
 	?c <- (http-char ?name 93) ; ]
@@ -1203,17 +1251,9 @@
 	(modify ?o (first-digit (format nil "%c" ?char)))
 	(assert (http-char ?name (http-read ?name))))
 
-(defrule http-dec-octet-set-second-digit-when-first-digit-is-one
+(defrule http-dec-octet-set-second-digit
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
-	?o <- (http-dec-octet (name ?name) (first-digit "1") (second-digit ""))
-	=>
-	(retract ?c)
-	(modify ?o (second-digit (format nil "%c" ?char)))
-	(assert (http-char ?name (http-read ?name))))
-
-(defrule http-dec-octet-set-second-digit-when-first-digit-is-two
-	?c <- (http-char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
-	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit ""))
+	?o <- (http-dec-octet (name ?name) (first-digit ~""&~"0") (second-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (second-digit (format nil "%c" ?char)))
@@ -1228,23 +1268,23 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-5
-	?c <- (http-char ?name ?char&48|49|50|51|52) ; 1 2 3 4 5
+	?c <- (http-char ?name ?char&48|49|50|51|52|53) ; 0 1 2 3 4 5
 	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit "5") (third-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (third-digit (format nil "%c" ?char)))
 	(assert (http-char ?name (http-read ?name))))
 
-(defrule http-dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-not-5
+(defrule http-dec-octet-set-third-digit-when-first-digit-is-two-and-second-digit-is-less-than-5
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
-	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit ~"5") (third-digit ""))
+	?o <- (http-dec-octet (name ?name) (first-digit "2") (second-digit "0"|"1"|"2"|"3"|"4") (third-digit ""))
 	=>
 	(retract ?c)
 	(modify ?o (third-digit (format nil "%c" ?char)))
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-end-dec-octet
-	(http-char ?name 32|46|58) ; SP . :
+	(http-char ?name 13|32|46|47|58) ; CR SP . / :
 	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
 	?i <- (http-ipv4address (octets $?octets ?o))
 	=>
@@ -1273,23 +1313,13 @@
 	(or
 		(http-char ?name ?char&:(member$ ?char (create$ ?*http-reg-name-no-digits* 37))) ; %
 		(and
-			(http-char ?name ~46) ; .
-			(test (< 0 (length$ ?octets)))
-			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
-			(test (neq "" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
-			(test (neq "1" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
-			(test (neq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
+			(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+			(http-dec-octet (name ?name) (first-digit ?first&~"") (second-digit ?second) (third-digit ?third))
+			(test (not (http-dec-octet-accepts-digit ?first ?second ?third ?char))))
 		(and
-			(http-char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
-			(test (< 0 (length$ ?octets)))
-			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
-			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit)))
-			(test (eq "5" (fact-slot-value (nth$ (length$ ?octets) ?octets) second-digit))))
-		(and
-			(http-char ?name ~48&~49&~50&~51&~52) ; 1 2 3 4 5
-			(test (< 0 (length$ ?octets)))
-			(test (not (instancep (nth$ (length$ ?octets) ?octets))))
-			(test (eq "2" (fact-slot-value (nth$ (length$ ?octets) ?octets) first-digit))))
+			(http-char ?name 13|32|47|58) ; CR SP / :
+			(test (> 4 (length$ ?octets)))
+			(test (instancep (nth$ (length$ ?octets) ?octets))))
 		(and
 			(http-char ?name ~13&~32&~47&~58)
 			(test (= 4 (length$ ?octets)))
@@ -1297,11 +1327,13 @@
 	=>
 	(retract ?i)
 	(bind ?value "")
+	(bind ?separator "")
 	(do-for-all-instances ((?octet HTTP-DEC-OCTET)) (member$ ?octet ?octets)
-		(bind ?value (str-cat ?value (send ?octet get-value)))
+		(bind ?value (str-cat ?value ?separator (send ?octet get-value)))
+		(bind ?separator ".")
 		(unmake-instance ?octet))
 	(do-for-fact ((?octet http-dec-octet)) (member$ ?octet ?octets)
-		(bind ?value (str-cat ?value "." (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit)))
+		(bind ?value (str-cat ?value ?separator (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit)))
 		(retract ?octet))
 	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*) (sequence ?value)))))))))
 
@@ -5130,16 +5162,15 @@ else (if (eq "charset" (lowcase ?self:parameter-name))
 (printout ?t "]"))
 
 (defmessage-handler HTTP-IPV6ADDRESS pprint primary (?t)
-(if (neq ?self:parts nil) then
 (bind ?parts ?self:parts)
 (bind ?len (length$ ?parts))
 (bind ?i 0)
 (foreach ?part ?parts
 (bind ?i (+ ?i 1))
-(if (instancep ?part) then
-(send ?part pprint ?t)
-(if (< ?i ?len) then (printout ?t ":") else (printout ?t))
-else (printout ?t ":") (if (= 1 ?len) then (printout ?t ":"))))))
+(if (instancep ?part)
+then (send ?part pprint ?t)
+(if (and (< ?i ?len) (instancep (nth$ (+ ?i 1) ?parts))) then (printout ?t ":"))
+else (printout ?t ?part))))
 
 (defmessage-handler HTTP-H16 pprint primary (?t)
 (printout ?t ?self:value))
