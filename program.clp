@@ -597,6 +597,23 @@
 	(slot name)
 	(slot value))
 
+; Content-Range = range-unit SP ( range-resp / unsatisfied-range )
+; range-resp = incl-range "/" ( complete-length / "*" )
+; unsatisfied-range = "*/" complete-length
+(deftemplate http-content-range-header
+	(slot name)
+	(slot range-unit)
+	(slot range))
+
+(deftemplate http-range-resp
+	(slot name)
+	(slot incl-range)
+	(slot complete-length))
+
+(deftemplate http-unsatisfied-range
+	(slot name)
+	(slot complete-length))
+
 (deftemplate http-upgrade-header
 	(slot name)
 	(multislot protocols))
@@ -917,6 +934,10 @@
 (defclass HTTP-SUFFIX-RANGE (is-a HTTP) (slot suffix-length))
 (defclass HTTP-OTHER-RANGE (is-a HTTP) (slot value))
 (defclass HTTP-RANGE-SPEC (is-a HTTP) (slot value))
+(defclass HTTP-CONTENT-RANGE-HEADER (is-a HTTP) (slot range-unit) (slot range))
+(defclass HTTP-RANGE-RESP (is-a HTTP) (slot incl-range) (slot complete-length))
+(defclass HTTP-INCL-RANGE (is-a HTTP-INT-RANGE))
+(defclass HTTP-UNSATISFIED-RANGE (is-a HTTP) (slot complete-length))
 (defclass HTTP-UPGRADE-HEADER (is-a HTTP) (multislot protocols))
 (defclass HTTP-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
 (defclass HTTP-CREDENTIALS-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
@@ -2070,7 +2091,7 @@
 
 (defrule http-detect-unknown-header
 	(http-char ?name ?char)
-	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Disposition"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"From"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Disposition"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Range"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"From"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -5390,6 +5411,108 @@
 	(retract ?r)
 	(modify ?fv (value (make-instance of HTTP-RANGE-HEADER (id ?name) (ranges-specifier ?ranges-specifier)))))
 
+; Content-Range = range-unit SP ( range-resp / unsatisfied-range )
+(defrule http-detect-content-range-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Content-Range"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-content-range-header (name ?name) (range-unit (assert (http-token (name ?name)))))))))
+
+(defrule http-content-range-header-end-range-unit
+	?c <- (http-char ?name 32) ; SP
+	?t <- (http-token (name ?name) (value ?value))
+	?h <- (http-content-range-header (name ?name) (range-unit ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?h (range-unit ?value))
+	(assert (http-char ?name (http-read ?name))))
+
+; range-resp = incl-range "/" ( complete-length / "*" )
+; incl-range = first-pos "-" last-pos
+; the incl-range is built by the http-int-range first-pos and last-pos rules
+(defrule http-content-range-header-detect-range-resp
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?h <- (http-content-range-header (name ?name) (range-unit ?u&:(stringp ?u)) (range nil))
+	=>
+	(modify ?h (range (assert (http-range-resp (name ?name) (incl-range (assert (http-int-range (name ?name)))))))))
+
+(defrule http-range-resp-end-incl-range
+	?c <- (http-char ?name 47) ; /
+	?i <- (http-int-range (name ?name) (first-pos ?first-pos) (last-pos ?last-pos&~nil))
+	?r <- (http-range-resp (name ?name) (incl-range ?i))
+	=>
+	(retract ?c ?i)
+	(modify ?r (incl-range (make-instance of HTTP-INCL-RANGE (id ?name) (first-pos ?first-pos) (last-pos ?last-pos))) (complete-length ""))
+	(assert (http-char ?name (http-read ?name))))
+
+; complete-length = 1*DIGIT
+(defrule http-range-resp-build-complete-length
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?r <- (http-range-resp (name ?name) (complete-length ?complete-length&~nil&~"*"))
+	=>
+	(retract ?c)
+	(modify ?r (complete-length (format nil "%s%c" ?complete-length ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-range-resp-unknown-complete-length
+	?c <- (http-char ?name 42) ; *
+	?r <- (http-range-resp (name ?name) (complete-length ""))
+	=>
+	(retract ?c)
+	(modify ?r (complete-length "*"))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-content-range-header-end-range-resp
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?r <- (http-range-resp (name ?name) (incl-range ?i&:(instancep ?i)) (complete-length ?complete-length&~nil&~""))
+	?h <- (http-content-range-header (name ?name) (range ?r))
+	=>
+	(retract ?r)
+	(modify ?h (range (make-instance of HTTP-RANGE-RESP (id ?name) (incl-range ?i) (complete-length ?complete-length)))))
+
+; unsatisfied-range = "*/" complete-length
+(defrule http-content-range-header-detect-unsatisfied-range
+	?c <- (http-char ?name 42) ; *
+	?h <- (http-content-range-header (name ?name) (range-unit ?u&:(stringp ?u)) (range nil))
+	=>
+	(retract ?c)
+	(modify ?h (range (assert (http-unsatisfied-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-unsatisfied-range-detect-complete-length
+	?c <- (http-char ?name 47) ; /
+	?u <- (http-unsatisfied-range (name ?name) (complete-length nil))
+	=>
+	(retract ?c)
+	(modify ?u (complete-length ""))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-unsatisfied-range-build-complete-length
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?u <- (http-unsatisfied-range (name ?name) (complete-length ?complete-length&~nil))
+	=>
+	(retract ?c)
+	(modify ?u (complete-length (format nil "%s%c" ?complete-length ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-content-range-header-end-unsatisfied-range
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?u <- (http-unsatisfied-range (name ?name) (complete-length ?complete-length&~nil&~""))
+	?h <- (http-content-range-header (name ?name) (range ?u))
+	=>
+	(retract ?u)
+	(modify ?h (range (make-instance of HTTP-UNSATISFIED-RANGE (id ?name) (complete-length ?complete-length)))))
+
+(defrule http-end-content-range-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-content-range-header (name ?name) (range-unit ?u&:(stringp ?u)) (range ?r&:(instancep ?r)))
+	?fv <- (http-field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-CONTENT-RANGE-HEADER (id ?name) (range-unit ?u) (range ?r)))))
+
 (defrule http-ignore-ows-at-end-of-field-value
 	?c <- (http-char ?name 9|32) ; HTAB SP
 	(http-field-value (name ?name) (value ?v&:(instancep ?v)))
@@ -6389,6 +6512,17 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 
 (defmessage-handler HTTP-OTHER-RANGE pprint primary (?t)
 (printout ?t ?self:value))
+
+(defmessage-handler HTTP-CONTENT-RANGE-HEADER pprint primary (?t)
+(printout ?t ?self:range-unit " ")
+(send ?self:range pprint ?t))
+
+(defmessage-handler HTTP-RANGE-RESP pprint primary (?t)
+(send ?self:incl-range pprint ?t)
+(printout ?t "/" ?self:complete-length))
+
+(defmessage-handler HTTP-UNSATISFIED-RANGE pprint primary (?t)
+(printout ?t "*/" ?self:complete-length))
 
 (defmessage-handler HTTP-UPGRADE-HEADER pprint primary (?t)
 (bind ?i 0)
