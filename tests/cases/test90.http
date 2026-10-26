@@ -1,0 +1,4 @@
+GET /next HTTP/1.1
+Host: example.com
+Referer:  /search?q=cool+http  
+

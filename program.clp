@@ -21,9 +21,13 @@
 ;   userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
 (defglobal ?*http-userinfo* = (create$ ?*http-unreserved* ?*http-sub-delims* 58))
 ;       scheme      = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
-(defglobal ?*http-scheme* = (create$ ?*http-alphanum* 38 45 46)) ; + - .
+(defglobal ?*http-scheme* = (create$ ?*http-alphanum* 43 45 46)) ; + - .
 ;    query         = *( pchar / "/" / "?" )
 (defglobal ?*http-query* = (create$ ?*http-pchar* 47 63)) ; / ?
+;      segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
+;                    ; non-zero-length segment without any colon ":"
+(defglobal ?*http-segment-nz-nc* = (create$ ?*http-unreserved* ?*http-sub-delims* 64)) ; @
+(defglobal ?*http-segment-nz-nc-no-alpha* = (create$ ?*http-digit* ?*http-sub-delims* 45 46 64 95 126)) ; - . @ _ ~
 
 ; tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 ;         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
@@ -95,7 +99,31 @@
 ;       scheme        = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
 	(slot scheme)
 	(slot hier-part)
-	(slot query))
+	(slot query)
+;   URI           = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+;   an absolute-URI with a fragment is a URI (used by Location)
+	(slot fragment))
+
+; https://datatracker.ietf.org/doc/html/rfc9110#section-4.1
+;   partial-URI   = relative-part [ "?" query ]
+; https://datatracker.ietf.org/doc/html/rfc3986#section-4.2
+;   relative-ref  = relative-part [ "?" query ] [ "#" fragment ]
+;   relative-part = "//" authority path-abempty
+;                 / path-absolute
+;                 / path-noscheme
+;                 / path-empty
+; a relative-part is built by the hier-part rules (the forms they share)
+(deftemplate http-partial-uri
+	(slot name)
+	(slot relative-part)
+	(slot query)
+	(slot fragment))
+
+; Referer  = absolute-URI / partial-URI
+; Location = URI-reference
+(deftemplate http-uri-reference-header
+	(slot name)
+	(slot uri-reference))
 
 ; scheme        = alpha *( alpha | digit | "+" | "-" | "." )
 (deftemplate http-scheme
@@ -209,6 +237,12 @@
 (deftemplate http-path-absolute
 	(slot name)
 	(slot segment-nz)
+	(multislot segments))
+
+;       path-noscheme = segment-nz-nc *( "/" segment )
+(deftemplate http-path-noscheme
+	(slot name)
+	(slot segment-nz-nc)
 	(multislot segments))
 
 ;       path-rootless = segment-nz *( "/" segment )
@@ -406,6 +440,10 @@
 (deftemplate http-accept-language-header
 	(slot name)
 	(multislot language-ranges))
+
+(deftemplate http-content-language-header
+	(slot name)
+	(multislot language-tags))
 
 (deftemplate http-language-range
 	(slot name)
@@ -718,11 +756,16 @@
 (defclass HTTP-METHOD (is-a HTTP) (slot value))
 (defclass HTTP-ORIGIN-FORM (is-a HTTP) (multislot segments) (slot query))
 (defclass HTTP-ABSOLUTE-URI (is-a HTTP) (slot scheme) (slot hier-part) (slot query))
+(defclass HTTP-URI (is-a HTTP-ABSOLUTE-URI) (slot fragment))
+(defclass HTTP-PARTIAL-URI (is-a HTTP) (slot relative-part) (slot query))
+(defclass HTTP-RELATIVE-REF (is-a HTTP-PARTIAL-URI) (slot fragment))
+(defclass HTTP-FRAGMENT (is-a HTTP) (slot value))
 (defclass HTTP-ASTERISK-FORM (is-a HTTP))
 (defclass HTTP-AUTHORITY-FORM (is-a HTTP) (slot uri-host) (slot port))
 (defclass HTTP-SCHEME (is-a HTTP) (slot value))
 (defclass HTTP-USERINFO (is-a HTTP) (slot value))
 (defclass HTTP-HIER-PART (is-a HTTP) (slot authority) (slot path))
+(defclass HTTP-RELATIVE-PART (is-a HTTP-HIER-PART))
 (defclass HTTP-AUTHORITY (is-a HTTP) (slot userinfo) (slot host) (slot port))
 (defclass HTTP-IP-LITERAL (is-a HTTP) (slot value))
 (defclass HTTP-IPV6ADDRESS (is-a HTTP) (multislot parts))
@@ -735,6 +778,7 @@
 (defclass HTTP-PORT (is-a HTTP) (slot value))
 (defclass HTTP-PATH-ABEMPTY (is-a HTTP) (multislot segments))
 (defclass HTTP-PATH-ABSOLUTE (is-a HTTP) (slot segment-nz) (multislot segments))
+(defclass HTTP-PATH-NOSCHEME (is-a HTTP) (slot segment-nz-nc) (multislot segments))
 (defclass HTTP-PATH-ROOTLESS (is-a HTTP) (slot segment-nz) (multislot segments))
 (defclass HTTP-SEGMENT (is-a HTTP) (slot value))
 (defclass HTTP-PARAMETER (is-a HTTP) (slot parameter-name) (slot parameter-value))
@@ -758,6 +802,9 @@
 (defclass HTTP-SERVER-HEADER (is-a HTTP-PRODUCT-HEADER))
 (defclass HTTP-PRODUCT (is-a HTTP) (slot token) (slot product-version))
 (defclass HTTP-HOST-HEADER (is-a HTTP) (slot uri-host) (slot port))
+(defclass HTTP-URI-REFERENCE-HEADER (is-a HTTP) (slot uri-reference))
+(defclass HTTP-REFERER-HEADER (is-a HTTP-URI-REFERENCE-HEADER))
+(defclass HTTP-LOCATION-HEADER (is-a HTTP-URI-REFERENCE-HEADER))
 (defclass HTTP-QUOTED-STRING (is-a HTTP) (slot value))
 (defclass HTTP-MESSAGE-BODY (is-a HTTP) (slot value))
 (defclass HTTP-OCTET-STREAM (is-a HTTP) (slot value))
@@ -775,7 +822,9 @@
 (defclass HTTP-ACCEPT-HEADER (is-a HTTP) (multislot media-ranges))
 (defclass HTTP-MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
 (defclass HTTP-ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
-(defclass HTTP-LANGUAGE-RANGE (is-a HTTP) (slot first-language) (multislot languages) (slot weight))
+(defclass HTTP-CONTENT-LANGUAGE-HEADER (is-a HTTP) (multislot language-tags))
+(defclass HTTP-LANGUAGE-TAG (is-a HTTP) (slot first-language) (multislot languages))
+(defclass HTTP-LANGUAGE-RANGE (is-a HTTP-LANGUAGE-TAG) (slot weight))
 (defclass HTTP-LANGUAGE (is-a HTTP) (slot value))
 (defclass HTTP-ALLOW-HEADER (is-a HTTP) (multislot methods))
 (defclass HTTP-TOKEN-LIST-HEADER (is-a HTTP) (multislot tokens))
@@ -802,7 +851,9 @@
 (defclass HTTP-RANGE-SPEC (is-a HTTP) (slot value))
 (defclass HTTP-UPGRADE-HEADER (is-a HTTP) (multislot protocols))
 (defclass HTTP-PROTOCOL (is-a HTTP) (slot protocol-name) (slot protocol-version))
-(defclass HTTP-PROXY-AUTHORIZATION-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
+(defclass HTTP-CREDENTIALS-HEADER (is-a HTTP) (slot auth-scheme) (multislot second-part))
+(defclass HTTP-AUTHORIZATION-HEADER (is-a HTTP-CREDENTIALS-HEADER))
+(defclass HTTP-PROXY-AUTHORIZATION-HEADER (is-a HTTP-CREDENTIALS-HEADER))
 (defclass HTTP-TOKEN68 (is-a HTTP) (slot value) (slot equals))
 (defclass HTTP-AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
 (defclass HTTP-COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
@@ -1041,7 +1092,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-authority-change-host-port-to-userinfo
-	(http-char ?name ?char&~32&~47&:(not (member$ ?char ?*http-digit*))) ; SP /
+	(http-char ?name ?char&~9&~13&~32&~35&~47&~63&:(not (member$ ?char ?*http-digit*))) ; HTAB CR SP # / ?
 	?r <- (object (is-a HTTP-REG-NAME) (value ?reg-name))
 	?h <- (object (is-a HTTP-HOST) (value =(instance-name ?r)))
 	?p <- (http-port (value ?port))
@@ -1050,6 +1101,17 @@
 	(retract ?p)
 	(unmake-instance ?r ?h)
 	(modify ?a (host nil) (port nil) (userinfo (assert (http-escapable-sequence (name ?name) (sequence (format nil "%s:%s" ?reg-name ?port)) (allowed-chars ?*http-userinfo*))))))
+
+;   authority = [ userinfo "@" ] host [ ":" port ] : an "@" right after the
+;   host means what was read was the userinfo, not the host
+(defrule http-authority-change-host-to-userinfo
+	(http-char ?name 64) ; @
+	?r <- (object (is-a HTTP-REG-NAME) (value ?reg-name))
+	?h <- (object (is-a HTTP-HOST) (value =(instance-name ?r)))
+	?a <- (http-authority (name ?name) (userinfo nil) (host =(instance-name ?h)) (port nil))
+	=>
+	(unmake-instance ?r ?h)
+	(modify ?a (host nil) (userinfo (assert (http-escapable-sequence (name ?name) (sequence ?reg-name) (allowed-chars ?*http-userinfo*))))))
 
 (defrule http-authority-form-end-port
 	(http-char ?name 32) ; SP
@@ -1069,7 +1131,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-authority-end-host
-	(http-char ?name 32|47|58) ; SP / :
+	(http-char ?name 9|13|32|47|58|64) ; HTAB CR SP / : @
 	?h <- (http-host (value ?host&:(instancep ?host)))
 	?a <- (http-authority (name ?name) (host ?h))
 	=>
@@ -1275,7 +1337,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-end-dec-octet
-	(http-char ?name 13|32|46|47) ; CR SP . /
+	(http-char ?name 9|13|32|46|47|64) ; HTAB CR SP . / @
 	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
 	?i <- (http-ipv4address (octets $?octets ?o))
 	=>
@@ -1301,7 +1363,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-host-end-ipv4address
-	(http-char ?name 13|32|47|58) ; CR SP / :
+	(http-char ?name 9|13|32|47|58) ; HTAB CR SP / :
 	?i <- (http-ipv4address (name ?name) (octets ?first ?second ?third ?fourth&:(instancep ?fourth)))
 	?h <- (http-host (value ?i))
 	=>
@@ -1318,11 +1380,11 @@
 			(http-dec-octet (name ?name) (first-digit ?first&~"") (second-digit ?second) (third-digit ?third))
 			(test (not (http-dec-octet-accepts-digit ?first ?second ?third ?char))))
 		(and
-			(http-char ?name 13|32|47|58) ; CR SP / :
+			(http-char ?name 9|13|32|47|58|64) ; HTAB CR SP / : @
 			(test (> 4 (length$ ?octets)))
 			(test (instancep (nth$ (length$ ?octets) ?octets))))
 		(and
-			(http-char ?name ~13&~32&~47&~58)
+			(http-char ?name ~9&~13&~32&~47&~58) ; an "@" after four octets makes them a userinfo, so it stays
 			(test (= 4 (length$ ?octets)))
 			(test (instancep (nth$ 4 ?octets)))))
 	=>
@@ -1345,7 +1407,7 @@
 	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*)))))))))
 
 (defrule http-end-reg-name
-	(http-char ?name 13|32|47|58) ; CR SP / :
+	(http-char ?name 9|13|32|47|58|64) ; HTAB CR SP / : @
 	?e <- (http-escapable-sequence (sequence ?sequence) (pct-encoded nil))
 	?r <- (http-reg-name (value ?e))
 	?h <- (http-host (name ?name) (value ?r))
@@ -1387,7 +1449,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-authority-end-port
-	(http-char ?name 32|47) ; SP /
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
 	?p <- (http-port (name ?name) (value ?port))
 	?a <- (http-authority (host ?host&:(instancep ?host)) (port ?p))
 	=>
@@ -1395,7 +1457,7 @@
 	(modify ?a (port (make-instance of HTTP-PORT (id ?name) (value ?port)))))
 
 (defrule http-end-authority
-	(http-char ?name 32|47|63) ; SP / ?
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
 	?a <- (http-authority (name ?name) (userinfo ?userinfo&nil|:(instancep ?userinfo)) (host ?host&:(instancep ?host)) (port ?port&nil|:(instancep ?port)))
 	?h <- (http-hier-part (authority ?a))
 	=>
@@ -1403,13 +1465,13 @@
 	(modify ?h (authority (make-instance of HTTP-AUTHORITY (id ?name) (userinfo ?userinfo) (host ?host) (port ?port)))))
 
 (defrule http-start-path-abempty
-	(http-char ?name 32|47|63) ; SP / ?
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
 	?h <- (http-hier-part (name ?name) (authority ?a&:(instancep ?a)) (path nil))
 	=>
 	(modify ?h (path (assert (http-path-abempty (name ?name))))))
 
 (defrule http-end-path-abempty
-	(http-char ?name 32|63) ; SP ?
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
 	?p <- (http-path-abempty (name ?name) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
 	?h <- (http-hier-part (path ?p))
 	=>
@@ -1417,7 +1479,7 @@
 	(modify ?h (path (make-instance of HTTP-PATH-ABEMPTY (id ?name) (segments ?segments)))))
 
 (defrule http-end-hier-part
-	(http-char ?name 32|63) ; SP ?
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
 	?h <- (http-hier-part (name ?name) (authority ?authority&nil|:(instancep ?authority)) (path ?path&:(instancep ?path)))
 	?a <- (http-absolute-uri (hier-part ?h))
 	=>
@@ -1433,7 +1495,7 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-absolute-uri-end-query
-	(http-char ?name 32) ; SP
+	(http-char ?name 9|13|32|35) ; HTAB CR SP #
 	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
 	?a <- (http-absolute-uri (query ?e))
 	=>
@@ -1468,7 +1530,7 @@
 	(modify ?o (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
 (defrule http-path-abempty-end-of-segment
-	(http-char ?name 32|47|63) ; SP / ?
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
 	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
 	?s <- (http-segment (value ?es))
 	?p <- (http-path-abempty (name ?name) (segments $?segments ?s))
@@ -1477,7 +1539,7 @@
 	(modify ?p (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
 
 (defrule http-path-absolute-end-of-segment
-	(http-char ?name 32|47|63) ; SP / ?
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
 	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
 	?s <- (http-segment (value ?es))
 	?p <- (http-path-absolute (name ?name) (segments $?segments ?s))
@@ -1512,11 +1574,36 @@
 	
 (defrule http-path-absolute-find-next-segment
 	?c <- (http-char ?name 47) ; /
-	?p <- (http-path-absolute (name ?name) (segments $?segments ?segment&:(instancep ?segment)))
+	?p <- (http-path-absolute (name ?name) (segment-nz ?segment-nz&:(instancep ?segment-nz)) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
 	=>
 	(retract ?c)
-	(modify ?p (segments ?segments ?segment (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(modify ?p (segments ?segments (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
 	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-path-absolute-end-segment-nz
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
+	?es <- (http-escapable-sequence (sequence ?value&~"") (pct-encoded nil))
+	?p <- (http-path-absolute (name ?name) (segment-nz ?es))
+	=>
+	(retract ?es)
+	(modify ?p (segment-nz (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
+
+; path-absolute = "/" [ segment-nz *( "/" segment ) ] : a lone "/" has no segment-nz
+(defrule http-path-absolute-end-without-segment-nz
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
+	?es <- (http-escapable-sequence (sequence "") (pct-encoded nil))
+	?p <- (http-path-absolute (name ?name) (segment-nz ?es))
+	=>
+	(retract ?es)
+	(modify ?p (segment-nz nil)))
+
+(defrule http-end-path-absolute
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
+	?p <- (http-path-absolute (name ?name) (segment-nz ?segment-nz&nil|:(instancep ?segment-nz)) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
+	?h <- (http-hier-part (path ?p))
+	=>
+	(retract ?p)
+	(modify ?h (path (make-instance of HTTP-PATH-ABSOLUTE (id ?name) (segment-nz ?segment-nz) (segments ?segments)))))
 	
 (defrule http-path-rootless-find-next-segment
 	?c <- (http-char ?name 47) ; /
@@ -1559,6 +1646,207 @@
 	(retract ?c ?a)
 	(modify ?r (request-target (make-instance of HTTP-ABSOLUTE-URI (id ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query))))
 	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-relative-part
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
+	?h <- (http-hier-part (name ?name) (authority ?authority&nil|:(instancep ?authority)) (path ?path&:(instancep ?path)))
+	?p <- (http-partial-uri (relative-part ?h))
+	=>
+	(retract ?h)
+	(modify ?p (relative-part (make-instance of HTTP-RELATIVE-PART (id ?name) (authority ?authority) (path ?path)))))
+
+(defrule http-partial-uri-start-query
+	?c <- (http-char ?name 63) ; ?
+	?p <- (http-partial-uri (name ?name) (relative-part ?r&:(instancep ?r)) (query nil))
+	=>
+	(retract ?c)
+	(modify ?p (query (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-query*)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-partial-uri-end-query
+	(http-char ?name 9|13|32|35) ; HTAB CR SP #
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+	?p <- (http-partial-uri (query ?e))
+	=>
+	(retract ?e)
+	(modify ?p (query (make-instance of HTTP-QUERY (id ?name) (value ?sequence)))))
+
+;   Referer  = absolute-URI / partial-URI
+;   Location = URI-reference
+;   URI-reference = URI / relative-ref
+;   fragment      = *( pchar / "/" / "?" )
+; Referer (RFC 9110 10.1.3) and Location (10.2.2) share the URI grammar, so the
+; same uri-reference-header fact and rules build both; only Location allows a
+; fragment, and only the end rule differs.
+(defrule http-detect-uri-reference-header-absolute-uri
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alpha*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(retract ?c)
+	(modify ?fv (value (assert (http-uri-reference-header (name ?name) (uri-reference (assert (http-absolute-uri (name ?name) (scheme (assert (http-scheme (name ?name) (value (format nil "%c" ?char))))))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-detect-uri-reference-header-partial-uri
+	(http-char ?name 47) ; /
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-uri-reference-header (name ?name) (uri-reference (assert (http-partial-uri (name ?name) (relative-part (assert (http-hier-part (name ?name))))))))))))
+
+; relative-part = ... / path-noscheme : a value that starts like a scheme but is
+; never followed by ":" is a path-noscheme; its first segment is what was read
+(defrule http-uri-reference-header-change-scheme-to-path-noscheme
+	(http-char ?name ?char&~58&~:(member$ ?char ?*http-scheme*)) ; :
+	?s <- (http-scheme (name ?name) (value ?value&~nil))
+	?a <- (http-absolute-uri (scheme ?s) (hier-part nil))
+	?h <- (http-uri-reference-header (uri-reference ?a))
+	=>
+	(retract ?s ?a)
+	(modify ?h (uri-reference (assert (http-partial-uri (name ?name) (relative-part (assert (http-hier-part (name ?name) (path (assert (http-path-noscheme (name ?name) (segment-nz-nc (assert (http-escapable-sequence (name ?name) (sequence ?value) (allowed-chars ?*http-segment-nz-nc*)))))))))))))))
+
+; a path-noscheme that does not start with ALPHA cannot be a scheme at all
+(defrule http-detect-uri-reference-header-path-noscheme
+	(http-char ?name ?char&:(member$ ?char (create$ ?*http-segment-nz-nc-no-alpha* 37))) ; %
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-uri-reference-header (name ?name) (uri-reference (assert (http-partial-uri (name ?name) (relative-part (assert (http-hier-part (name ?name) (path (assert (http-path-noscheme (name ?name) (segment-nz-nc (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-segment-nz-nc*))))))))))))))))))
+
+(defrule http-path-noscheme-end-segment-nz-nc
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
+	?es <- (http-escapable-sequence (sequence ?value&~"") (pct-encoded nil))
+	?p <- (http-path-noscheme (name ?name) (segment-nz-nc ?es))
+	=>
+	(retract ?es)
+	(modify ?p (segment-nz-nc (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
+
+(defrule http-path-noscheme-find-next-segment
+	?c <- (http-char ?name 47) ; /
+	?p <- (http-path-noscheme (name ?name) (segment-nz-nc ?segment-nz-nc&:(instancep ?segment-nz-nc)) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
+	=>
+	(retract ?c)
+	(modify ?p (segments ?segments (assert (http-segment (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-pchar*))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-path-noscheme-end-of-segment
+	(http-char ?name 9|13|32|35|47|63) ; HTAB CR SP # / ?
+	?es <- (http-escapable-sequence (sequence ?value) (pct-encoded nil))
+	?s <- (http-segment (value ?es))
+	?p <- (http-path-noscheme (name ?name) (segments $?segments ?s))
+	=>
+	(retract ?es ?s)
+	(modify ?p (segments ?segments (make-instance of HTTP-SEGMENT (id ?name) (value ?value)))))
+
+(defrule http-end-path-noscheme
+	(http-char ?name 9|13|32|35|63) ; HTAB CR SP # ?
+	?p <- (http-path-noscheme (name ?name) (segment-nz-nc ?segment-nz-nc&:(instancep ?segment-nz-nc)) (segments $?segments&:(= 0 (length$ ?segments))|:(instancep (nth$ (length$ ?segments) ?segments))))
+	?h <- (http-hier-part (path ?p))
+	=>
+	(retract ?p)
+	(modify ?h (path (make-instance of HTTP-PATH-NOSCHEME (id ?name) (segment-nz-nc ?segment-nz-nc) (segments ?segments)))))
+
+(defrule http-uri-reference-header-end-absolute-uri
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?a <- (http-absolute-uri (name ?name) (scheme ?scheme) (hier-part ?hier-part&:(instancep ?hier-part)) (query ?query&nil|:(instancep ?query)) (fragment nil))
+	?h <- (http-uri-reference-header (uri-reference ?a))
+	=>
+	(retract ?a)
+	(modify ?h (uri-reference (make-instance of HTTP-ABSOLUTE-URI (id ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query)))))
+
+(defrule http-uri-reference-header-end-uri
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?a <- (http-absolute-uri (name ?name) (scheme ?scheme) (hier-part ?hier-part&:(instancep ?hier-part)) (query ?query&nil|:(instancep ?query)) (fragment ?fragment&:(instancep ?fragment)))
+	?h <- (http-uri-reference-header (uri-reference ?a))
+	=>
+	(retract ?a)
+	(modify ?h (uri-reference (make-instance of HTTP-URI (id ?name) (scheme ?scheme) (hier-part ?hier-part) (query ?query) (fragment ?fragment)))))
+
+(defrule http-uri-reference-header-end-partial-uri
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?p <- (http-partial-uri (name ?name) (relative-part ?relative-part&:(instancep ?relative-part)) (query ?query&nil|:(instancep ?query)) (fragment nil))
+	?h <- (http-uri-reference-header (uri-reference ?p))
+	=>
+	(retract ?p)
+	(modify ?h (uri-reference (make-instance of HTTP-PARTIAL-URI (id ?name) (relative-part ?relative-part) (query ?query)))))
+
+(defrule http-uri-reference-header-end-relative-ref
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?p <- (http-partial-uri (name ?name) (relative-part ?relative-part&:(instancep ?relative-part)) (query ?query&nil|:(instancep ?query)) (fragment ?fragment&:(instancep ?fragment)))
+	?h <- (http-uri-reference-header (uri-reference ?p))
+	=>
+	(retract ?p)
+	(modify ?h (uri-reference (make-instance of HTTP-RELATIVE-REF (id ?name) (relative-part ?relative-part) (query ?query) (fragment ?fragment)))))
+
+(defrule http-location-header-uri-start-fragment
+	?c <- (http-char ?name 35) ; #
+	?a <- (http-absolute-uri (name ?name) (hier-part ?hier-part&:(instancep ?hier-part)) (query ?query&nil|:(instancep ?query)) (fragment nil))
+	?h <- (http-uri-reference-header (uri-reference ?a))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Location"))
+	=>
+	(retract ?c)
+	(modify ?a (fragment (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-query*)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-location-header-relative-ref-start-fragment
+	?c <- (http-char ?name 35) ; #
+	?p <- (http-partial-uri (name ?name) (relative-part ?relative-part&:(instancep ?relative-part)) (query ?query&nil|:(instancep ?query)) (fragment nil))
+	?h <- (http-uri-reference-header (uri-reference ?p))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Location"))
+	=>
+	(retract ?c)
+	(modify ?p (fragment (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-query*)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-uri-end-fragment
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+	?a <- (http-absolute-uri (fragment ?e))
+	=>
+	(retract ?e)
+	(modify ?a (fragment (make-instance of HTTP-FRAGMENT (id ?name) (value ?sequence)))))
+
+(defrule http-relative-ref-end-fragment
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (pct-encoded nil))
+	?p <- (http-partial-uri (fragment ?e))
+	=>
+	(retract ?e)
+	(modify ?p (fragment (make-instance of HTTP-FRAGMENT (id ?name) (value ?sequence)))))
+
+(defrule http-uri-reference-header-skip-ows-after-uri-reference
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-uri-reference-header (name ?name) (uri-reference ?u&:(instancep ?u)))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-referer-header
+	(http-char ?name 13) ; CR
+	?h <- (http-uri-reference-header (name ?name) (uri-reference ?u&:(instancep ?u)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Referer"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-REFERER-HEADER (id ?name) (uri-reference ?u)))))
+
+(defrule http-end-location-header
+	(http-char ?name 13) ; CR
+	?h <- (http-uri-reference-header (name ?name) (uri-reference ?u&:(instancep ?u)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Location"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-LOCATION-HEADER (id ?name) (uri-reference ?u)))))
 
 (defrule http-char-is-allowed-char-in-escapable-sequence
 	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (allowed-chars $?allowed-chars) (pct-encoded nil))
@@ -1714,7 +2002,7 @@
 
 (defrule http-detect-unknown-header
 	(http-char ?name ?char)
-	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -3451,6 +3739,51 @@
 	(retract ?clh)
 	(modify ?fv (value (make-instance of HTTP-ACCEPT-LANGUAGE-HEADER (id ?name) (language-ranges ?language-ranges)))))
 
+;   Content-Language = #language-tag
+;   language-tag     = <Language-Tag, see [RFC5646], Section 2.1>
+; A language-tag is built by the language-range rules above (the subtags are
+; the same 1*8alphanum pieces); only the header's own rules differ, and a
+; language-tag carries no weight.
+(defrule http-detect-content-language-header
+	(http-char ?name ?char&:(member$ ?char ?*http-alpha*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Content-Language"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-content-language-header (name ?name) (language-tags (assert (http-language-range (name ?name) (first-language (assert (http-language (name ?name))))))))))))
+
+(defrule http-content-language-header-end-language-tag
+	(http-char ?name 13|44) ; CR ,
+	?l <- (http-language-range (name ?name) (first-language ?first-language&:(instancep ?first-language)) (languages $?languages&:(= 0 (length$ ?languages))|:(instancep (nth$ (length$ ?languages) ?languages))) (weight nil))
+	?h <- (http-content-language-header (language-tags $?language-tags ?l))
+	=>
+	(retract ?l)
+	(modify ?h (language-tags ?language-tags (make-instance of HTTP-LANGUAGE-TAG (id ?name) (first-language ?first-language) (languages ?languages)))))
+
+(defrule http-content-language-header-ignore-ows-between-language-tags
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?l <- (http-language-range (first-language nil))
+	?h <- (http-content-language-header (name ?name) (language-tags $?language-tags ?l))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-content-language-header-start-next-language-tag
+	?c <- (http-char ?name 44) ; ,
+	?h <- (http-content-language-header (name ?name) (language-tags $?language-tags&:(instancep (nth$ (length$ ?language-tags) ?language-tags))))
+	=>
+	(retract ?c)
+	(modify ?h (language-tags ?language-tags (assert (http-language-range (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-content-language-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-content-language-header (name ?name) (language-tags $?language-tags&:(instancep (nth$ (length$ ?language-tags) ?language-tags))))
+	?fv <- (http-field-value (value ?clh))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of HTTP-CONTENT-LANGUAGE-HEADER (id ?name) (language-tags ?language-tags)))))
+
 ;RWS = 1*( SP / HTAB )
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 ;
@@ -4270,14 +4603,18 @@
 	(modify ?f (value (make-instance of HTTP-HOST-HEADER (id ?name) (uri-host ?h) (port ?p)))))
 
 ;
+;  Authorization = credentials
 ;  Proxy-Authorization = credentials
 ;  credentials = auth-scheme [ 1*SP ( token68 / [ auth-param *( OWS "," OWS auth-param ) ] ) ]
 ;  auth-scheme = token
 ;  token68 = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"="
 ;  auth-param = token BWS "=" BWS ( token / quoted-string )
+; Authorization (RFC 9110 11.6.2) and Proxy-Authorization (11.7.2) share the
+; credentials grammar, so the same proxy-authorization-header fact and rules
+; build both; only the end rule differs.
 (defrule http-detect-proxy-authorization-header
 	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
-	?o <- (object (is-a HTTP-FIELD-NAME) (value "Proxy-Authorization"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Authorization"|"Proxy-Authorization"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -4289,8 +4626,7 @@
 	?p <- (http-proxy-authorization-header (name ?name) (auth-scheme ?t))
 	=>
 	(retract ?t)
-	(modify ?p (auth-scheme ?value))
-	(assert (http-char ?name (http-read ?name))))
+	(modify ?p (auth-scheme ?value)))
 
 (defrule http-proxy-authorization-detect-second-part-after-auth-scheme
 	?c <- (http-char ?name 32) ; SP
@@ -4388,10 +4724,22 @@
 	(retract ?c)
 	(assert (http-char ?name (http-read ?name))))
 
+(defrule http-end-authorization-header
+	(http-char ?name 13) ; CR
+	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?fv <- (http-field-value (value ?clh))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Authorization"))
+	=>
+	(retract ?clh)
+	(modify ?fv (value (make-instance of HTTP-AUTHORIZATION-HEADER (id ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
+
 (defrule http-end-proxy-authorization-header
 	(http-char ?name 13) ; CR
 	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
 	?fv <- (http-field-value (value ?clh))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Proxy-Authorization"))
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of HTTP-PROXY-AUTHORIZATION-HEADER (id ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
@@ -5254,14 +5602,16 @@ else (printout ?t ?part))))
 
 (defmessage-handler HTTP-PATH-ABSOLUTE pprint primary (?t)
 (printout ?t "/")
-(if (neq ?self:segments nil) then
-(bind ?segs ?self:segments)
-(bind ?len (length$ ?segs))
-(bind ?i 0)
-(foreach ?seg ?segs
-(bind ?i (+ ?i 1))
-(send ?seg pprint ?t)
-(if (< ?i ?len) then (printout ?t "/") else (printout ?t)))))
+(if (neq ?self:segment-nz nil) then (send ?self:segment-nz pprint ?t))
+(foreach ?seg ?self:segments
+(printout ?t "/")
+(send ?seg pprint ?t)))
+
+(defmessage-handler HTTP-PATH-NOSCHEME pprint primary (?t)
+(send ?self:segment-nz-nc pprint ?t)
+(foreach ?seg ?self:segments
+(printout ?t "/")
+(send ?seg pprint ?t)))
 
 (defmessage-handler HTTP-PATH-ABEMPTY pprint primary (?t)
 (printout ?t "/")
@@ -5313,6 +5663,23 @@ then (send ?self:path pprint ?t)))
 (send ?self:hier-part pprint ?t)
 (if (neq ?self:query nil)
 then (send ?self:query pprint ?t)))
+
+(defmessage-handler HTTP-URI pprint after (?t)
+(send ?self:fragment pprint ?t))
+
+(defmessage-handler HTTP-PARTIAL-URI pprint primary (?t)
+(send ?self:relative-part pprint ?t)
+(if (neq ?self:query nil)
+then (send ?self:query pprint ?t)))
+
+(defmessage-handler HTTP-RELATIVE-REF pprint after (?t)
+(send ?self:fragment pprint ?t))
+
+(defmessage-handler HTTP-FRAGMENT pprint primary (?t)
+(printout ?t "#" ?self:value))
+
+(defmessage-handler HTTP-URI-REFERENCE-HEADER pprint primary (?t)
+(send ?self:uri-reference pprint ?t))
 
 (defmessage-handler HTTP-ASTERISK-FORM pprint primary (?t)
 (printout ?t "*"))
@@ -5511,7 +5878,14 @@ then (printout ?t "." ?self:fraction)))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:language-ranges)) then (printout ?t ",") else (printout ?t))))
 
-(defmessage-handler HTTP-LANGUAGE-RANGE pprint primary (?t)
+(defmessage-handler HTTP-CONTENT-LANGUAGE-HEADER pprint primary (?t)
+(bind ?i 0)
+(foreach ?f ?self:language-tags
+     (bind ?i (+ ?i 1))
+     (send ?f pprint ?t)
+     (if (< ?i (length$ ?self:language-tags)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler HTTP-LANGUAGE-TAG pprint primary (?t)
 	(send ?self:first-language pprint ?t)
 	(bind ?i 0)
 	(if (<> 0 (length$ ?self:languages))
@@ -5520,7 +5894,9 @@ then (printout ?t "." ?self:fraction)))
 	     (foreach ?f ?self:languages
 	     (bind ?i (+ ?i 1))
 	     (send ?f pprint ?t)
-	     (if (< ?i (length$ ?self:languages)) then (printout ?t "-") else (printout ?t))))
+	     (if (< ?i (length$ ?self:languages)) then (printout ?t "-") else (printout ?t)))))
+
+(defmessage-handler HTTP-LANGUAGE-RANGE pprint after (?t)
 	(if (neq ?self:weight nil)
 	then
 	     (printout ?t ";")
@@ -5631,7 +6007,7 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 	(if (neq ?self:protocol-version nil)
 		then (printout ?t "/" ?self:protocol-version)))
 
-(defmessage-handler HTTP-PROXY-AUTHORIZATION-HEADER pprint primary (?t)
+(defmessage-handler HTTP-CREDENTIALS-HEADER pprint primary (?t)
 	(printout ?t ?self:auth-scheme " ")
 	(bind ?i 0)
 	(foreach ?f ?self:second-part

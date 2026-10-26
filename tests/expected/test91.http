@@ -1,0 +1,4 @@
+HTTP/1.1 302 Found
+Location: //cdn.example.org/img/logo.png#v2
+Content-Length: 0
+

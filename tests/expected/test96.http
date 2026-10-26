@@ -1,0 +1,4 @@
+HTTP/1.1 302 Found
+Location: https://10.0.0.1@example.com:8080/a?b#c
+Content-Length: 0
+

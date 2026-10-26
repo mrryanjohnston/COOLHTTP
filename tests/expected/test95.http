@@ -1,0 +1,4 @@
+HTTP/1.1 302 Found
+Location: 2024/report.pdf?dl=1#p2
+Content-Length: 0
+
