@@ -1,0 +1,5 @@
+POST /upload HTTP/1.1
+Host: example.com
+Content-Disposition: form-data;name=field1;title*=iso-8859-1'en'%A3%20rates
+Content-Length: 0
+

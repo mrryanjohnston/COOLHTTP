@@ -29,6 +29,14 @@
 (defglobal ?*http-segment-nz-nc* = (create$ ?*http-unreserved* ?*http-sub-delims* 64)) ; @
 (defglobal ?*http-segment-nz-nc-no-alpha* = (create$ ?*http-digit* ?*http-sub-delims* 45 46 64 95 126)) ; - . @ _ ~
 
+;   attr-char = ALPHA / DIGIT / "!" / "#" / "$" / "&" / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+(defglobal ?*http-attr-char* = (create$ ?*http-alphanum* 33 35 36 38 43 45 46 94 95 96 124 126))
+;   mime-charsetc = ALPHA / DIGIT / "!" / "#" / "$" / "%" / "&" / "+" / "-" / "^" / "_" / "`" / "{" / "}" / "~"
+(defglobal ?*http-mime-charsetc* = (create$ ?*http-alphanum* 33 35 36 37 38 43 45 94 95 96 123 125 126))
+
+;   atext = ALPHA / DIGIT / "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "/" / "=" / "?" / "^" / "_" / "`" / "{" / "|" / "}" / "~"
+(defglobal ?*http-atext* = (create$ ?*http-alphanum* 33 35 36 37 38 39 42 43 45 47 61 63 94 95 96 123 124 125 126))
+
 ; tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 ;         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 (defglobal ?*http-tchar* = (create$ ?*http-alphanum* 33 35 36 37 38 39 42 43 45 46 94 95 96 124 126)) ; ! # $ % & ' * + - . ^ _ ` | ~
@@ -328,6 +336,28 @@
 	(slot subtype)
 	(multislot parameters))
 
+; https://datatracker.ietf.org/doc/html/rfc6266#section-4.1
+;   content-disposition = "Content-Disposition" ":" disposition-type *( ";" disposition-parm )
+;   disposition-type    = "inline" | "attachment" | disp-ext-type ; disp-ext-type = token
+;   disposition-parm    = filename-parm | disp-ext-parm
+;   filename-parm       = "filename" "=" value | "filename*" "=" ext-value
+;   disp-ext-parm       = token "=" value | ext-token "=" ext-value
+(deftemplate http-content-disposition-header
+	(slot name)
+	(slot disposition-type)
+	(multislot parameters))
+
+; https://datatracker.ietf.org/doc/html/rfc8187#section-3.2.1
+;   ext-value   = charset "'" [ language ] "'" value-chars
+;   value-chars = *( pct-encoded / attr-char )
+;   attr-char   = ALPHA / DIGIT / "!" / "#" / "$" / "&" / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+; language is nil until the first "'" has been read, value-chars until the second
+(deftemplate http-ext-value
+	(slot name)
+	(slot charset (default ""))
+	(slot language)
+	(slot value-chars))
+
 (deftemplate http-host-header
 	(slot name)
 	(slot uri-host)
@@ -344,6 +374,8 @@
 (deftemplate http-parameter
 	(slot name)
 	(slot parameter-name)
+;  ext-token = <the characters in token, followed by "*"> : set when the "*" is read
+	(slot ext-token (default FALSE))
 	(slot parameter-value))
 
 (deftemplate http-token
@@ -444,6 +476,36 @@
 (deftemplate http-content-language-header
 	(slot name)
 	(multislot language-tags))
+
+; From = mailbox ; https://datatracker.ietf.org/doc/html/rfc5322#section-3.4
+;   mailbox       = name-addr / addr-spec
+;   name-addr     = [display-name] angle-addr
+;   angle-addr    = "<" addr-spec ">"
+;   display-name  = phrase = 1*word ; word = atom / quoted-string
+;   addr-spec     = local-part "@" domain
+;   local-part    = dot-atom / quoted-string
+;   domain        = dot-atom / domain-literal
+;   dot-atom-text = 1*atext *("." 1*atext)
+(deftemplate http-from-header
+	(slot name)
+	(slot mailbox))
+
+; angle-addr is nil before any "<", open after it and closed after the ">"
+(deftemplate http-mailbox
+	(slot name)
+	(multislot display-name)
+	(slot local-part)
+	(slot domain)
+	(slot angle-addr))
+
+(deftemplate http-dot-atom
+	(slot name)
+	(slot value (default "")))
+
+;   domain-literal = "[" *dtext "]" ; dtext = %d33-90 / %d94-126
+(deftemplate http-domain-literal
+	(slot name)
+	(slot value (default "")))
 
 (deftemplate http-language-range
 	(slot name)
@@ -781,7 +843,7 @@
 (defclass HTTP-PATH-NOSCHEME (is-a HTTP) (slot segment-nz-nc) (multislot segments))
 (defclass HTTP-PATH-ROOTLESS (is-a HTTP) (slot segment-nz) (multislot segments))
 (defclass HTTP-SEGMENT (is-a HTTP) (slot value))
-(defclass HTTP-PARAMETER (is-a HTTP) (slot parameter-name) (slot parameter-value))
+(defclass HTTP-PARAMETER (is-a HTTP) (slot parameter-name) (slot ext-token) (slot parameter-value))
 (defclass HTTP-QUERY (is-a HTTP) (slot value))
 (defclass HTTP-VERSION (is-a HTTP) (slot H) (slot T) (slot TT) (slot P) (slot major) (slot minor))
 (defclass HTTP-FIELD-LINE (is-a HTTP) (slot field-name) (slot field-value))
@@ -795,6 +857,8 @@
 (defclass HTTP-CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass HTTP-MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
 (defclass HTTP-CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
+(defclass HTTP-CONTENT-DISPOSITION-HEADER (is-a HTTP) (slot disposition-type) (multislot parameters))
+(defclass HTTP-EXT-VALUE (is-a HTTP) (slot charset) (slot language) (slot value-chars))
 (defclass HTTP-VIA-HEADER (is-a HTTP) (multislot values))
 (defclass HTTP-VIA-HEADER-VALUE (is-a HTTP) (slot received-protocol) (slot received-by) (slot comment))
 (defclass HTTP-PRODUCT-HEADER (is-a HTTP) (multislot values))
@@ -823,6 +887,10 @@
 (defclass HTTP-MEDIA-RANGE (is-a HTTP) (slot type) (slot subtype) (multislot parameters) (slot weight))
 (defclass HTTP-ACCEPT-LANGUAGE-HEADER (is-a HTTP) (multislot language-ranges))
 (defclass HTTP-CONTENT-LANGUAGE-HEADER (is-a HTTP) (multislot language-tags))
+(defclass HTTP-FROM-HEADER (is-a HTTP) (slot mailbox))
+(defclass HTTP-ADDR-SPEC (is-a HTTP) (slot local-part) (slot domain))
+(defclass HTTP-NAME-ADDR (is-a HTTP) (multislot display-name) (slot addr-spec))
+(defclass HTTP-DOMAIN-LITERAL (is-a HTTP) (slot value))
 (defclass HTTP-LANGUAGE-TAG (is-a HTTP) (slot first-language) (multislot languages))
 (defclass HTTP-LANGUAGE-RANGE (is-a HTTP-LANGUAGE-TAG) (slot weight))
 (defclass HTTP-LANGUAGE (is-a HTTP) (slot value))
@@ -2002,7 +2070,7 @@
 
 (defrule http-detect-unknown-header
 	(http-char ?name ?char)
-	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Disposition"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"From"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -2932,11 +3000,11 @@
 
 (defrule http-media-range-end-parameter
 	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (ext-token ?ext-token) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
 	?m <- (http-media-range (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?m (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
+	(modify ?m (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (ext-token ?ext-token) (parameter-value ?parameter-value)))))
 
 (defrule http-media-range-end-weight
 	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
@@ -3784,6 +3852,182 @@
 	(retract ?clh)
 	(modify ?fv (value (make-instance of HTTP-CONTENT-LANGUAGE-HEADER (id ?name) (language-tags ?language-tags)))))
 
+;   From = mailbox (RFC 9110 10.1.2; the mailbox grammar is RFC 5322 3.4)
+; The first atext run or quoted-string may be the local-part of an addr-spec or
+; the first word of a display-name: "@" after it makes it the local-part, SP,
+; HTAB or "<" make it a word.  CFWS comments are not handled.
+(defrule http-detect-from-header-dot-atom
+	(http-char ?name ?char&:(member$ ?char ?*http-atext*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "From"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-from-header (name ?name) (mailbox (assert (http-mailbox (name ?name) (local-part (assert (http-dot-atom (name ?name))))))))))))
+
+(defrule http-detect-from-header-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "From"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(retract ?c)
+	(modify ?fv (value (assert (http-from-header (name ?name) (mailbox (assert (http-mailbox (name ?name) (local-part (assert (http-quoted-string (name ?name)))))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-detect-from-header-angle-addr
+	?c <- (http-char ?name 60) ; <
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "From"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(retract ?c)
+	(modify ?fv (value (assert (http-from-header (name ?name) (mailbox (assert (http-mailbox (name ?name) (angle-addr open))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-build-dot-atom
+	?c <- (http-char ?name ?char&46|:(member$ ?char ?*http-atext*)) ; .
+	?d <- (http-dot-atom (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-start-local-part-dot-atom
+	(http-char ?name ?char&:(member$ ?char ?*http-atext*))
+	?m <- (http-mailbox (name ?name) (local-part nil) (domain nil))
+	=>
+	(modify ?m (local-part (assert (http-dot-atom (name ?name))))))
+
+(defrule http-mailbox-start-local-part-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?m <- (http-mailbox (name ?name) (local-part nil) (domain nil))
+	=>
+	(retract ?c)
+	(modify ?m (local-part (assert (http-quoted-string (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-start-angle-addr
+	?c <- (http-char ?name 60) ; <
+	?m <- (http-mailbox (name ?name) (local-part nil) (domain nil) (angle-addr nil))
+	=>
+	(retract ?c)
+	(modify ?m (angle-addr open))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-end-local-part-dot-atom
+	(http-char ?name 64) ; @
+	?d <- (http-dot-atom (value ?value&~""))
+	?m <- (http-mailbox (name ?name) (local-part ?d))
+	=>
+	(retract ?d)
+	(modify ?m (local-part ?value)))
+
+(defrule http-mailbox-end-local-part-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?q <- (http-quoted-string (name ?name) (value ?value))
+	?m <- (http-mailbox (name ?name) (local-part ?q))
+	(not (http-quoted-pair ?name))
+	=>
+	(retract ?c ?q)
+	(modify ?m (local-part (make-instance of HTTP-QUOTED-STRING (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-dot-atom-is-display-name-word
+	(http-char ?name 9|32|60) ; HTAB SP <
+	?d <- (http-dot-atom (value ?value&~""))
+	?m <- (http-mailbox (name ?name) (display-name $?words) (local-part ?d) (domain nil) (angle-addr nil))
+	=>
+	(retract ?d)
+	(modify ?m (display-name ?words ?value) (local-part nil)))
+
+(defrule http-mailbox-quoted-string-is-display-name-word
+	(http-char ?name 9|32|60) ; HTAB SP <
+	?m <- (http-mailbox (name ?name) (display-name $?words) (local-part ?q&:(instancep ?q)) (domain nil) (angle-addr nil))
+	=>
+	(modify ?m (display-name ?words ?q) (local-part nil)))
+
+(defrule http-mailbox-skip-ows-between-words
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-mailbox (name ?name) (display-name $?words&:(> (length$ ?words) 0)) (local-part nil) (domain nil) (angle-addr nil))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-start-domain
+	?c <- (http-char ?name 64) ; @
+	?m <- (http-mailbox (name ?name) (local-part ?l&:(stringp ?l)|:(instancep ?l)) (domain nil))
+	=>
+	(retract ?c)
+	(modify ?m (domain (assert (http-dot-atom (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-change-domain-to-domain-literal
+	?c <- (http-char ?name 91) ; [
+	?d <- (http-dot-atom (value ""))
+	?m <- (http-mailbox (name ?name) (domain ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?m (domain (assert (http-domain-literal (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-build-domain-literal
+	?c <- (http-char ?name ?char&:(or (and (>= ?char 33) (<= ?char 90)) (and (>= ?char 94) (<= ?char 126)))) ; dtext
+	?d <- (http-domain-literal (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-end-domain-literal
+	?c <- (http-char ?name 93) ; ]
+	?d <- (http-domain-literal (name ?name) (value ?value))
+	?m <- (http-mailbox (name ?name) (domain ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?m (domain (make-instance of HTTP-DOMAIN-LITERAL (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-end-domain-dot-atom
+	(http-char ?name 9|13|32|62) ; HTAB CR SP >
+	?d <- (http-dot-atom (value ?value&~""))
+	?m <- (http-mailbox (name ?name) (domain ?d))
+	=>
+	(retract ?d)
+	(modify ?m (domain ?value)))
+
+(defrule http-mailbox-end-angle-addr
+	?c <- (http-char ?name 62) ; >
+	?m <- (http-mailbox (name ?name) (domain ?d&:(stringp ?d)|:(instancep ?d)) (angle-addr open))
+	=>
+	(retract ?c)
+	(modify ?m (angle-addr closed))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-mailbox-skip-ows-after-mailbox
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-mailbox (name ?name) (domain ?d&:(stringp ?d)|:(instancep ?d)) (angle-addr nil|closed))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-from-header-addr-spec
+	(http-char ?name 13) ; CR
+	?m <- (http-mailbox (name ?name) (display-name) (local-part ?l&:(stringp ?l)|:(instancep ?l)) (domain ?d&:(stringp ?d)|:(instancep ?d)) (angle-addr nil))
+	?h <- (http-from-header (name ?name) (mailbox ?m))
+	?fv <- (http-field-value (value ?h))
+	=>
+	(retract ?m ?h)
+	(modify ?fv (value (make-instance of HTTP-FROM-HEADER (id ?name) (mailbox (make-instance of HTTP-ADDR-SPEC (id ?name) (local-part ?l) (domain ?d)))))))
+
+(defrule http-end-from-header-name-addr
+	(http-char ?name 13) ; CR
+	?m <- (http-mailbox (name ?name) (display-name $?words) (local-part ?l&:(stringp ?l)|:(instancep ?l)) (domain ?d&:(stringp ?d)|:(instancep ?d)) (angle-addr closed))
+	?h <- (http-from-header (name ?name) (mailbox ?m))
+	?fv <- (http-field-value (value ?h))
+	=>
+	(retract ?m ?h)
+	(modify ?fv (value (make-instance of HTTP-FROM-HEADER (id ?name) (mailbox (make-instance of HTTP-NAME-ADDR (id ?name) (display-name ?words) (addr-spec (make-instance of HTTP-ADDR-SPEC (id ?name) (local-part ?l) (domain ?d)))))))))
+
 ;RWS = 1*( SP / HTAB )
 ;  Via = #( received-protocol RWS received-by [ RWS comment ] )
 ;
@@ -3900,9 +4144,19 @@
 (defrule http-build-token
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-tchar*))
 	?t <- (http-token (name ?name) (value ?value))
+	(not (and (http-parameter (parameter-name ?t)) (test (= ?char 42)))) ; * ends an ext-token parameter name
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?value ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-parameter-name-detect-ext-token
+	?c <- (http-char ?name 42) ; *
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?p <- (http-parameter (parameter-name ?t) (ext-token FALSE))
+	=>
+	(retract ?c)
+	(modify ?p (ext-token TRUE))
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-parameter-end-parameter-name
@@ -3926,7 +4180,7 @@
 
 (defrule http-parameter-detect-parameter-value-token
 	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
-	?p <- (http-parameter (name ?name) (parameter-name ?parameter-name&:(stringp ?parameter-name)) (parameter-value nil))
+	?p <- (http-parameter (name ?name) (parameter-name ?parameter-name&:(stringp ?parameter-name)) (ext-token FALSE) (parameter-value nil))
 	=>
 	(modify ?p (parameter-value (assert (http-token (name ?name))))))
 
@@ -4000,17 +4254,11 @@
 
 (defrule http-content-type-header-end-parameter
 	(http-char ?name 9|13|32|59) ; HTAB CR SP ;
-	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (ext-token ?ext-token) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
 	?c <- (http-content-type-header (name ?name) (subtype ?s&:(instancep ?s)) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?c (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (parameter-value ?parameter-value)))))
-
-(defrule http-parameter-detect-parameter-value-token
-	(http-char ?name ?char&:(member$ ?char (create$ ?*http-tchar*)))
-	?p <- (http-parameter (name ?name) (parameter-name ?t&:(stringp ?t)) (parameter-value nil))
-	=>
-	(modify ?p (parameter-value (assert (http-token (name ?name))))))
+	(modify ?c (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (ext-token ?ext-token) (parameter-value ?parameter-value)))))
 
 (defrule http-host-header-end-host
 	(http-char ?name 13|32|58) ; CR SP :
@@ -4594,6 +4842,111 @@
 	(retract ?cth)
 	(modify ?f (value (make-instance of HTTP-CONTENT-TYPE-HEADER (id ?name) (type ?type) (subtype ?subtype) (parameters ?parameters)))))
 
+;   ext-value = charset "'" [ language ] "'" value-chars (RFC 8187 3.2.1)
+; the value of a parameter whose name is an ext-token
+(defrule http-parameter-detect-parameter-value-ext-value
+	(http-char ?name ?char&:(member$ ?char ?*http-mime-charsetc*))
+	?p <- (http-parameter (name ?name) (parameter-name ?parameter-name&:(stringp ?parameter-name)) (ext-token TRUE) (parameter-value nil))
+	=>
+	(modify ?p (parameter-value (assert (http-ext-value (name ?name))))))
+
+(defrule http-build-ext-value-charset
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-mime-charsetc*))
+	?e <- (http-ext-value (name ?name) (charset ?charset) (language nil))
+	=>
+	(retract ?c)
+	(modify ?e (charset (format nil "%s%c" ?charset ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-ext-value-end-charset
+	?c <- (http-char ?name 39) ; '
+	?e <- (http-ext-value (name ?name) (charset ~"") (language nil))
+	=>
+	(retract ?c)
+	(modify ?e (language ""))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-build-ext-value-language
+	?c <- (http-char ?name ?char&45|:(member$ ?char ?*http-alphanum*)) ; -
+	?e <- (http-ext-value (name ?name) (language ?language&:(stringp ?language)) (value-chars nil))
+	=>
+	(retract ?c)
+	(modify ?e (language (format nil "%s%c" ?language ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-ext-value-end-language
+	?c <- (http-char ?name 39) ; '
+	?e <- (http-ext-value (name ?name) (language ?language&:(stringp ?language)) (value-chars nil))
+	=>
+	(retract ?c)
+	(modify ?e (value-chars ""))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-build-ext-value-value-chars
+	?c <- (http-char ?name ?char&37|:(member$ ?char ?*http-attr-char*)) ; %
+	?e <- (http-ext-value (name ?name) (value-chars ?value-chars&:(stringp ?value-chars)))
+	=>
+	(retract ?c)
+	(modify ?e (value-chars (format nil "%s%c" ?value-chars ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-parameter-end-parameter-value-ext-value
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?e <- (http-ext-value (name ?name) (charset ?charset) (language ?language) (value-chars ?value-chars&:(stringp ?value-chars)))
+	?p <- (http-parameter (parameter-value ?e))
+	=>
+	(retract ?e)
+	(modify ?p (parameter-value (make-instance of HTTP-EXT-VALUE (id ?name) (charset ?charset) (language ?language) (value-chars ?value-chars)))))
+
+;   Content-Disposition = disposition-type *( ";" disposition-parm ) (RFC 6266 4.1)
+; the parameters are built by the shared parameter rules above
+(defrule http-detect-content-disposition-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Content-Disposition"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-content-disposition-header (name ?name) (disposition-type (assert (http-token (name ?name)))))))))
+
+(defrule http-content-disposition-header-end-disposition-type
+	(http-char ?name 9|13|32|59) ; HTAB CR SP ;
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?h <- (http-content-disposition-header (name ?name) (disposition-type ?t))
+	=>
+	(retract ?t)
+	(modify ?h (disposition-type ?value)))
+
+(defrule http-content-disposition-header-detect-parameter
+	?c <- (http-char ?name 59) ; ;
+	?h <- (http-content-disposition-header (name ?name) (disposition-type ?d&:(stringp ?d)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	=>
+	(retract ?c)
+	(modify ?h (parameters ?parameters (assert (http-parameter (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-content-disposition-header-skip-ows
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-content-disposition-header (name ?name) (disposition-type ?d&:(stringp ?d)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-content-disposition-header-end-parameter
+	(http-char ?name 9|13|32|59) ; HTAB CR SP ;
+	?p <- (http-parameter (parameter-name ?t&:(stringp ?t)) (ext-token ?ext-token) (parameter-value ?parameter-value&:(instancep ?parameter-value)|:(stringp ?parameter-value)))
+	?h <- (http-content-disposition-header (name ?name) (parameters $?parameters ?p))
+	=>
+	(retract ?p)
+	(modify ?h (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?t) (ext-token ?ext-token) (parameter-value ?parameter-value)))))
+
+(defrule http-end-content-disposition-header
+	(http-char ?name 13) ; CR
+	?h <- (http-content-disposition-header (name ?name) (disposition-type ?d&:(stringp ?d)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	?f <- (http-field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?f (value (make-instance of HTTP-CONTENT-DISPOSITION-HEADER (id ?name) (disposition-type ?d) (parameters ?parameters)))))
+
 (defrule http-end-host-header
 	(http-char ?name 13|32) ; CR SP
 	?hh <- (http-host-header (name ?name) (uri-host ?h&:(instancep ?h)) (port ?p&nil|:(instancep ?p)))
@@ -5148,11 +5501,11 @@
 
 (defrule http-expectation-end-parameter
 	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
-	?p <- (http-parameter (parameter-name ?pn&:(stringp ?pn)) (parameter-value ?pv&:(stringp ?pv)|:(instancep ?pv)))
+	?p <- (http-parameter (parameter-name ?pn&:(stringp ?pn)) (ext-token ?ext-token) (parameter-value ?pv&:(stringp ?pv)|:(instancep ?pv)))
 	?e <- (http-expectation (name ?name) (parameters $?parameters ?p))
 	=>
 	(retract ?p)
-	(modify ?e (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?pn) (parameter-value ?pv)))))
+	(modify ?e (parameters ?parameters (make-instance of HTTP-PARAMETER (id ?name) (parameter-name ?pn) (ext-token ?ext-token) (parameter-value ?pv)))))
 
 (defrule http-expect-header-end-expectation
 	(http-char ?name 13|44) ; CR ,
@@ -5540,13 +5893,22 @@
 (defmessage-handler HTTP-METHOD pprint primary (?t)
 (printout ?t ?self:value))
 
+(defmessage-handler HTTP-QUOTED-STRING pprint primary (?t)
+(http-print-quoted-string ?t ?self:value))
+
+(defmessage-handler HTTP-EXT-VALUE pprint primary (?t)
+(printout ?t ?self:charset "'" ?self:language "'" ?self:value-chars))
+
 (defmessage-handler HTTP-PARAMETER pprint primary (?t)
-(if (instancep ?self:parameter-value)
+(if ?self:ext-token
+then (printout ?t ?self:parameter-name "*=")
+     (send ?self:parameter-value pprint ?t)
+else (if (instancep ?self:parameter-value)
 then (printout ?t ?self:parameter-name "=")
-     (http-print-quoted-string ?t (send ?self:parameter-value get-value))
+     (send ?self:parameter-value pprint ?t)
 else (if (eq "charset" (lowcase ?self:parameter-name))
      then (printout ?t (lowcase ?self:parameter-name) "=" (lowcase ?self:parameter-value))
-     else (printout ?t ?self:parameter-name "=" ?self:parameter-value))))
+     else (printout ?t ?self:parameter-name "=" ?self:parameter-value)))))
 
 (defmessage-handler HTTP-SEGMENT pprint primary (?t)
 (printout ?t ?self:value))
@@ -5761,6 +6123,12 @@ then (foreach ?f ?self:parameters
      (printout ?t ";")
      (send ?f pprint ?t))))
 
+(defmessage-handler HTTP-CONTENT-DISPOSITION-HEADER pprint primary (?t)
+(printout ?t ?self:disposition-type)
+(foreach ?f ?self:parameters
+     (printout ?t ";")
+     (send ?f pprint ?t)))
+
 (defmessage-handler HTTP-HOST-HEADER pprint primary (?t)
 (send ?self:uri-host pprint ?t)
 (if (neq ?self:port nil)
@@ -5884,6 +6252,33 @@ then (printout ?t "." ?self:fraction)))
      (bind ?i (+ ?i 1))
      (send ?f pprint ?t)
      (if (< ?i (length$ ?self:language-tags)) then (printout ?t ",") else (printout ?t))))
+
+(defmessage-handler HTTP-FROM-HEADER pprint primary (?t)
+	(send ?self:mailbox pprint ?t))
+
+; a word of a display-name or a local-part is an atom (a string) or a quoted-string
+(deffunction http-print-word (?t ?word)
+	(if (instancep ?word)
+	then (http-print-quoted-string ?t (send ?word get-value))
+	else (printout ?t ?word)))
+
+(defmessage-handler HTTP-ADDR-SPEC pprint primary (?t)
+	(http-print-word ?t ?self:local-part)
+	(printout ?t "@")
+	(if (instancep ?self:domain)
+	then (send ?self:domain pprint ?t)
+	else (printout ?t ?self:domain)))
+
+(defmessage-handler HTTP-NAME-ADDR pprint primary (?t)
+	(foreach ?word ?self:display-name
+		(http-print-word ?t ?word)
+		(printout ?t " "))
+	(printout ?t "<")
+	(send ?self:addr-spec pprint ?t)
+	(printout ?t ">"))
+
+(defmessage-handler HTTP-DOMAIN-LITERAL pprint primary (?t)
+	(printout ?t "[" ?self:value "]"))
 
 (defmessage-handler HTTP-LANGUAGE-TAG pprint primary (?t)
 	(send ?self:first-language pprint ?t)

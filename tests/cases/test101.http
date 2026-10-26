@@ -1,0 +1,4 @@
+HTTP/1.1 200 OK
+Content-Disposition:  attachment ;  filename*=UTF-8''%e2%82%ac%20rates.txt ; filename="rates.txt"	
+Content-Length: 0
+

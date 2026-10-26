@@ -111,6 +111,12 @@ test93.http
 test94.http
 test95.http
 test96.http
+test97.http
+test98.http
+test99.http
+test100.http
+test101.http
+test102.http
 ))
 
 (foreach ?file ?*files*
