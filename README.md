@@ -31,6 +31,22 @@ There are two directories: `cases` and `expected`.
 a file from `case` outputs into its same named test case
 in `expected`.
 
+## Linting
+
+Run `make lint` to check that the rules follow the practices of a COOL codec.
+The lint script, `lint/lint.bat`, is written in CLIPS. It decodes every
+file in `tests/cases` one rule at a time and checks:
+
+1. only one rule is on the agenda at a time while one case is decoded
+2. all the cases decode together in one run, each to the file named the same
+   in `tests/expected`, firing as many rules as they fired alone put together
+3. no rule has an `(if` in its right hand side
+4. no deffunction called from a rule's right hand side, directly or through
+   another deffunction, has an `(if`
+
+It prints one line per violation, a summary, and exits with status 1 when
+it found a violation.
+
 ## The start fact and the end fact
 
 Since 15 September 2026 each construct of this codec has the prefix `http-`,

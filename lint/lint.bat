@@ -1,0 +1,154 @@
+;;; Lints the rules of the codec against the practices a COOL codec follows:
+;;;
+;;;   1. only one rule is activated at a time while one example is decoded
+;;;   2. many examples decode at once, each to the same result as alone
+;;;   3. the right hand side of a rule holds no (if ...)
+;;;   4. no deffunction called from the right hand side of a rule, directly
+;;;      or through another deffunction, holds an (if ...)
+;;;
+;;; Prints one line per violation and a summary, then exits with 1 when it
+;;; found a violation and 0 when it found none.
+(load* ../tests/compline.clp)
+(load* ../program.clp)
+
+;;; the count survives the reset before each run
+(set-reset-globals FALSE)
+(defglobal ?*violations* = 0)
+;;; guards against a rule set that never empties its agenda
+(defglobal ?*max-steps* = 100000)
+
+(deffunction violation (?message)
+	(bind ?*violations* (+ ?*violations* 1))
+	(println "LINT " ?message))
+
+;;; the cases in tests/cases: test.http, test2.http, test3.http ... up to the
+;;; first number that has no file
+(deffunction find-cases ()
+	(bind ?cases (create$))
+	(bind ?n 1)
+	(bind ?file test.http)
+	(while (open (sym-cat ../tests/cases/ ?file) probe) do
+		(close probe)
+		(bind ?cases (create$ ?cases ?file))
+		(bind ?n (+ ?n 1))
+		(bind ?file (sym-cat test ?n .http)))
+	?cases)
+
+(deffunction start-case (?file)
+	(open (sym-cat ../tests/cases/ ?file) ?file)
+	(assert (http-parse (stream ?file) (id ?file)) (http-ready (id ?file))))
+
+;;; the name of every rule on the agenda, once per activation
+(deffunction activations ()
+	(bind ?active (create$))
+	(foreach ?rule (get-defrule-list)
+		(loop-for-count (nth$ 3 (matches ?rule terse))
+			(bind ?active (create$ ?active ?rule))))
+	?active)
+
+;;; 1. decodes one case a rule at a time and checks the agenda after every
+;;; firing.  Returns the number of rules that fired.
+(deffunction lint-one-activation (?file)
+	(reset)
+	(start-case ?file)
+	(bind ?fired 0)
+	(bind ?offending-steps 0)
+	(bind ?active (activations))
+	(while (and (> (length$ ?active) 0) (< ?fired ?*max-steps*)) do
+		(if (> (length$ ?active) 1) then
+			(bind ?offending-steps (+ ?offending-steps 1))
+			(if (= ?offending-steps 1) then
+				(violation (format nil "%s: %d activations after %d rules fired: %s"
+				                   ?file (length$ ?active) ?fired (implode$ ?active)))))
+		(run 1)
+		(bind ?fired (+ ?fired 1))
+		(bind ?active (activations)))
+	(close ?file)
+	(if (> ?offending-steps 1) then
+		(println "     " ?file ": " ?offending-steps " steps had more than one activation"))
+	(if (>= ?fired ?*max-steps*) then
+		(violation (format nil "%s: the agenda was not empty after %d rules fired" ?file ?fired)))
+	?fired)
+
+;;; 2. decodes every case in one run, then checks that each one printed
+;;; what it prints alone and that the run fired as many rules as the cases
+;;; fired alone put together.
+(deffunction lint-many-at-once (?cases ?fired-alone)
+	(reset)
+	(foreach ?file ?cases (start-case ?file))
+	(bind ?fired 0)
+	(while (and (> (length$ (activations)) 0) (< ?fired ?*max-steps*)) do
+		(run 1)
+		(bind ?fired (+ ?fired 1)))
+	(if (<> ?fired ?fired-alone) then
+		(violation (format nil "%d rules fired decoding the cases together, %d fired decoding them alone"
+		                   ?fired ?fired-alone)))
+	(foreach ?file ?cases
+		(bind ?done (find-all-facts ((?f http-done)) (eq ?f:id ?file)))
+		(if (<> (length$ ?done) 1)
+		    then (violation (format nil "%s: found %d http-done facts decoding the cases together"
+		                            ?file (length$ ?done)))
+		    else (open actual actual "w")
+		         (send (fact-slot-value (nth$ 1 ?done) message) pprint actual)
+		         (close actual)
+		         ;; compare-files prints the differing lines and returns 1 when the files match
+		         (if (= 0 (compare-files (sym-cat ../tests/expected/ ?file) actual t)) then
+		             (violation (format nil "%s: decoded differently together with the other cases" ?file))))
+		(close ?file))
+	;; compare-files prints a dot per matching case; end that line
+	(println))
+
+;;; the text of the rule from => on
+(deffunction rhs (?rule)
+	(bind ?text (ppdefrule ?rule nil))
+	(sub-string (str-index "=>" ?text) (str-length ?text) ?text))
+
+;;; TRUE when the text of a construct holds an (if
+(deffunction holds-if (?text)
+	(or (str-index "(if " ?text) (str-index (format nil "(if%n") ?text)))
+
+;;; TRUE when the text of a construct calls the function ?name
+(deffunction calls (?text ?name)
+	(or (str-index (str-cat "(" ?name " ") ?text)
+	    (str-index (str-cat "(" ?name ")") ?text)
+	    (str-index (str-cat "(" ?name (format nil "%n")) ?text)))
+
+;;; the deffunctions the text calls, the deffunctions those call, and so on
+(deffunction called-deffunctions (?text)
+	(bind ?found (create$))
+	(bind ?pending (create$ ?text))
+	(while (> (length$ ?pending) 0) do
+		(bind ?text (nth$ 1 ?pending))
+		(bind ?pending (rest$ ?pending))
+		(foreach ?function (get-deffunction-list)
+			(if (and (not (member$ ?function ?found)) (calls ?text ?function)) then
+				(bind ?found (create$ ?found ?function))
+				(bind ?pending (create$ ?pending (ppdeffunction ?function nil))))))
+	?found)
+
+;;; 3. the right hand side holds no (if
+(deffunction lint-rhs (?rule)
+	(if (holds-if (rhs ?rule)) then
+		(violation (format nil "%s: (if in the right hand side" ?rule))))
+
+;;; 4. no deffunction the right hand side calls holds an (if
+(deffunction lint-rhs-deffunctions (?rule)
+	(foreach ?function (called-deffunctions (rhs ?rule))
+		(if (holds-if (ppdeffunction ?function nil)) then
+			(violation (format nil "%s: (if in deffunction %s called from the right hand side"
+			                   ?rule ?function)))))
+
+(deffunction lint ()
+	(bind ?cases (find-cases))
+	(bind ?fired-alone 0)
+	(foreach ?file ?cases
+		(bind ?fired-alone (+ ?fired-alone (lint-one-activation ?file))))
+	(lint-many-at-once ?cases ?fired-alone)
+	(foreach ?rule (get-defrule-list)
+		(lint-rhs ?rule)
+		(lint-rhs-deffunctions ?rule))
+	(println (length$ (get-defrule-list)) " rules, " (length$ ?cases) " cases, "
+	         ?*violations* " violations")
+	(if (> ?*violations* 0) then (exit 1) else (exit 0)))
+
+(lint)

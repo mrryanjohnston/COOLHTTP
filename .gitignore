@@ -1,2 +1,4 @@
+# scratch files rewritten by every test and lint run
 tests/actual
+lint/actual
 *.swp

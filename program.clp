@@ -1126,7 +1126,7 @@
 
 (defrule http-ipv6address-change-one-digit-ipv4address-to-h16
 	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ""))
-	(http-char ?name ?char&93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first "" "" ?char))) ; ]
+	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first "" "" ?char))) ; : ]
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	=>
@@ -1135,7 +1135,7 @@
 
 (defrule http-ipv6address-change-two-digit-ipv4address-to-h16
 	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second&~"") (third-digit ""))
-	(http-char ?name ?char&93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first ?second "" ?char))) ; ]
+	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first ?second "" ?char))) ; : ]
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	=>
@@ -1143,22 +1143,13 @@
 	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value (str-cat ?first ?second)))))))
 
 (defrule http-ipv6address-change-three-digit-ipv4address-to-h16
-	(http-char ?name ?char&93|:(member$ ?char ?*http-hexdig*)) ; ]
+	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hexdig*)) ; : ]
 	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third&~""))
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	=>
 	(retract ?octet ?i4)
 	(modify ?i (parts ?parts (assert (http-h16 (name ?name) (value (str-cat ?first ?second ?third)))))))
-
-(defrule http-ipv6address-change-ipv4address-octet-to-h16
-	(http-char ?name 58) ; :
-	?i4 <- (http-ipv4address (name ?name) (octets ?octet&:(instancep ?octet)))
-	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
-	=>
-	(retract ?i4)
-	(modify ?i (parts ?parts (make-instance of HTTP-H16 (id ?name) (value (send ?octet get-value)))))
-	(unmake-instance ?octet))
 
 (defrule http-ipv6address-end-dec-octet
 	(http-char ?name 93) ; ]
@@ -1284,9 +1275,19 @@
 	(assert (http-char ?name (http-read ?name))))
 
 (defrule http-end-dec-octet
-	(http-char ?name 13|32|46|47|58) ; CR SP . / :
+	(http-char ?name 13|32|46|47) ; CR SP . /
 	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
 	?i <- (http-ipv4address (octets $?octets ?o))
+	=>
+	(retract ?o)
+	(modify ?i (octets ?octets (make-instance of HTTP-DEC-OCTET (id ?name) (value (format nil "%s%s%s" ?first ?second ?third))))))
+
+;;; ":" ends an octet only before a port; inside an IPv6 address it makes the octet an h16 instead
+(defrule http-end-dec-octet-before-port
+	(http-char ?name 58) ; :
+	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+	?i <- (http-ipv4address (octets $?octets ?o))
+	(http-host (value ?i))
 	=>
 	(retract ?o)
 	(modify ?i (octets ?octets (make-instance of HTTP-DEC-OCTET (id ?name) (value (format nil "%s%s%s" ?first ?second ?third))))))
@@ -2633,7 +2634,7 @@
 
 (defrule http-media-range-detect-ows
 	?c <- (http-char ?name 32) ; SP
-	(http-media-range (name ?name) (type ?t) (subtype ?s) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
+	(http-media-range (name ?name) (type ?t) (subtype ?s) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))) (weight ?w&nil|:(instancep ?w)))
 	(test (or
 		(and (eq ?t nil) (eq ?s nil))
 		(and (instancep ?t) (instancep ?s))))
@@ -2812,9 +2813,11 @@
 	(modify ?c (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
 (defrule http-accept-encoding-header-end-coding
-	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	(http-char ?name ?char&9|13|32|44) ; HTAB CR SP ,
 	?c <- (http-coding (codings ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
 	?a <- (http-accept-encoding-header (name ?name) (codings $?codings ?c))
+	;; OWS before a weight is skipped, since ";" might follow it; it ends the coding only after the weight
+	(test (or (eq ?char 13) (eq ?char 44) (instancep ?w)))
 	=>
 	(retract ?c)
 	(modify ?a (codings ?codings (make-instance of HTTP-CODING (id ?name) (codings ?value) (weight ?w)))))
@@ -4438,9 +4441,11 @@
 	(modify ?t (weight (make-instance of HTTP-WEIGHT (id ?name) (qvalue ?q)))))
 
 (defrule http-te-header-end-t-coding
-	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	(http-char ?name ?char&9|13|32|44) ; HTAB CR SP ,
 	?t <- (http-t-coding (name ?name) (value ?value&:(stringp ?value)) (weight ?w&nil|:(instancep ?w)))
 	?te <- (http-te-header (t-codings $?t-codings ?t))
+	;; OWS before a weight is skipped, since ";" might follow it; it ends the t-coding only after the weight
+	(test (or (eq ?char 13) (eq ?char 44) (instancep ?w)))
 	=>
 	(retract ?t)
 	(modify ?te (t-codings ?t-codings (make-instance of HTTP-T-CODING (id ?name) (value ?value) (weight ?w)))))
@@ -4978,8 +4983,9 @@
 	"a JSON body stays on the stream for COOLJSON, which reads it after http-done"
 	?c <- (http-char ?name 10) ; LF
 	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
-	(object (is-a HTTP-TYPE) (id ?name) (value "application"))
-	(object (is-a HTTP-SUBTYPE) (id ?name) (value "json"))
+	(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (subtype ?subtype))
+	(object (is-a HTTP-TYPE) (name ?type) (value "application"))
+	(object (is-a HTTP-SUBTYPE) (name ?subtype) (value "json"))
 	=>
 	(retract ?c)
 	(modify ?m (length-remaining 0))
@@ -4991,11 +4997,13 @@
 	(or
 		(not (object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name)))
 		(and
-			(object (is-a HTTP-TYPE) (id ?name) (value "application"))
-			(object (is-a HTTP-SUBTYPE) (id ?name) (value "octet-stream")))
+			(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?t) (subtype ?s))
+			(object (is-a HTTP-TYPE) (name ?t) (value "application"))
+			(object (is-a HTTP-SUBTYPE) (name ?s) (value "octet-stream")))
 		(and
-			(object (is-a HTTP-TYPE) (id ?name) (value ?type))
-			(object (is-a HTTP-SUBTYPE) (id ?name) (value ?subtype))
+			(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?t) (subtype ?s))
+			(object (is-a HTTP-TYPE) (name ?t) (value ?type))
+			(object (is-a HTTP-SUBTYPE) (name ?s) (value ?subtype))
 			(not (http-supported-content-type ?type ?subtype))))
 	=>
 	(retract ?c)
@@ -5005,8 +5013,9 @@
 (defrule http-message-body-detect-application-x-www-form-urlencoded
 	?c <- (http-char ?name 10) ; LF
 	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
-	(object (is-a HTTP-TYPE) (id ?name) (value "application"))
-	(object (is-a HTTP-SUBTYPE) (id ?name) (value "x-www-form-urlencoded"))
+	(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (subtype ?subtype))
+	(object (is-a HTTP-TYPE) (name ?type) (value "application"))
+	(object (is-a HTTP-SUBTYPE) (name ?subtype) (value "x-www-form-urlencoded"))
 	=>
 	(retract ?c)
 	(modify ?m (value (assert (http-x-www-form-urlencoded (name ?name) (sequences (assert (http-sequence (name ?name))))))))
@@ -5015,56 +5024,115 @@
 (defrule http-build-octet-stream
 	?c <- (http-char ?name ?char)
 	?o <- (http-octet-stream (name ?name) (value ?value))
-	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?o))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?o))
 	=>
 	(retract ?c)
 	(modify ?o (value (format nil "%s%c" ?value ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-build-octet-stream-with-last-octet
+	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	?c <- (http-char ?name ?char)
+	?o <- (http-octet-stream (name ?name) (value ?value))
+	?m <- (http-message-body (length-remaining 1) (value ?o))
+	=>
+	(retract ?c)
+	(modify ?o (value (format nil "%s%c" ?value ?char)))
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
 
 (defrule http-x-www-form-urlencoded-build-name-string
 	?c <- (http-char ?name ?char&~61) ; =
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (name-string (format nil "%s%c" ?name-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-x-www-form-urlencoded-build-name-string-with-last-octet
+	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	?c <- (http-char ?name ?char&~61) ; =
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining 1) (value ?x))
+	=>
+	(retract ?c)
+	(modify ?sequence (name-string (format nil "%s%c" ?name-string ?char)))
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
 
 (defrule http-x-www-form-urlencoded-end-name-string
 	?c <- (http-char ?name 61) ; =
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (value-string ""))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-x-www-form-urlencoded-end-name-string-with-last-octet
+	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	?c <- (http-char ?name 61) ; =
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining 1) (value ?x))
+	=>
+	(retract ?c)
+	(modify ?sequence (value-string ""))
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
 
 (defrule http-x-www-form-urlencoded-build-value-string
 	?c <- (http-char ?name ?char&~38) ; &
 	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
 	=>
 	(retract ?c)
 	(modify ?sequence (value-string (format nil "%s%c" ?value-string ?char)))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-x-www-form-urlencoded-build-value-string-with-last-octet
+	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	?c <- (http-char ?name ?char&~38) ; &
+	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining 1) (value ?x))
+	=>
+	(retract ?c)
+	(modify ?sequence (value-string (format nil "%s%c" ?value-string ?char)))
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
 
 (defrule http-x-www-form-urlencoded-end-sequence-and-start-next-sequence
 	?c <- (http-char ?name 38) ; &
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
-	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value ?x))
+	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
 	=>
 	(retract ?c ?sequence)
 	(modify ?x (sequences ?sequences (make-instance of HTTP-SEQUENCE (id ?name) (name-string ?name-string) (value-string ?value-string)) (assert (http-sequence (name ?name)))))
 	(modify ?m (length-remaining (- ?length-remaining 1)))
-	(assert (http-char ?name (if (> ?length-remaining 1) then (http-read ?name) else -1))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-x-www-form-urlencoded-end-sequence-and-start-next-sequence-with-last-octet
+	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	?c <- (http-char ?name 38) ; &
+	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
+	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
+	?m <- (http-message-body (length-remaining 1) (value ?x))
+	=>
+	(retract ?c ?sequence)
+	(modify ?x (sequences ?sequences (make-instance of HTTP-SEQUENCE (id ?name) (name-string ?name-string) (value-string ?value-string)) (assert (http-sequence (name ?name)))))
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1)))
 
 (defrule http-end-octet-stream
 	(http-char ?name -1)
