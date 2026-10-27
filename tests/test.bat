@@ -1,20 +1,67 @@
-;(set-strategy depth) ; default
-;(set-strategy breadth)
-;(set-strategy simplicity)
-;(set-strategy complexity)
-;(set-strategy lex)
-;(set-strategy mea) ; fastest!!
-;(set-strategy random)
+;;; Runs every case under every conflict resolution strategy CLIPS offers.  A
+;;; COOL codec keeps only one rule on the agenda at a time, so it decodes the
+;;; same way under each strategy; a case that fails under one strategy and not
+;;; another points at a rule that relies on firing order.  All the cases
+;;; decode in one run, so a strategy like breadth advances every message a
+;;; character at a time in lockstep: a rule whose patterns are not all tied to
+;;; one message then matches facts from two messages at once, which decoding
+;;; one case at a time cannot show.
 ;(watch rules)
 ;(watch facts)
 ;(watch activations)
-(watch statistics)
-;(watch all)
-(load compline.clp)
-(load ../program.clp)
-(reset)
+;(watch statistics)
+(load* compline.clp)
+(load* ../program.clp)
 
-(defglobal ?*files* = (create$ 
+(defglobal ?*strategies* = (create$ depth breadth lex mea complexity simplicity random))
+
+;;; Compares what the codec decoded for one case with the file of the same
+;;; name in expected.  Prints the failure, if any, and returns TRUE when the
+;;; case passed.
+(deffunction check-case (?strategy ?file)
+	(open actual actual "w")
+	(bind ?found FALSE)
+	(do-for-fact ((?d http-done)) (eq ?d:id ?file)
+		(bind ?found TRUE)
+		(send ?d:message pprint actual))
+	(close actual)
+	(if (not ?found) then
+		(println "FAIL " ?file " (" ?strategy "): did not find the http-done fact")
+		(return FALSE))
+	(bind ?differences (compare-files (sym-cat expected/ ?file) actual))
+	(if (> (length$ ?differences) 0) then
+		(println "FAIL " ?file " (" ?strategy ")")
+		(foreach ?line ?differences (println ?line))
+		(return FALSE))
+	TRUE)
+
+;;; Decodes every case at once under one strategy, then checks each.  Returns
+;;; the number of checks that failed.
+(deffunction run-strategy (?strategy ?files)
+	(set-strategy ?strategy)
+	(reset)
+	(foreach ?file ?files
+		(open (sym-cat cases/ ?file) ?file)
+		(assert (http-parse (stream ?file) (id ?file)) (http-ready (id ?file))))
+	(run)
+	(bind ?failed 0)
+	(foreach ?file ?files
+		(if (not (check-case ?strategy ?file)) then
+			(bind ?failed (+ ?failed 1)))
+		(close ?file))
+	?failed)
+
+;;; Runs every strategy, reporting only the failures plus a one line summary.
+(deffunction run-tests (?files)
+	(bind ?failed 0)
+	(foreach ?strategy ?*strategies*
+		(bind ?failed (+ ?failed (run-strategy ?strategy ?files))))
+	(bind ?total (* (length$ ?files) (length$ ?*strategies*)))
+	(println (length$ ?files) " cases x " (length$ ?*strategies*) " strategies = "
+	         ?total " tests, " (- ?total ?failed) " passed, " ?failed " failed")
+	(if (> ?failed 0) then (exit 1) else (exit 0)))
+
+(run-tests (create$
 test.http
 test2.http
 test3.http
@@ -140,34 +187,3 @@ test122.http
 test123.http
 test124.http
 ))
-
-(foreach ?file ?*files*
-	(assert (http-parse (stream ?file) (id ?file)) (http-ready (id ?file)))
-	(open (sym-cat cases/ ?file) ?file)
-)
-
-(run)
-
-(defglobal ?*successes* = 0)
-(defglobal ?*did-not-complete* = 0)
-(foreach ?file ?*files*
-	(open actual actual "w")
-	(bind ?found FALSE)
-	(do-for-instance ((?i HTTP-MESSAGE)) (eq ?file ?i:id)
-		(bind ?found TRUE)
-		(send ?i pprint actual))
-	(if ?found
-	    then
-	         (close actual)
-	         (bind ?*successes* (+ ?*successes* (compare-files (sym-cat expected/ ?file) actual t)))
-	         (close ?file)
-	    else (close actual)
-	         (println crlf "Failure: did not find HTTP-MESSAGE for " ?file)
-                 (bind ?*did-not-complete* (+ ?*did-not-complete* 1)))
-)
-(println)
-(println)
-(println "Successful tests: " ?*successes* "/" (length$ ?*files*))
-(println "Did not complete: " ?*did-not-complete* "/" (length$ ?*files*))
-(println)
-(if (< ?*successes* (length$ ?*files*)) then (exit 1) else (exit 0))

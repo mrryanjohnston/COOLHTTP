@@ -5885,7 +5885,7 @@
 (defrule http-range-spec-suffix-range-change-to-other-range
 	(http-char ?name ?char&~:(member$ ?char ?*http-digit*)&:(member$ ?char ?*http-other-range*))
 	?s <- (http-suffix-range (name ?name) (suffix-length ?suffix-length))
-	?r <- (http-range-spec (value ?o))
+	?r <- (http-range-spec (value ?s))
 	=>
 	(retract ?s)
 	(modify ?r (value (assert (http-other-range (name ?name) (value (format nil "-%s" ?suffix-length)))))))
@@ -5972,7 +5972,7 @@
 
 (defrule http-end-range-spec
 	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
-	?r <- (http-range-spec (value ?value&:(instancep ?value)))
+	?r <- (http-range-spec (name ?name) (value ?value&:(instancep ?value)))
 	?range-set <- (http-range-set (range-specs $?range-specs ?r))
 	=>
 	(retract ?r)
@@ -5980,7 +5980,7 @@
 
 (defrule http-range-set-skip-ows-after-range-spec
 	?c <- (http-char ?name 9|32) ; HTAB SP
-	(http-range-set (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
+	(http-range-set (name ?name) (range-specs $?range-specs ?range-spec&:(instancep ?range-spec)))
 	=>
 	(retract ?c)
 	(assert (http-char ?name (http-read ?name))))
@@ -5995,7 +5995,7 @@
 
 (defrule http-range-set-skip-ows-before-next-range-spec
 	?c <- (http-char ?name 9|32) ; HTAB SP
-	?r <- (http-range-spec (value nil))
+	?r <- (http-range-spec (name ?name) (value nil))
 	(http-range-set (range-specs $?range-specs ?r))
 	=>
 	(retract ?c)

@@ -91,12 +91,11 @@
 		    else (open actual actual "w")
 		         (send (fact-slot-value (nth$ 1 ?done) message) pprint actual)
 		         (close actual)
-		         ;; compare-files prints the differing lines and returns 1 when the files match
-		         (if (= 0 (compare-files (sym-cat ../tests/expected/ ?file) actual t)) then
-		             (violation (format nil "%s: decoded differently together with the other cases" ?file))))
-		(close ?file))
-	;; compare-files prints a dot per matching case; end that line
-	(println))
+		         (bind ?differences (compare-files (sym-cat ../tests/expected/ ?file) actual))
+		         (if (> (length$ ?differences) 0) then
+		             (violation (format nil "%s: decoded differently together with the other cases" ?file))
+		             (foreach ?line ?differences (println ?line))))
+		(close ?file)))
 
 ;;; the text of the rule from => on
 (deffunction rhs (?rule)
