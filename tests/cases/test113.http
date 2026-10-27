@@ -1,0 +1,4 @@
+HTTP/1.1 407 Proxy Authentication Required
+Proxy-Authenticate:  Digest realm="proxy" ,  qop=auth, nonce = "abc123" , Basic realm="fallback"	
+Content-Length: 0
+

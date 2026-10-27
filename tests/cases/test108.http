@@ -1,0 +1,4 @@
+HTTP/1.1 304 Not Modified
+Age:	0	 
+ETag: "abc"
+

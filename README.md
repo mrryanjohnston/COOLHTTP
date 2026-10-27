@@ -49,7 +49,7 @@ it found a violation.
 
 ## The start fact and the end fact
 
-Since 15 September 2026 each construct of this codec has the prefix `http-`,
+Each construct of this codec has the prefix `http-`,
 and the codec has its own start fact, so it loads next to other codecs in
 one environment. Open the stream and assert the start fact with the logical
 name of the stream and an id for the results, then run:
@@ -67,7 +67,9 @@ A protocol codec reads only while a `http-ready` fact for the id exists, and a c
 
 A message whose `Content-Type` is `application/json` ends after its header
 lines, and its body stays on the stream: assert `(json-parse (stream ?id)
-(id ?id))` and `(json-ready (id ?id))` after `http-done`, and COOLJSON reads
+(id ?id))` and `(json-ready (id ?id))` after `http-done`, ands
+[COOLJSON](https://github.com/mrryanjohnston/COOLJSON)
+reads
 the body from the same stream. A message with a
 `Content-Length` ends when that many octets are read, and the codec reads
 nothing after them, so it serves a socket whose peer waits for the reply.

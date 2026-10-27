@@ -127,8 +127,9 @@
 	(slot query)
 	(slot fragment))
 
-; Referer  = absolute-URI / partial-URI
-; Location = URI-reference
+; Referer          = absolute-URI / partial-URI
+; Location         = URI-reference
+; Content-Location = absolute-URI / partial-URI
 (deftemplate http-uri-reference-header
 	(slot name)
 	(slot uri-reference))
@@ -327,6 +328,13 @@
 
 ;   Max-Forwards = 1*DIGIT
 (deftemplate http-max-forwards-header
+	(slot name)
+	(slot value (default "")))
+
+; https://datatracker.ietf.org/doc/html/rfc9111#section-5.1
+;   Age = delta-seconds
+;   delta-seconds = 1*DIGIT
+(deftemplate http-age-header
 	(slot name)
 	(slot value (default "")))
 
@@ -539,6 +547,20 @@
 	(slot value)
 	(slot weight))
 
+; https://datatracker.ietf.org/doc/html/rfc9112#section-6.1
+;   Transfer-Encoding  = #transfer-coding
+;   transfer-coding    = token *( OWS ";" OWS transfer-parameter )
+;   transfer-parameter = token BWS "=" BWS ( token / quoted-string )
+(deftemplate http-transfer-encoding-header
+	(slot name)
+	(multislot transfer-codings)) ; HTTP-TRANSFER-CODING instances, the last one an http-transfer-coding fact while building
+
+; a transfer-parameter has the auth-param grammar, so the shared http-auth-param fact and rules build it
+(deftemplate http-transfer-coding
+	(slot name)
+	(slot value) ; http-token fact, then string
+	(multislot transfer-parameters)) ; HTTP-AUTH-PARAM instances, the last one an http-auth-param fact while building
+
 (deftemplate http-expect-header
 	(slot name)
 	(multislot expectations))
@@ -631,12 +653,37 @@
 (deftemplate http-token68
 	(slot name)
 	(slot value (default ""))
-	(slot equals (default 0)))
+	(slot equals (default 0))
+	(slot ows (default FALSE))) ; TRUE once SP/HTAB followed the chars: OWS before "," / CR, or BWS around an auth-param's "="
 
 (deftemplate http-auth-param
 	(slot name)
-	(slot left-side)
-	(slot right-side))
+	(slot left-side) ; http-token fact, then string
+	(slot equals (default FALSE)) ; TRUE once the "=" was read
+	(slot right-side)) ; nil, http-token / http-quoted-string fact, then string / HTTP-QUOTED-STRING instance
+
+; https://datatracker.ietf.org/doc/html/rfc9110#section-11.6.1
+; https://datatracker.ietf.org/doc/html/rfc9110#section-11.7.1
+;   WWW-Authenticate   = #challenge
+;   Proxy-Authenticate = #challenge
+;   challenge          = auth-scheme [ 1*SP ( token68 / #auth-param ) ]
+(deftemplate http-authenticate-header
+	(slot name)
+	(multislot challenges) ; HTTP-CHALLENGE instances, the last one an http-challenge fact while building
+	(slot pending)) ; after ",": http-token fact, then its string while OWS is skipped, until "=" (auth-param) or another char (auth-scheme) decides
+
+(deftemplate http-challenge
+	(slot name)
+	(slot auth-scheme) ; http-token fact, then string
+	(multislot second-part)) ; http-token68 / http-auth-param fact while building, HTTP-TOKEN68 / HTTP-AUTH-PARAM instances once complete
+
+; https://datatracker.ietf.org/doc/html/rfc9110#section-11.6.3
+; https://datatracker.ietf.org/doc/html/rfc9110#section-11.7.3
+;   Authentication-Info       = #auth-param
+;   Proxy-Authentication-Info = #auth-param
+(deftemplate http-auth-params-header
+	(slot name)
+	(multislot auth-params)) ; HTTP-AUTH-PARAM instances, the last one an http-auth-param fact while building
 
 (deftemplate http-cookie-header
 	(slot name)
@@ -701,7 +748,16 @@
 ;   date3        = month SP ( 2DIGIT / ( SP 1DIGIT ))
 (deftemplate http-date-header
 	(slot name)
-	(slot http-date)) ; day-name fact, then rfc1123-date / rfc850-date / asctime-date fact, then instance
+	(slot http-date)) ; day-name fact, then rfc1123-date / rfc850-date / asctime-date fact, then instance; for Expires also an invalid-date fact
+
+; https://datatracker.ietf.org/doc/html/rfc9111#section-5.3
+;   Expires = HTTP-date
+; A recipient MUST interpret invalid date formats, especially the value "0", as
+; a time in the past; the invalid field value is kept as read, trailing OWS dropped.
+(deftemplate http-invalid-date
+	(slot name)
+	(slot value (default ""))
+	(slot possible-ows (default "")))
 
 (deftemplate http-day-name
 	(slot name)
@@ -757,6 +813,17 @@
 (deftemplate http-if-range-header
 	(slot name)
 	(slot value)) ; W while peeking, entity-tag fact / http-date-header fact, then instance
+
+; https://datatracker.ietf.org/doc/html/rfc9110#section-10.2.3
+;   Retry-After = HTTP-date / delay-seconds
+;   delay-seconds = 1*DIGIT
+(deftemplate http-retry-after-header
+	(slot name)
+	(slot value)) ; http-date-header fact / delay-seconds fact, then instance
+
+(deftemplate http-delay-seconds
+	(slot name)
+	(slot value (default "")))
 
 ;  rfc1123-date = wkday "," SP date1 SP time SP "GMT"
 
@@ -873,6 +940,7 @@
 (defclass HTTP-ACCEPT-CHARSET-HEADER (is-a HTTP) (multislot charsets))
 (defclass HTTP-CONTENT-LENGTH-HEADER (is-a HTTP) (slot value))
 (defclass HTTP-MAX-FORWARDS-HEADER (is-a HTTP) (slot value))
+(defclass HTTP-AGE-HEADER (is-a HTTP) (slot value))
 (defclass HTTP-CONTENT-TYPE-HEADER (is-a HTTP) (slot type) (slot subtype) (multislot parameters))
 (defclass HTTP-CONTENT-DISPOSITION-HEADER (is-a HTTP) (slot disposition-type) (multislot parameters))
 (defclass HTTP-EXT-VALUE (is-a HTTP) (slot charset) (slot language) (slot value-chars))
@@ -886,6 +954,7 @@
 (defclass HTTP-URI-REFERENCE-HEADER (is-a HTTP) (slot uri-reference))
 (defclass HTTP-REFERER-HEADER (is-a HTTP-URI-REFERENCE-HEADER))
 (defclass HTTP-LOCATION-HEADER (is-a HTTP-URI-REFERENCE-HEADER))
+(defclass HTTP-CONTENT-LOCATION-HEADER (is-a HTTP-URI-REFERENCE-HEADER))
 (defclass HTTP-QUOTED-STRING (is-a HTTP) (slot value))
 (defclass HTTP-MESSAGE-BODY (is-a HTTP) (slot value))
 (defclass HTTP-OCTET-STREAM (is-a HTTP) (slot value))
@@ -920,6 +989,8 @@
 (defclass HTTP-CONTENT-ENCODING-HEADER (is-a HTTP-TOKEN-LIST-HEADER))
 (defclass HTTP-TE-HEADER (is-a HTTP) (multislot t-codings))
 (defclass HTTP-T-CODING (is-a HTTP) (slot value) (slot weight))
+(defclass HTTP-TRANSFER-ENCODING-HEADER (is-a HTTP) (multislot transfer-codings))
+(defclass HTTP-TRANSFER-CODING (is-a HTTP) (slot value) (multislot transfer-parameters)) ; transfer-parameters are HTTP-AUTH-PARAM instances
 (defclass HTTP-EXPECT-HEADER (is-a HTTP) (multislot expectations))
 (defclass HTTP-EXPECTATION (is-a HTTP) (slot token) (slot value) (multislot parameters))
 (defclass HTTP-CACHE-DIRECTIVE-HEADER (is-a HTTP) (multislot cache-directives))
@@ -944,7 +1015,14 @@
 (defclass HTTP-AUTHORIZATION-HEADER (is-a HTTP-CREDENTIALS-HEADER))
 (defclass HTTP-PROXY-AUTHORIZATION-HEADER (is-a HTTP-CREDENTIALS-HEADER))
 (defclass HTTP-TOKEN68 (is-a HTTP) (slot value) (slot equals))
-(defclass HTTP-AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side))
+(defclass HTTP-AUTH-PARAM (is-a HTTP) (slot left-side) (slot right-side)) ; right-side is a token string or an HTTP-QUOTED-STRING
+(defclass HTTP-AUTHENTICATE-HEADER (is-a HTTP) (multislot challenges))
+(defclass HTTP-WWW-AUTHENTICATE-HEADER (is-a HTTP-AUTHENTICATE-HEADER))
+(defclass HTTP-PROXY-AUTHENTICATE-HEADER (is-a HTTP-AUTHENTICATE-HEADER))
+(defclass HTTP-CHALLENGE (is-a HTTP) (slot auth-scheme) (multislot second-part))
+(defclass HTTP-AUTH-PARAMS-HEADER (is-a HTTP) (multislot auth-params))
+(defclass HTTP-AUTHENTICATION-INFO-HEADER (is-a HTTP-AUTH-PARAMS-HEADER))
+(defclass HTTP-PROXY-AUTHENTICATION-INFO-HEADER (is-a HTTP-AUTH-PARAMS-HEADER))
 (defclass HTTP-COOKIE-HEADER (is-a HTTP) (multislot cookie-pairs))
 (defclass HTTP-COOKIE-PAIR (is-a HTTP) (slot cookie-name) (slot cookie-value) (slot cookie-value-quoted))
 (defclass HTTP-SECURE-AV (is-a HTTP))
@@ -966,6 +1044,8 @@
 (defclass HTTP-LAST-MODIFIED-HEADER (is-a HTTP-DATE-HEADER))
 (defclass HTTP-IF-MODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
 (defclass HTTP-IF-UNMODIFIED-SINCE-HEADER (is-a HTTP-DATE-HEADER))
+(defclass HTTP-EXPIRES-HEADER (is-a HTTP-DATE-HEADER)) ; http-date is a date instance or an HTTP-INVALID-DATE
+(defclass HTTP-INVALID-DATE (is-a HTTP) (slot value))
 (defclass HTTP-DAY-NAME-L (is-a HTTP) (slot value))
 (defclass HTTP-RFC850-DATE (is-a HTTP) (slot day-name-l) (slot date2) (slot time))
 (defclass HTTP-DATE2 (is-a HTTP) (slot day) (slot month) (slot year))
@@ -977,6 +1057,8 @@
 (defclass HTTP-IF-MATCH-HEADER (is-a HTTP-ENTITY-TAG-LIST-HEADER))
 (defclass HTTP-IF-NONE-MATCH-HEADER (is-a HTTP-ENTITY-TAG-LIST-HEADER))
 (defclass HTTP-IF-RANGE-HEADER (is-a HTTP) (slot value)) ; ENTITY-TAG or an RFC1123-DATE / RFC850-DATE / ASCTIME-DATE instance
+(defclass HTTP-RETRY-AFTER-HEADER (is-a HTTP) (slot value))
+(defclass HTTP-DELAY-SECONDS (is-a HTTP) (slot value))
 (defclass HTTP-SET-COOKIE-HEADER (is-a HTTP) (slot cookie-pair) (multislot cookie-avs))
 (defclass HTTP-COOKIE-AV (is-a HTTP) (slot value))
 (defclass HTTP-DOMAIN-AV (is-a HTTP) (slot subdomain))
@@ -1760,16 +1842,17 @@
 	(retract ?e)
 	(modify ?p (query (make-instance of HTTP-QUERY (id ?name) (value ?sequence)))))
 
-;   Referer  = absolute-URI / partial-URI
-;   Location = URI-reference
-;   URI-reference = URI / relative-ref
-;   fragment      = *( pchar / "/" / "?" )
-; Referer (RFC 9110 10.1.3) and Location (10.2.2) share the URI grammar, so the
-; same uri-reference-header fact and rules build both; only Location allows a
-; fragment, and only the end rule differs.
+;   Referer          = absolute-URI / partial-URI
+;   Location         = URI-reference
+;   Content-Location = absolute-URI / partial-URI
+;   URI-reference    = URI / relative-ref
+;   fragment         = *( pchar / "/" / "?" )
+; Referer (RFC 9110 10.1.3), Location (10.2.2) and Content-Location (8.7) share
+; the URI grammar, so the same uri-reference-header fact and rules build all
+; three; only Location allows a fragment, and only the end rules differ.
 (defrule http-detect-uri-reference-header-absolute-uri
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-alpha*))
-	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"|"Content-Location"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -1779,7 +1862,7 @@
 
 (defrule http-detect-uri-reference-header-partial-uri
 	(http-char ?name 47) ; /
-	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"|"Content-Location"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -1799,7 +1882,7 @@
 ; a path-noscheme that does not start with ALPHA cannot be a scheme at all
 (defrule http-detect-uri-reference-header-path-noscheme
 	(http-char ?name ?char&:(member$ ?char (create$ ?*http-segment-nz-nc-no-alpha* 37))) ; %
-	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Referer"|"Location"|"Content-Location"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -1936,6 +2019,16 @@
 	=>
 	(retract ?h)
 	(modify ?fv (value (make-instance of HTTP-LOCATION-HEADER (id ?name) (uri-reference ?u)))))
+
+(defrule http-end-content-location-header
+	(http-char ?name 13) ; CR
+	?h <- (http-uri-reference-header (name ?name) (uri-reference ?u&:(instancep ?u)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Content-Location"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-CONTENT-LOCATION-HEADER (id ?name) (uri-reference ?u)))))
 
 (defrule http-char-is-allowed-char-in-escapable-sequence
 	?e <- (http-escapable-sequence (name ?name) (sequence ?sequence) (allowed-chars $?allowed-chars) (pct-encoded nil))
@@ -2091,7 +2184,7 @@
 
 (defrule http-detect-unknown-header
 	(http-char ?name ?char)
-	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Cache-Control"&~"Connection"&~"Content-Disposition"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Range"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"From"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value ?field-name&~"Accept"&~"Accept-Charset"&~"Allow"&~"Authentication-Info"&~"Authorization"&~"Accept-Encoding"&~"Accept-Language"&~"Accept-Ranges"&~"Age"&~"Cache-Control"&~"Connection"&~"Content-Disposition"&~"Content-Encoding"&~"Content-Language"&~"Content-Length"&~"Content-Location"&~"Content-Range"&~"Content-Type"&~"Cookie"&~"Date"&~"ETag"&~"Expect"&~"Expires"&~"From"&~"Host"&~"If-Match"&~"If-Modified-Since"&~"If-None-Match"&~"If-Range"&~"If-Unmodified-Since"&~"Last-Modified"&~"Location"&~"Max-Forwards"&~"Pragma"&~"Proxy-Authenticate"&~"Proxy-Authentication-Info"&~"Proxy-Authorization"&~"Range"&~"Referer"&~"Retry-After"&~"Server"&~"Set-Cookie"&~"TE"&~"Trailer"&~"Transfer-Encoding"&~"Upgrade"&~"User-Agent"&~"Vary"&~"Via"&~"WWW-Authenticate"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	(test (or
@@ -4074,6 +4167,16 @@
 	=>
 	(modify ?fv (value (assert (http-max-forwards-header (name ?name))))))
 
+;   Age = delta-seconds
+;   delta-seconds = 1*DIGIT
+(defrule http-detect-age-header
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Age"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-age-header (name ?name))))))
+
 ;   Content-Type = media-type
 ;     media-type = type "/" subtype parameters
 ;     type       = token
@@ -4321,6 +4424,14 @@
 	(modify ?mfh (value (format nil "%s%c" ?max-forwards-header ?char)))
 	(assert (http-char ?name (http-read ?name))))
 
+(defrule http-build-age-header
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?ah <- (http-age-header (name ?name) (value ?age-header))
+	=>
+	(retract ?c)
+	(modify ?ah (value (format nil "%s%c" ?age-header ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
 (defrule http-unknown-header-allow-ows
 	?c <- (http-char ?name ?char&9|32) ; HTAB SP
 	?u <- (http-unknown-header (name ?name) (value ?unknown-header&~"") (possible-ows ?possible-ows))
@@ -4354,6 +4465,14 @@
 	(retract ?mfh)
 	(modify ?fv (value (make-instance of HTTP-MAX-FORWARDS-HEADER (id ?name) (value ?max-forwards-header)))))
 
+(defrule http-end-age-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?ah <- (http-age-header (name ?name) (value ?age-header))
+	?fv <- (http-field-value (value ?ah))
+	=>
+	(retract ?ah)
+	(modify ?fv (value (make-instance of HTTP-AGE-HEADER (id ?name) (value ?age-header)))))
+
 ;   Date                = HTTP-date
 ;   Last-Modified       = HTTP-date
 ;   If-Modified-Since   = HTTP-date
@@ -4370,7 +4489,7 @@
 ; "," after 3 letters -> IMF-fixdate, "," after a full name -> rfc850-date, SP after 3 letters -> asctime-date
 (defrule http-detect-http-date-header
 	(http-char ?name 70|77|83|84|87) ; F M S T W
-	?o <- (object (is-a HTTP-FIELD-NAME) (value "Date"|"Last-Modified"|"If-Modified-Since"|"If-Unmodified-Since"))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Date"|"Last-Modified"|"If-Modified-Since"|"If-Unmodified-Since"|"Expires"))
 	?fv <- (http-field-value (name ?name) (value nil))
 	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
 	=>
@@ -4630,6 +4749,58 @@
 	(retract ?h)
 	(modify ?fv (value (make-instance of HTTP-IF-UNMODIFIED-SINCE-HEADER (id ?name) (http-date ?d)))))
 
+;   Expires = HTTP-date
+; Expires (RFC 9111 5.3) joins the HTTP-date family above; a value whose first
+; character cannot start a day name is an invalid date (RFC 9111 5.3: treat as
+; already expired), kept as read so it can be printed back.
+(defrule http-detect-expires-header-invalid-date
+	(http-char ?name ?char&~70&~77&~83&~84&~87) ; not F M S T W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Expires"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	(test (or
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(modify ?fv (value (assert (http-date-header (name ?name) (http-date (assert (http-invalid-date (name ?name)))))))))
+
+(defrule http-build-invalid-date
+	?c <- (http-char ?name ?char)
+	?i <- (http-invalid-date (name ?name) (value ?value) (possible-ows ?possible-ows))
+	(test (or
+		(and (>= ?char 33) (<= ?char 126)) ; VCHAR
+		(and (>= ?char 128) (<= ?char 255)))) ; obs-text
+	=>
+	(retract ?c)
+	(modify ?i (value (format nil "%s%s%c" ?value ?possible-ows ?char)) (possible-ows ""))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-invalid-date-allow-ows
+	?c <- (http-char ?name ?char&9|32) ; HTAB SP
+	?i <- (http-invalid-date (name ?name) (value ?value&~"") (possible-ows ?possible-ows))
+	=>
+	(retract ?c)
+	(modify ?i (possible-ows (format nil "%s%c" ?possible-ows ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-date-header-end-invalid-date
+	(http-char ?name 13) ; CR
+	?i <- (http-invalid-date (name ?name) (value ?value&~""))
+	?h <- (http-date-header (name ?name) (http-date ?i))
+	=>
+	(retract ?i)
+	(modify ?h (http-date (make-instance of HTTP-INVALID-DATE (id ?name) (value ?value)))))
+
+(defrule http-end-expires-header
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?h <- (http-date-header (name ?name) (http-date ?d&:(instancep ?d)))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Expires"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-EXPIRES-HEADER (id ?name) (http-date ?d)))))
+
 ;   ETag          = entity-tag
 ;   entity-tag    = [ weak ] opaque-tag
 ;   weak          = %s"W/"
@@ -4855,6 +5026,65 @@
 	(retract ?h)
 	(modify ?fv (value (make-instance of HTTP-IF-RANGE-HEADER (id ?name) (value ?v)))))
 
+;   Retry-After = HTTP-date / delay-seconds
+;   delay-seconds = 1*DIGIT
+; The first character picks the branch: a DIGIT starts delay-seconds, F M S T W
+; start a day name (W is unambiguous here, unlike If-Range).
+(defrule http-detect-retry-after-header-http-date
+	(http-char ?name 70|77|83|84|87) ; F M S T W
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Retry-After"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-retry-after-header (name ?name) (value (assert (http-date-header (name ?name) (http-date (assert (http-day-name (name ?name))))))))))))
+
+(defrule http-detect-retry-after-header-delay-seconds
+	(http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Retry-After"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-retry-after-header (name ?name) (value (assert (http-delay-seconds (name ?name)))))))))
+
+(defrule http-build-delay-seconds
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*))
+	?d <- (http-delay-seconds (name ?name) (value ?value))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-retry-after-header-end-delay-seconds
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?d <- (http-delay-seconds (name ?name) (value ?value))
+	?h <- (http-retry-after-header (name ?name) (value ?d))
+	=>
+	(retract ?d)
+	(modify ?h (value (make-instance of HTTP-DELAY-SECONDS (id ?name) (value ?value)))))
+
+(defrule http-retry-after-header-end-http-date
+	(http-char ?name 9|13|32) ; HTAB CR SP
+	?d <- (http-date-header (name ?name) (http-date ?date&:(instancep ?date)))
+	?h <- (http-retry-after-header (name ?name) (value ?d))
+	=>
+	(retract ?d)
+	(modify ?h (value ?date)))
+
+(defrule http-retry-after-header-skip-ows-after-value
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-retry-after-header (name ?name) (value ?v&:(instancep ?v)))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-retry-after-header
+	(http-char ?name 13) ; CR
+	?h <- (http-retry-after-header (name ?name) (value ?v&:(instancep ?v)))
+	?fv <- (http-field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-RETRY-AFTER-HEADER (id ?name) (value ?v)))))
+
 (defrule http-end-content-type-header
 	(http-char ?name 13)
 	?cth <- (http-content-type-header (name ?name) (type ?type&:(instancep ?type)) (subtype ?subtype&:(instancep ?subtype)) (parameters $?parameters&:(= 0 (length$ ?parameters))|:(instancep (nth$ (length$ ?parameters) ?parameters))))
@@ -5020,7 +5250,7 @@
 
 (defrule http-build-token68
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-token68*))
-	?t <- (http-token68 (name ?name) (value ?value) (equals 0))
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0) (ows FALSE))
 	=>
 	(retract ?c)
 	(modify ?t (value (format nil "%s%c" ?value ?char)))
@@ -5028,7 +5258,7 @@
 
 (defrule http-token68-detect-equals
 	?c <- (http-char ?name 61) ; =
-	?t <- (http-token68 (name ?name) (value ?value) (equals ?equals))
+	?t <- (http-token68 (name ?name) (value ?value) (equals ?equals) (ows FALSE))
 	=>
 	(retract ?c)
 	(modify ?t (equals (+ 1 ?equals)))
@@ -5058,26 +5288,9 @@
 	(retract ?t)
 	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side ?value) (right-side (assert (http-token (name ?name)))))))))
 
-(defrule http-auth-param-end-left-side
-	?c <- (http-char ?name 61) ; =
-	?t <- (http-token (value ?value))
-	?a <- (http-auth-param (name ?name) (left-side ?t))
-	=>
-	(retract ?c ?t)
-	(modify ?a (left-side ?value) (right-side (assert (http-token (name ?name)))))
-	(assert (http-char ?name (http-read ?name))))
-
-(defrule http-auth-param-end-left-side
-	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
-	?t <- (http-token (value ?value))
-	?a <- (http-auth-param (name ?name) (right-side ?t))
-	=>
-	(retract ?t)
-	(modify ?a (right-side ?value)))
-
 (defrule http-proxy-authorization-header-end-auth-param
 	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
-	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)))
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)|:(instancep ?right-side)))
 	?p <- (http-proxy-authorization-header (name ?name) (second-part $?auth-params ?a))
 	=>
 	(retract ?a)
@@ -5117,6 +5330,317 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of HTTP-PROXY-AUTHORIZATION-HEADER (id ?name) (auth-scheme ?auth-scheme) (second-part ?auth-params)))))
+
+;  auth-param = token BWS "=" BWS ( token / quoted-string )
+; Shared by every owner of an http-auth-param fact (credentials and challenges).
+; The owner creates the fact with left-side a token fact, or a string when the
+; name was already read (with equals TRUE when the "=" was too), and ends it.
+(defrule http-auth-param-end-name
+	(http-char ?name 9|32|61) ; HTAB SP =
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	=>
+	(retract ?t)
+	(modify ?a (left-side ?value)))
+
+(defrule http-auth-param-skip-bws-before-equals
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-auth-param (name ?name) (left-side ?left-side&:(stringp ?left-side)) (equals FALSE) (right-side nil))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-auth-param-detect-equals
+	?c <- (http-char ?name 61) ; =
+	?a <- (http-auth-param (name ?name) (left-side ?left-side&:(stringp ?left-side)) (equals FALSE) (right-side nil))
+	=>
+	(retract ?c)
+	(modify ?a (equals TRUE))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-auth-param-skip-bws-after-equals
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-auth-param (name ?name) (equals TRUE) (right-side nil))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-auth-param-detect-right-side-token
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?a <- (http-auth-param (name ?name) (equals TRUE) (right-side nil))
+	=>
+	(modify ?a (right-side (assert (http-token (name ?name))))))
+
+(defrule http-auth-param-detect-right-side-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?a <- (http-auth-param (name ?name) (equals TRUE) (right-side nil))
+	=>
+	(retract ?c)
+	(modify ?a (right-side (assert (http-quoted-string (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-auth-param-end-right-side-token
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (name ?name) (value ?value))
+	?a <- (http-auth-param (name ?name) (right-side ?t))
+	=>
+	(retract ?t)
+	(modify ?a (right-side ?value)))
+
+(defrule http-auth-param-end-right-side-quoted-string
+	?c <- (http-char ?name 34) ; "
+	?q <- (http-quoted-string (name ?name) (value ?value))
+	?a <- (http-auth-param (name ?name) (right-side ?q))
+	(not (http-quoted-pair ?name))
+	=>
+	(retract ?c ?q)
+	(modify ?a (right-side (make-instance of HTTP-QUOTED-STRING (id ?name) (value ?value))))
+	(assert (http-char ?name (http-read ?name))))
+
+;  WWW-Authenticate   = #challenge
+;  Proxy-Authenticate = #challenge
+;  challenge          = auth-scheme [ 1*SP ( token68 / #auth-param ) ]
+;  auth-scheme        = token
+;  token68            = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"="
+; WWW-Authenticate (RFC 9110 11.6.1) and Proxy-Authenticate (11.7.1) share the
+; challenge grammar, so the same authenticate-header fact and rules build both;
+; only the end rules differ. Two points are ambiguous and are decided by the
+; next character: after the scheme, a run of token68 chars is a token68 until a
+; "=" is followed by a value or whitespace is followed by "="; after a ",", the
+; next token is an auth-param of the current challenge if "=" follows, else the
+; auth-scheme of the next challenge.
+(defrule http-detect-authenticate-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "WWW-Authenticate"|"Proxy-Authenticate"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-authenticate-header (name ?name) (challenges (assert (http-challenge (name ?name) (auth-scheme (assert (http-token (name ?name))))))))))))
+
+(defrule http-challenge-end-auth-scheme
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?t <- (http-token (name ?name) (value ?value))
+	?ch <- (http-challenge (name ?name) (auth-scheme ?t))
+	=>
+	(retract ?t)
+	(modify ?ch (auth-scheme ?value)))
+
+; 1*SP before the second part, OWS between auth-params, and OWS before "," / CR
+(defrule http-challenge-skip-ows
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?ch <- (http-challenge (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?second-part&:(= 0 (length$ ?second-part))|:(instancep (nth$ (length$ ?second-part) ?second-part))))
+	(http-authenticate-header (name ?name) (pending nil) (challenges $? ?ch))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-challenge-detect-token68
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?ch <- (http-challenge (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
+	(http-authenticate-header (name ?name) (pending nil) (challenges $? ?ch))
+	=>
+	(modify ?ch (second-part (assert (http-token68 (name ?name))))))
+
+(defrule http-challenge-token68-detect-ows
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token68 (name ?name) (value ?value&~""))
+	(http-challenge (name ?name) (second-part ?t))
+	=>
+	(retract ?c)
+	(modify ?t (ows TRUE))
+	(assert (http-char ?name (http-read ?name))))
+
+; token68 chars, whitespace, then "=": the chars were an auth-param name (BWS "=")
+(defrule http-challenge-change-token68-to-auth-param-at-equals
+	?c <- (http-char ?name 61) ; =
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0) (ows TRUE))
+	?ch <- (http-challenge (name ?name) (second-part ?t))
+	=>
+	(retract ?c ?t)
+	(modify ?ch (second-part (assert (http-auth-param (name ?name) (left-side ?value) (equals TRUE)))))
+	(assert (http-char ?name (http-read ?name))))
+
+; token68 chars, one "=", then a value: the chars were an auth-param name
+(defrule http-challenge-change-token68-to-auth-param-after-equals
+	(http-char ?name ?char&34|:(member$ ?char ?*http-tchar*)) ; DQUOTE tchar
+	?t <- (http-token68 (name ?name) (value ?value&~:(str-index "/" ?value)) (equals 1))
+	?ch <- (http-challenge (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?ch (second-part (assert (http-auth-param (name ?name) (left-side ?value) (equals TRUE))))))
+
+; a tchar that is not a token68 char: the chars so far are an auth-param name
+(defrule http-challenge-change-token68-to-auth-param-name
+	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*))
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0) (ows FALSE))
+	?ch <- (http-challenge (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?ch (second-part (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name) (value ?value)))))))))
+
+(defrule http-challenge-end-token68
+	(http-char ?name 13|44) ; CR ,
+	?t <- (http-token68 (name ?name) (value ?value&~"") (equals ?equals))
+	?ch <- (http-challenge (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?ch (second-part (make-instance of HTTP-TOKEN68 (id ?name) (value ?value) (equals ?equals)))))
+
+(defrule http-challenge-end-auth-param
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)|:(instancep ?right-side)))
+	?ch <- (http-challenge (name ?name) (second-part $?second-part ?a))
+	=>
+	(retract ?a)
+	(modify ?ch (second-part ?second-part (make-instance of HTTP-AUTH-PARAM (id ?name) (left-side ?left-side) (right-side ?right-side)))))
+
+; "," after a complete challenge element: the next token is pending until the
+; character after it says whether it is an auth-param name or an auth-scheme
+(defrule http-authenticate-header-detect-pending
+	?c <- (http-char ?name 44) ; ,
+	?ch <- (http-challenge (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?second-part&:(= 0 (length$ ?second-part))|:(instancep (nth$ (length$ ?second-part) ?second-part))))
+	?h <- (http-authenticate-header (name ?name) (pending nil) (challenges $? ?ch))
+	=>
+	(retract ?c)
+	(modify ?h (pending (assert (http-token (name ?name)))))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-authenticate-header-skip-ows-before-pending
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	(http-authenticate-header (name ?name) (pending ?t))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-authenticate-header-end-pending-token
+	(http-char ?name 9|13|32|44|61) ; HTAB CR SP , =
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?h <- (http-authenticate-header (name ?name) (pending ?t))
+	=>
+	(retract ?t)
+	(modify ?h (pending ?value)))
+
+(defrule http-authenticate-header-skip-ows-after-pending
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-authenticate-header (name ?name) (pending ?pending&:(stringp ?pending)))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-authenticate-header-pending-is-auth-param
+	?c <- (http-char ?name 61) ; =
+	?ch <- (http-challenge (name ?name) (second-part $?second-part))
+	?h <- (http-authenticate-header (name ?name) (pending ?pending&:(stringp ?pending)) (challenges $? ?ch))
+	=>
+	(retract ?c)
+	(modify ?ch (second-part ?second-part (assert (http-auth-param (name ?name) (left-side ?pending) (equals TRUE)))))
+	(modify ?h (pending nil))
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-authenticate-header-pending-is-auth-scheme
+	(http-char ?name ?char&13|44|:(member$ ?char ?*http-tchar*)) ; CR , tchar
+	?ch <- (http-challenge (name ?name) (auth-scheme ?auth-scheme) (second-part $?second-part))
+	?h <- (http-authenticate-header (name ?name) (pending ?pending&:(stringp ?pending)) (challenges $?challenges ?ch))
+	=>
+	(retract ?ch)
+	(modify ?h (pending nil) (challenges ?challenges (make-instance of HTTP-CHALLENGE (id ?name) (auth-scheme ?auth-scheme) (second-part ?second-part)) (assert (http-challenge (name ?name) (auth-scheme ?pending))))))
+
+(defrule http-authenticate-header-end-challenge
+	(http-char ?name 13) ; CR
+	?ch <- (http-challenge (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?second-part&:(= 0 (length$ ?second-part))|:(instancep (nth$ (length$ ?second-part) ?second-part))))
+	?h <- (http-authenticate-header (name ?name) (pending nil) (challenges $?challenges ?ch))
+	=>
+	(retract ?ch)
+	(modify ?h (challenges ?challenges (make-instance of HTTP-CHALLENGE (id ?name) (auth-scheme ?auth-scheme) (second-part ?second-part)))))
+
+(defrule http-end-www-authenticate-header
+	(http-char ?name 13) ; CR
+	?h <- (http-authenticate-header (name ?name) (challenges $?challenges&:(instancep (nth$ (length$ ?challenges) ?challenges))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "WWW-Authenticate"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-WWW-AUTHENTICATE-HEADER (id ?name) (challenges ?challenges)))))
+
+(defrule http-end-proxy-authenticate-header
+	(http-char ?name 13) ; CR
+	?h <- (http-authenticate-header (name ?name) (challenges $?challenges&:(instancep (nth$ (length$ ?challenges) ?challenges))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Proxy-Authenticate"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-PROXY-AUTHENTICATE-HEADER (id ?name) (challenges ?challenges)))))
+
+;  Authentication-Info       = #auth-param
+;  Proxy-Authentication-Info = #auth-param
+; Authentication-Info (RFC 9110 11.6.3) and Proxy-Authentication-Info (11.7.3)
+; are both a list of auth-params, so the same auth-params-header fact and rules
+; build both; only the end rules differ. The shared auth-param rules above
+; build each element.
+(defrule http-detect-auth-params-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Authentication-Info"|"Proxy-Authentication-Info"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-auth-params-header (name ?name) (auth-params (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name))))))))))))
+
+(defrule http-auth-params-header-end-auth-param
+	(http-char ?name 9|13|32|44) ; HTAB CR SP ,
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)|:(instancep ?right-side)))
+	?h <- (http-auth-params-header (name ?name) (auth-params $?auth-params ?a))
+	=>
+	(retract ?a)
+	(modify ?h (auth-params ?auth-params (make-instance of HTTP-AUTH-PARAM (id ?name) (left-side ?left-side) (right-side ?right-side)))))
+
+; OWS before "," or CR
+(defrule http-auth-params-header-skip-ows
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-auth-params-header (name ?name) (auth-params $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-auth-params-header-detect-next-auth-param
+	?c <- (http-char ?name 44) ; ,
+	?h <- (http-auth-params-header (name ?name) (auth-params $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	=>
+	(retract ?c)
+	(modify ?h (auth-params ?auth-params (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+; OWS after ","
+(defrule http-auth-params-header-skip-ows-before-name
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	(http-auth-params-header (name ?name) (auth-params $? ?a))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-authentication-info-header
+	(http-char ?name 13) ; CR
+	?h <- (http-auth-params-header (name ?name) (auth-params $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Authentication-Info"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-AUTHENTICATION-INFO-HEADER (id ?name) (auth-params ?auth-params)))))
+
+(defrule http-end-proxy-authentication-info-header
+	(http-char ?name 13) ; CR
+	?h <- (http-auth-params-header (name ?name) (auth-params $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?fv <- (http-field-value (value ?h))
+	(http-field-line (field-name ?fn) (field-value ?fv))
+	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Proxy-Authentication-Info"))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-PROXY-AUTHENTICATION-INFO-HEADER (id ?name) (auth-params ?auth-params)))))
 
 ;   TE                 = #t-codings
 ;  t-codings          = "trailers" / ( transfer-coding [ weight ] )
@@ -5208,6 +5732,96 @@
 	=>
 	(retract ?clh)
 	(modify ?fv (value (make-instance of HTTP-TE-HEADER (id ?name) (t-codings ?t-codings)))))
+
+;   Transfer-Encoding  = #transfer-coding
+;   transfer-coding    = token *( OWS ";" OWS transfer-parameter )
+;   transfer-parameter = token BWS "=" BWS ( token / quoted-string )
+; Transfer-Encoding (RFC 9112 6.1). TE's t-coding rules are not reused because
+; there a ";" starts a weight; here it starts a transfer-parameter, which the
+; shared auth-param rules build.
+(defrule http-detect-transfer-encoding-header
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*))
+	?o <- (object (is-a HTTP-FIELD-NAME) (value "Transfer-Encoding"))
+	?fv <- (http-field-value (name ?name) (value nil))
+	?fl <- (http-field-line (field-name =(instance-name ?o)) (field-value ?fv))
+	=>
+	(modify ?fv (value (assert (http-transfer-encoding-header (name ?name) (transfer-codings (assert (http-transfer-coding (name ?name) (value (assert (http-token (name ?name))))))))))))
+
+(defrule http-transfer-coding-end-value
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?tc <- (http-transfer-coding (name ?name) (value ?t))
+	=>
+	(retract ?t)
+	(modify ?tc (value ?value)))
+
+; OWS before ";", "," or CR
+(defrule http-transfer-coding-skip-ows
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	(http-transfer-coding (name ?name) (value ?value&:(stringp ?value)) (transfer-parameters $?transfer-parameters&:(= 0 (length$ ?transfer-parameters))|:(instancep (nth$ (length$ ?transfer-parameters) ?transfer-parameters))))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-transfer-coding-detect-transfer-parameter
+	?c <- (http-char ?name 59) ; ;
+	?tc <- (http-transfer-coding (name ?name) (value ?value&:(stringp ?value)) (transfer-parameters $?transfer-parameters&:(= 0 (length$ ?transfer-parameters))|:(instancep (nth$ (length$ ?transfer-parameters) ?transfer-parameters))))
+	=>
+	(retract ?c)
+	(modify ?tc (transfer-parameters ?transfer-parameters (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+; OWS after ";"
+(defrule http-transfer-coding-skip-ows-before-transfer-parameter-name
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	(http-transfer-coding (name ?name) (transfer-parameters $? ?a))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-transfer-coding-end-transfer-parameter
+	(http-char ?name 9|13|32|44|59) ; HTAB CR SP , ;
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)|:(instancep ?right-side)))
+	?tc <- (http-transfer-coding (name ?name) (transfer-parameters $?transfer-parameters ?a))
+	=>
+	(retract ?a)
+	(modify ?tc (transfer-parameters ?transfer-parameters (make-instance of HTTP-AUTH-PARAM (id ?name) (left-side ?left-side) (right-side ?right-side)))))
+
+(defrule http-transfer-encoding-header-end-transfer-coding
+	(http-char ?name 13|44) ; CR ,
+	?tc <- (http-transfer-coding (name ?name) (value ?value&:(stringp ?value)) (transfer-parameters $?transfer-parameters&:(= 0 (length$ ?transfer-parameters))|:(instancep (nth$ (length$ ?transfer-parameters) ?transfer-parameters))))
+	?h <- (http-transfer-encoding-header (name ?name) (transfer-codings $?transfer-codings ?tc))
+	=>
+	(retract ?tc)
+	(modify ?h (transfer-codings ?transfer-codings (make-instance of HTTP-TRANSFER-CODING (id ?name) (value ?value) (transfer-parameters ?transfer-parameters)))))
+
+(defrule http-transfer-encoding-header-detect-next-transfer-coding
+	?c <- (http-char ?name 44) ; ,
+	?h <- (http-transfer-encoding-header (name ?name) (transfer-codings $?transfer-codings&:(instancep (nth$ (length$ ?transfer-codings) ?transfer-codings))))
+	=>
+	(retract ?c)
+	(modify ?h (transfer-codings ?transfer-codings (assert (http-transfer-coding (name ?name) (value (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (http-read ?name))))
+
+; OWS after ","
+(defrule http-transfer-encoding-header-skip-ows-before-transfer-coding
+	?c <- (http-char ?name 9|32) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?tc <- (http-transfer-coding (name ?name) (value ?t))
+	(http-transfer-encoding-header (name ?name) (transfer-codings $? ?tc))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (http-read ?name))))
+
+(defrule http-end-transfer-encoding-header
+	(http-char ?name 13) ; CR
+	?h <- (http-transfer-encoding-header (name ?name) (transfer-codings $?transfer-codings&:(instancep (nth$ (length$ ?transfer-codings) ?transfer-codings))))
+	?fv <- (http-field-value (value ?h))
+	=>
+	(retract ?h)
+	(modify ?fv (value (make-instance of HTTP-TRANSFER-ENCODING-HEADER (id ?name) (transfer-codings ?transfer-codings)))))
 
 ; range-set = range-spec *( OWS "," OWS range-spec )
 ; range-spec = int-range / suffix-range / other-range
@@ -6237,6 +6851,9 @@ then (send ?self:message-body pprint ?t)))
 (defmessage-handler HTTP-MAX-FORWARDS-HEADER pprint primary (?t)
 (printout ?t ?self:value))
 
+(defmessage-handler HTTP-AGE-HEADER pprint primary (?t)
+(printout ?t ?self:value))
+
 (defmessage-handler HTTP-CONTENT-TYPE-HEADER pprint primary (?t)
 (send ?self:type pprint ?t)
 (printout ?t "/")
@@ -6484,6 +7101,19 @@ then (printout ?t "." ?self:fraction)))
 (if (neq ?self:weight nil)
 then (printout ?t ";") (send ?self:weight pprint ?t)))
 
+(defmessage-handler HTTP-TRANSFER-ENCODING-HEADER pprint primary (?t)
+	(bind ?i 0)
+	(foreach ?f ?self:transfer-codings
+		(bind ?i (+ ?i 1))
+		(send ?f pprint ?t)
+		(if (< ?i (length$ ?self:transfer-codings)) then (printout ?t ","))))
+
+(defmessage-handler HTTP-TRANSFER-CODING pprint primary (?t)
+	(printout ?t ?self:value)
+	(foreach ?p ?self:transfer-parameters
+		(printout ?t ";")
+		(send ?p pprint ?t)))
+
 (defmessage-handler HTTP-RANGE-HEADER pprint primary (?t)
 (send ?self:ranges-specifier pprint ?t))
 
@@ -6552,7 +7182,30 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 		(printout ?t "=")))
 
 (defmessage-handler HTTP-AUTH-PARAM pprint primary (?t)
-	(printout ?t ?self:left-side "=" ?self:right-side))
+	(printout ?t ?self:left-side "=")
+	(http-print-word ?t ?self:right-side))
+
+(defmessage-handler HTTP-AUTHENTICATE-HEADER pprint primary (?t)
+	(bind ?i 0)
+	(foreach ?c ?self:challenges
+		(bind ?i (+ ?i 1))
+		(send ?c pprint ?t)
+		(if (< ?i (length$ ?self:challenges)) then (printout ?t ", "))))
+
+(defmessage-handler HTTP-CHALLENGE pprint primary (?t)
+	(printout ?t ?self:auth-scheme)
+	(bind ?i 0)
+	(foreach ?f ?self:second-part
+		(bind ?i (+ ?i 1))
+		(if (= ?i 1) then (printout ?t " ") else (printout ?t ", "))
+		(send ?f pprint ?t)))
+
+(defmessage-handler HTTP-AUTH-PARAMS-HEADER pprint primary (?t)
+	(bind ?i 0)
+	(foreach ?a ?self:auth-params
+		(bind ?i (+ ?i 1))
+		(send ?a pprint ?t)
+		(if (< ?i (length$ ?self:auth-params)) then (printout ?t ", "))))
 
 (defmessage-handler HTTP-COOKIE-HEADER pprint primary (?t)
 	(bind ?i 0)
@@ -6607,6 +7260,9 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (defmessage-handler HTTP-DATE-HEADER pprint primary (?t)
 (send ?self:http-date pprint ?t))
 
+(defmessage-handler HTTP-INVALID-DATE pprint primary (?t)
+(printout ?t ?self:value))
+
 (defmessage-handler HTTP-ENTITY-TAG pprint primary (?t)
 (if ?self:weak then (printout ?t "W/"))
 (printout ?t "\"" ?self:opaque-tag "\""))
@@ -6623,6 +7279,12 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 
 (defmessage-handler HTTP-IF-RANGE-HEADER pprint primary (?t)
 (send ?self:value pprint ?t))
+
+(defmessage-handler HTTP-RETRY-AFTER-HEADER pprint primary (?t)
+(send ?self:value pprint ?t))
+
+(defmessage-handler HTTP-DELAY-SECONDS pprint primary (?t)
+(printout ?t ?self:value))
 
 (defmessage-handler HTTP-DAY-NAME-L pprint (?t)
 (printout ?t ?self:value))

@@ -1,0 +1,4 @@
+HTTP/1.1 201 Created
+Content-Location: https://example.com/docs/report.pdf?v=2
+Content-Length: 0
+

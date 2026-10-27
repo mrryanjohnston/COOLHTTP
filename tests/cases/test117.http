@@ -1,0 +1,4 @@
+HTTP/1.1 200 OK
+Proxy-Authentication-Info:  qop=auth , nextnonce = "x\"y" ,cnonce=0a4f	
+Content-Length: 0
+

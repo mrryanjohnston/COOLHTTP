@@ -119,6 +119,26 @@ test101.http
 test102.http
 test103.http
 test104.http
+test105.http
+test106.http
+test107.http
+test108.http
+test109.http
+test110.http
+test111.http
+test112.http
+test113.http
+test114.http
+test115.http
+test116.http
+test117.http
+test118.http
+test119.http
+test120.http
+test121.http
+test122.http
+test123.http
+test124.http
 ))
 
 (foreach ?file ?*files*
@@ -150,4 +170,4 @@ test104.http
 (println "Successful tests: " ?*successes* "/" (length$ ?*files*))
 (println "Did not complete: " ?*did-not-complete* "/" (length$ ?*files*))
 (println)
-(exit)
+(if (< ?*successes* (length$ ?*files*)) then (exit 1) else (exit 0))
