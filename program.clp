@@ -403,6 +403,38 @@
 	(slot name)
 	(slot value (default "")))
 
+;  chunked-body   = *chunk
+;                   last-chunk
+;                   trailer-section
+;                   CRLF
+;  chunk          = chunk-size [ chunk-ext ] CRLF
+;                   chunk-data CRLF
+;  chunk-size     = 1*HEXDIG
+;  last-chunk     = 1*("0") [ chunk-ext ] CRLF
+;  chunk-data     = 1*OCTET ; a sequence of chunk-size octets
+;  chunk-ext      = *( BWS ";" BWS chunk-ext-name
+;                      [ BWS "=" BWS chunk-ext-val ] )
+;  chunk-ext-name = token
+;  chunk-ext-val  = token / quoted-string
+;  trailer-section   = *( field-line CRLF )
+(deftemplate http-chunked-body
+	(slot name)
+	(multislot chunks) ; HTTP-CHUNK instances, the last one an http-chunk fact while building
+	(slot last-chunk) ; nil, then the HTTP-LAST-CHUNK instance: the chunk whose chunk-size is 0 at its CRLF
+	(multislot trailer-section)) ; HTTP-FIELD-LINE instances, the last one an http-field-line fact while building
+
+(deftemplate http-chunk
+	(slot name)
+	(slot chunk-size (default 0)) ; built from each HEXDIG as it is read
+	(slot bws (default FALSE)) ; TRUE once whitespace followed chunk-size, so no HEXDIG may follow
+	(multislot chunk-ext) ; HTTP-CHUNK-EXT instances, the last one an http-auth-param fact while building
+	(slot length-remaining) ; nil until the CR after chunk-size [ chunk-ext ], then the octets of chunk-data still to read
+	(slot chunk-data)) ; nil, http-chunk-data fact, then HTTP-CHUNK-DATA instance
+
+(deftemplate http-chunk-data
+	(slot name)
+	(slot value (default "")))
+
 (deftemplate http-x-www-form-urlencoded
 	(slot name)
 	(multislot sequences))
@@ -958,6 +990,11 @@
 (defclass HTTP-QUOTED-STRING (is-a HTTP) (slot value))
 (defclass HTTP-MESSAGE-BODY (is-a HTTP) (slot value))
 (defclass HTTP-OCTET-STREAM (is-a HTTP) (slot value))
+(defclass HTTP-CHUNKED-BODY (is-a HTTP) (multislot chunks) (slot last-chunk) (multislot trailer-section))
+(defclass HTTP-CHUNK (is-a HTTP) (slot chunk-size) (multislot chunk-ext) (slot chunk-data))
+(defclass HTTP-LAST-CHUNK (is-a HTTP) (multislot chunk-ext))
+(defclass HTTP-CHUNK-EXT (is-a HTTP) (slot chunk-ext-name) (slot chunk-ext-val)) ; chunk-ext-val is nil, a token string or an HTTP-QUOTED-STRING
+(defclass HTTP-CHUNK-DATA (is-a HTTP) (slot value))
 (defclass HTTP-X-WWW-FORM-URLENCODED (is-a HTTP) (multislot sequences))
 (defclass HTTP-SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
 (defclass HTTP-STATUS-LINE (is-a HTTP) (slot http-version) (slot status-code) (slot reason-phrase))
@@ -1531,34 +1568,47 @@
 	(retract ?i)
 	(modify ?h (value (make-instance of HTTP-IPV4ADDRESS (id ?name) (first-octet ?first) (second-octet ?second) (third-octet ?third) (fourth-octet ?fourth)))))
 
-(defrule http-host-ipv4address-change-to-reg-name
-	?i <- (http-ipv4address (name ?name) (octets $?octets))
+;;; a char that cannot continue the octet being read, nor end it, makes the
+;;; address a reg-name: the finished octets, their dots and the digits read so
+;;; far become the start of its value
+(defrule http-host-ipv4address-change-to-reg-name-in-octet
+	?o <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second) (third-digit ?third))
+	?i <- (http-ipv4address (name ?name) (octets $?octets ?o))
 	?h <- (http-host (value ?i))
 	(or
 		(http-char ?name ?char&:(member$ ?char (create$ ?*http-reg-name-no-digits* 37)) ?stream) ; %
 		(and
 			(http-char ?name ?char&:(member$ ?char ?*http-digit*) ?stream)
-			(http-dec-octet (name ?name) (first-digit ?first&~"") (second-digit ?second) (third-digit ?third))
-			(test (not (http-dec-octet-accepts-digit ?first ?second ?third ?char))))
+			(test (not (http-dec-octet-accepts-digit ?first ?second ?third ?char)))))
+	=>
+	(retract ?i ?o)
+	(bind ?value "")
+	(foreach ?octet ?octets
+		(bind ?value (str-cat ?value (send ?octet get-value) "."))
+		(unmake-instance ?octet))
+	(bind ?value (str-cat ?value ?first ?second ?third))
+	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*) (sequence ?value)))))))))
+
+;;; a char that ends the address after fewer than four octets, or follows the
+;;; fourth octet without ending the address, makes it a reg-name
+(defrule http-host-ipv4address-change-to-reg-name-after-octet
+	?i <- (http-ipv4address (name ?name) (octets $?octets&:(instancep (nth$ (length$ ?octets) ?octets))))
+	?h <- (http-host (value ?i))
+	(or
 		(and
 			(http-char ?name 9|13|32|47|58|64 ?stream) ; HTAB CR SP / : @
-			(test (> 4 (length$ ?octets)))
-			(test (instancep (nth$ (length$ ?octets) ?octets))))
+			(test (> 4 (length$ ?octets))))
 		(and
 			(http-char ?name ~9&~13&~32&~47&~58 ?stream) ; an "@" after four octets makes them a userinfo, so it stays
-			(test (= 4 (length$ ?octets)))
-			(test (instancep (nth$ 4 ?octets)))))
+			(test (= 4 (length$ ?octets)))))
 	=>
 	(retract ?i)
 	(bind ?value "")
 	(bind ?separator "")
-	(do-for-all-instances ((?octet HTTP-DEC-OCTET)) (member$ ?octet ?octets)
+	(foreach ?octet ?octets
 		(bind ?value (str-cat ?value ?separator (send ?octet get-value)))
 		(bind ?separator ".")
 		(unmake-instance ?octet))
-	(do-for-fact ((?octet http-dec-octet)) (member$ ?octet ?octets)
-		(bind ?value (str-cat ?value ?separator (fact-slot-value ?octet first-digit) (fact-slot-value ?octet second-digit) (fact-slot-value ?octet third-digit)))
-		(retract ?octet))
 	(modify ?h (value (assert (http-reg-name (name ?name) (value (assert (http-escapable-sequence (name ?name) (allowed-chars ?*http-reg-name*) (sequence ?value)))))))))
 
 (defrule http-host-detect-reg-name
@@ -6392,6 +6442,9 @@
 	(http-char ?name 10 ?stream) ; LF
 	?m <- (http-message-body (name ?name) (length-remaining nil))
 	(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value ?value&~"0"))
+	(not (and
+		(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
+		(object (is-a HTTP-TRANSFER-CODING) (name ?tc) (value ?coding&:(eq (lowcase ?coding) "chunked")))))
 	=>
 	(modify ?m (length-remaining (string-to-field ?value))))
 
@@ -6401,6 +6454,9 @@
 	(or
 		(not (object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name)))
 		(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value "0")))
+	(not (and
+		(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
+		(object (is-a HTTP-TRANSFER-CODING) (name ?tc) (value ?coding&:(eq (lowcase ?coding) "chunked")))))
 	=>
 	(retract ?c)
 	(modify ?m (length-remaining 0))
@@ -6586,6 +6642,212 @@
 	=>
 	(retract ?x)
 	(modify ?m (value (make-instance of HTTP-X-WWW-FORM-URLENCODED (id ?name) (sequences ?sequences)))))
+
+; RFC 9112 6.3: a Transfer-Encoding whose final coding is chunked frames the
+; body, whatever Content-Length says. The chunked-body fact holds the chunks
+; while they are read; the trailer field lines reuse the field-line rules.
+(defrule http-message-body-detect-chunked-body
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining nil) (value nil))
+	(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
+	(object (is-a HTTP-TRANSFER-CODING) (name ?tc) (value ?coding&:(eq (lowcase ?coding) "chunked")))
+	=>
+	(retract ?c)
+	(modify ?m (value (assert (http-chunked-body (name ?name)))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunked-body-detect-chunk
+	(http-char ?name ?char&:(member$ ?char ?*http-hexdig*) ?stream)
+	?b <- (http-chunked-body (name ?name) (chunks $?chunks&:(= 0 (length$ ?chunks))|:(instancep (nth$ (length$ ?chunks) ?chunks))) (last-chunk nil))
+	=>
+	(modify ?b (chunks ?chunks (assert (http-chunk (name ?name))))))
+
+(defrule http-chunk-build-chunk-size-digit
+	?c <- (http-char ?name ?char&:(member$ ?char ?*http-digit*) ?stream)
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (bws FALSE) (chunk-ext) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (chunk-size (+ (* 16 ?chunk-size) (- ?char 48))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunk-build-chunk-size-upper-hex
+	?c <- (http-char ?name ?char&65|66|67|68|69|70 ?stream) ; A-F
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (bws FALSE) (chunk-ext) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (chunk-size (+ (* 16 ?chunk-size) (- ?char 55))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunk-build-chunk-size-lower-hex
+	?c <- (http-char ?name ?char&97|98|99|100|101|102 ?stream) ; a-f
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (bws FALSE) (chunk-ext) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (chunk-size (+ (* 16 ?chunk-size) (- ?char 87))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; BWS between chunk-size and ";" or CRLF
+(defrule http-chunk-skip-bws-after-chunk-size
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	?k <- (http-chunk (name ?name) (chunk-ext) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (bws TRUE))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; BWS between a chunk-ext and the next ";" or CRLF
+(defrule http-chunk-skip-bws-after-chunk-ext
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	(http-chunk (name ?name) (chunk-ext $? ?chunk-ext&:(instancep ?chunk-ext)) (length-remaining nil))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; a chunk-ext has the auth-param grammar with the "=" and chunk-ext-val
+; optional, so the shared auth-param rules build it and the owner rules below
+; end it when no "=" follows the name
+(defrule http-chunk-detect-chunk-ext
+	?c <- (http-char ?name 59 ?stream) ; ;
+	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext&:(= 0 (length$ ?chunk-ext))|:(instancep (nth$ (length$ ?chunk-ext) ?chunk-ext))) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (chunk-ext ?chunk-ext (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; BWS after ";"
+(defrule http-chunk-skip-bws-before-chunk-ext-name
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	?t <- (http-token (name ?name) (value ""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	(http-chunk (name ?name) (chunk-ext $? ?a))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunk-ext-end-name
+	(http-char ?name 13|59 ?stream) ; CR ;
+	?t <- (http-token (name ?name) (value ?value&~""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	(http-chunk (name ?name) (chunk-ext $? ?a))
+	=>
+	(retract ?t)
+	(modify ?a (left-side ?value)))
+
+(defrule http-chunk-end-chunk-ext-without-val
+	(http-char ?name 13|59 ?stream) ; CR ;
+	?a <- (http-auth-param (name ?name) (left-side ?left-side&:(stringp ?left-side)) (equals FALSE) (right-side nil))
+	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext ?a))
+	=>
+	(retract ?a)
+	(modify ?k (chunk-ext ?chunk-ext (make-instance of HTTP-CHUNK-EXT (id ?name) (chunk-ext-name ?left-side)))))
+
+(defrule http-chunk-end-chunk-ext-with-val
+	(http-char ?name 9|13|32|59 ?stream) ; HTAB CR SP ;
+	?a <- (http-auth-param (name ?name) (left-side ?left-side) (right-side ?right-side&:(stringp ?right-side)|:(instancep ?right-side)))
+	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext ?a))
+	=>
+	(retract ?a)
+	(modify ?k (chunk-ext ?chunk-ext (make-instance of HTTP-CHUNK-EXT (id ?name) (chunk-ext-name ?left-side) (chunk-ext-val ?right-side)))))
+
+; the CR after chunk-size [ chunk-ext ]: the size is final
+(defrule http-chunk-end-chunk-size
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (chunk-ext $?chunk-ext&:(= 0 (length$ ?chunk-ext))|:(instancep (nth$ (length$ ?chunk-ext) ?chunk-ext))) (length-remaining nil))
+	=>
+	(retract ?c)
+	(modify ?k (length-remaining ?chunk-size))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunk-detect-chunk-data
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (chunk-data nil))
+	=>
+	(retract ?c)
+	(modify ?k (chunk-data (assert (http-chunk-data (name ?name)))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; a chunk-size of 0 is the last-chunk
+(defrule http-chunked-body-end-last-chunk
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext) (length-remaining 0) (chunk-data nil))
+	?b <- (http-chunked-body (name ?name) (chunks $?chunks ?k) (last-chunk nil))
+	=>
+	(retract ?c ?k)
+	(modify ?b (chunks ?chunks) (last-chunk (make-instance of HTTP-LAST-CHUNK (id ?name) (chunk-ext ?chunk-ext))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-build-chunk-data
+	?c <- (http-char ?name ?char ?stream)
+	?d <- (http-chunk-data (name ?name) (value ?value))
+	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (chunk-data ?d))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(modify ?k (length-remaining (- ?length-remaining 1)))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-build-chunk-data-with-last-octet
+	?c <- (http-char ?name ?char ?stream)
+	?d <- (http-chunk-data (name ?name) (value ?value))
+	?k <- (http-chunk (name ?name) (length-remaining 1) (chunk-data ?d))
+	=>
+	(retract ?c)
+	(modify ?d (value (format nil "%s%c" ?value ?char)))
+	(modify ?k (length-remaining 0))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-end-chunk-data
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?d <- (http-chunk-data (name ?name) (value ?value))
+	?k <- (http-chunk (name ?name) (length-remaining 0) (chunk-data ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?k (chunk-data (make-instance of HTTP-CHUNK-DATA (id ?name) (value ?value))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunked-body-end-chunk
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (chunk-ext $?chunk-ext) (chunk-data ?chunk-data&:(instancep ?chunk-data)))
+	?b <- (http-chunked-body (name ?name) (chunks $?chunks ?k))
+	=>
+	(retract ?c ?k)
+	(modify ?b (chunks ?chunks (make-instance of HTTP-CHUNK (id ?name) (chunk-size ?chunk-size) (chunk-ext ?chunk-ext) (chunk-data ?chunk-data))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; trailer-section: the field-line rules build each line, as in the header section
+(defrule http-chunked-body-detect-trailer-field-line
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*) ?stream)
+	?b <- (http-chunked-body (name ?name) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))))
+	=>
+	(modify ?b (trailer-section ?trailer-section (assert (http-field-line (name ?name) (field-name (assert (http-field-name (name ?name)))))))))
+
+(defrule http-chunked-body-end-trailer-field-line
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?f <- (http-field-line (name ?name) (field-name ?field-name) (field-value ?field-value&:(instancep ?field-value)))
+	?b <- (http-chunked-body (name ?name) (trailer-section $?trailer-section ?f))
+	=>
+	(retract ?c ?f)
+	(modify ?b (trailer-section ?trailer-section (make-instance of HTTP-FIELD-LINE (id ?name) (field-name ?field-name) (field-value ?field-value))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-chunked-body-end-trailer-section
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?b <- (http-chunked-body (name ?name) (chunks $?chunks) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))))
+	?m <- (http-message-body (name ?name) (value ?b))
+	=>
+	(retract ?c ?b)
+	(modify ?m (value (make-instance of HTTP-CHUNKED-BODY (id ?name) (chunks ?chunks) (last-chunk ?last-chunk) (trailer-section ?trailer-section))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-message-end-chunked-body
+	"the LF that ends the chunked-body: a -1 char ends the message here, and the stream stays where it is (a socket has no EOF)"
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+	(object (is-a HTTP-CHUNKED-BODY) (name ?value))
+	=>
+	(retract ?c)
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1 ?stream)))
 
 (defrule http-message-end-message-body
 	(http-char ?name -1 ?stream)
@@ -7173,6 +7435,39 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (defmessage-handler HTTP-AUTH-PARAM pprint primary (?t)
 	(printout ?t ?self:left-side "=")
 	(http-print-word ?t ?self:right-side))
+
+(defmessage-handler HTTP-CHUNKED-BODY pprint primary (?t)
+(foreach ?c ?self:chunks
+     (send ?c pprint ?t))
+(send ?self:last-chunk pprint ?t)
+(foreach ?f ?self:trailer-section
+     (send ?f pprint ?t))
+(printout ?t crlf))
+
+(defmessage-handler HTTP-CHUNK pprint primary (?t)
+(printout ?t (format nil "%x" ?self:chunk-size))
+(foreach ?e ?self:chunk-ext
+     (printout ?t ";")
+     (send ?e pprint ?t))
+(printout ?t crlf)
+(send ?self:chunk-data pprint ?t)
+(printout ?t crlf))
+
+(defmessage-handler HTTP-LAST-CHUNK pprint primary (?t)
+(printout ?t "0")
+(foreach ?e ?self:chunk-ext
+     (printout ?t ";")
+     (send ?e pprint ?t))
+(printout ?t crlf))
+
+(defmessage-handler HTTP-CHUNK-EXT pprint primary (?t)
+(printout ?t ?self:chunk-ext-name)
+(if (neq ?self:chunk-ext-val nil)
+then (printout ?t "=")
+     (http-print-word ?t ?self:chunk-ext-val)))
+
+(defmessage-handler HTTP-CHUNK-DATA pprint primary (?t)
+(printout ?t ?self:value))
 
 (defmessage-handler HTTP-AUTHENTICATE-HEADER pprint primary (?t)
 	(bind ?i 0)

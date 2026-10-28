@@ -165,6 +165,9 @@ file in `tests/cases` one rule at a time and checks:
 3. no rule has an `(if` in its right hand side
 4. no deffunction called from a rule's right hand side, directly or through
    another deffunction, has an `(if`
+5. no rule has a `(find-fact` or `(do-for-fact` in its right hand side,
+   directly or through a deffunction: a single fact a rule acts on, it
+   matches in its left hand side
 
 It prints one line per violation, a summary, and exits with status 1 when
 it found a violation.
@@ -198,3 +201,8 @@ reads
 the body from the same stream. A message with a
 `Content-Length` ends when that many octets are read, and the codec reads
 nothing after them, so it serves a socket whose peer waits for the reply.
+A message whose `Transfer-Encoding` ends in `chunked` is framed by its chunks
+(RFC 9112 7.1) and ends after the CRLF that follows its trailer section; its
+body is an `HTTP-CHUNKED-BODY` of `HTTP-CHUNK` instances, an
+`HTTP-LAST-CHUNK` and the trailer `HTTP-FIELD-LINE` instances, and `pprint`
+writes the chunks back.

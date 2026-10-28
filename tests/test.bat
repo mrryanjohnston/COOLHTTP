@@ -186,4 +186,7 @@ test121.http
 test122.http
 test123.http
 test124.http
+test125.http
+test126.http
+test127.http
 ))
