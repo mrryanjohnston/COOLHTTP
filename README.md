@@ -46,12 +46,12 @@ RFC 9110, 9111, 9112 and 3986:
 ...
 ```
 
-Each instance has the `id` from the start fact. A rule matches only the
-objects that it uses:
+Each instance has the `id` from the start fact. The `HTTP-MESSAGE`
+indicates a complete mesage:
 
 ```clips
 (defrule log-form-field
-  (http-done (id ?id))
+  (object (is-a HTTP-MESSAGE) (id ?id))
   (object (is-a HTTP-SEQUENCE) (id ?id) (name-string ?name) (value-string ?value))
   =>
   (println ?name " = " ?value))
@@ -62,15 +62,15 @@ favoritefood = pizza
 name = Ryan
 ```
 
-The same classes make a message. The `pprint` handler writes the message as
-HTTP. This rule sends a response to the request above:
+The `pprint` handler writes the message as HTTP.
+This rule sends a response to the request above:
 
 ```clips
 (defrule reply
-  ?done <- (http-done (id ?id) (message ?request))
+  ?request <- (object (is-a HTTP-MESSAGE) (id ?id) (start-line ?line))
+  (object (is-a HTTP-REQUEST-LINE) (name ?line))
   (object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?id) (value ?n))
   =>
-  (retract ?done)
   (bind ?response (make-instance of HTTP-MESSAGE
     (start-line (make-instance of HTTP-STATUS-LINE
       (http-version (make-instance of HTTP-VERSION (major 1) (minor 1)))
@@ -90,7 +90,8 @@ HTTP. This rule sends a response to the request above:
     (message-body (make-instance of HTTP-MESSAGE-BODY
       (value (make-instance of HTTP-OCTET-STREAM (value "OK")))))))
   (println "read " ?n " body octets from " ?id ", replying:")
-  (send ?response pprint t))
+  (send ?response pprint t)
+  (assert (replied ?request ?response)))
 ```
 
 ```
@@ -107,6 +108,9 @@ unnecessary spaces. Give `pprint` the logical name of a socket in place of
 `t` (see
 [CLIPSockets](https://github.com/mrryanjohnston/CLIPSockets)
 for a networking library). The rule above is then a server.
+
+This codec only decodes and encodes. It is up to the implementing program
+to specify whether a message is "sent" or "received."
 
 ## Developer notes
 
@@ -165,7 +169,7 @@ file in `tests/cases` one rule at a time and checks:
 It prints one line per violation, a summary, and exits with status 1 when
 it found a violation.
 
-## The start fact and the end fact
+## The start fact and the result
 
 Each construct of this codec has the prefix `http-`,
 and the codec has its own start fact, so it loads next to other codecs in
@@ -176,16 +180,19 @@ name of the stream and an id for the results, then run:
     (assert (http-parse (stream input) (id input)) (http-ready (id input)))
     (run)
 
-The codec announces each result with `(http-done (id) (message))`, a fact with the `id` and
-the object it made; the program that matches the fact retracts it. Every
-object carries the `id` in its `id` slot, where it carried the
-`filename` before.
+The result is an `HTTP-MESSAGE` instance. Every object the codec makes
+carries the `id` in its `id` slot, and the message is the last object it
+makes, so match it with an object pattern or find it with `find-instance`:
 
-A protocol codec reads only while a `http-ready` fact for the id exists, and a complete message consumes it, so a server can poll between messages. A program that reads a file asserts the ready fact again until the codec asserts `http-eof`.
+    (find-instance ((?m HTTP-MESSAGE)) (eq ?m:id input))
+
+The codec reads when the start fact and a `http-ready` fact for the id both
+exist. It consumes both and reads one message, so a server can poll between
+messages. To read the next message on the same stream, assert both again.
 
 A message whose `Content-Type` is `application/json` ends after its header
 lines, and its body stays on the stream: assert `(json-parse (stream ?id)
-(id ?id))` and `(json-ready (id ?id))` after `http-done`, ands
+(id ?id))` and `(json-ready (id ?id))` once the `HTTP-MESSAGE` exists, and
 [COOLJSON](https://github.com/mrryanjohnston/COOLJSON)
 reads
 the body from the same stream. A message with a

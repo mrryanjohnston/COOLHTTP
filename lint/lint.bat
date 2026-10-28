@@ -84,12 +84,12 @@
 		(violation (format nil "%d rules fired decoding the cases together, %d fired decoding them alone"
 		                   ?fired ?fired-alone)))
 	(foreach ?file ?cases
-		(bind ?done (find-all-facts ((?f http-done)) (eq ?f:id ?file)))
+		(bind ?done (find-all-instances ((?m HTTP-MESSAGE)) (eq ?m:id ?file)))
 		(if (<> (length$ ?done) 1)
-		    then (violation (format nil "%s: found %d http-done facts decoding the cases together"
+		    then (violation (format nil "%s: found %d HTTP-MESSAGE instances decoding the cases together"
 		                            ?file (length$ ?done)))
 		    else (open actual actual "w")
-		         (send (fact-slot-value (nth$ 1 ?done) message) pprint actual)
+		         (send (nth$ 1 ?done) pprint actual)
 		         (close actual)
 		         (bind ?differences (compare-files (sym-cat ../tests/expected/ ?file) actual))
 		         (if (> (length$ ?differences) 0) then

@@ -21,12 +21,12 @@
 (deffunction check-case (?strategy ?file)
 	(open actual actual "w")
 	(bind ?found FALSE)
-	(do-for-fact ((?d http-done)) (eq ?d:id ?file)
+	(do-for-instance ((?m HTTP-MESSAGE)) (eq ?m:id ?file)
 		(bind ?found TRUE)
-		(send ?d:message pprint actual))
+		(send ?m pprint actual))
 	(close actual)
 	(if (not ?found) then
-		(println "FAIL " ?file " (" ?strategy "): did not find the http-done fact")
+		(println "FAIL " ?file " (" ?strategy "): did not find the HTTP-MESSAGE instance")
 		(return FALSE))
 	(bind ?differences (compare-files (sym-cat expected/ ?file) actual))
 	(if (> (length$ ?differences) 0) then
