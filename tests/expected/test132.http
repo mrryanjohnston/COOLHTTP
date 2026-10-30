@@ -1,0 +1,5 @@
+GET /proxy HTTP/1.1
+Host: example.com
+Proxy-Authorization: Negotiate
+Authorization: Basic dXNlcjpwYXNz
+

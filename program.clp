@@ -5272,21 +5272,19 @@
 	(retract ?t)
 	(modify ?p (auth-scheme ?value)))
 
-(defrule http-proxy-authorization-detect-second-part-after-auth-scheme
-	?c <- (http-char ?name 32 ?stream) ; SP
-	?p <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
+; 1*SP before the second part, OWS between auth-params, and OWS before CR
+(defrule http-proxy-authorization-header-skip-ows
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	(http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?second-part&:(= 0 (length$ ?second-part))|:(instancep (nth$ (length$ ?second-part) ?second-part))))
 	=>
 	(retract ?c)
-	(modify ?p (second-part (assert (http-token68 (name ?name)))))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
-(defrule http-proxy-authorization-skip-sp-after-auth-scheme
-	?c <- (http-char ?name 32 ?stream) ; SP
-	?t <- (http-token68 (name ?name) (value ""))
-	(http-proxy-authorization-header (name ?name) (second-part ?t))
+(defrule http-proxy-authorization-detect-token68
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*) ?stream)
+	?p <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part))
 	=>
-	(retract ?c)
-	(assert (http-char ?name (get-char ?stream) ?stream)))
+	(modify ?p (second-part (assert (http-token68 (name ?name))))))
 
 (defrule http-build-token68
 	?c <- (http-char ?name ?char&:(member$ ?char ?*http-token68*) ?stream)
@@ -5304,29 +5302,50 @@
 	(modify ?t (equals (+ 1 ?equals)))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
+(defrule http-proxy-authorization-token68-detect-ows
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	?t <- (http-token68 (name ?name) (value ?value&~""))
+	(http-proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?c)
+	(modify ?t (ows TRUE))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
 (defrule http-proxy-authorization-end-token68
-	(http-char ?name 9|13|32 ?stream) ; HTAB CR SP
+	(http-char ?name 13 ?stream) ; CR
 	?t <- (http-token68 (name ?name) (value ?value&~"") (equals ?equals))
 	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
 	(modify ?p (second-part (make-instance of HTTP-TOKEN68 (id ?name) (value ?value) (equals ?equals)))))
 
-(defrule http-proxy-authorization-change-token68-to-auth-param
-	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*) ?stream)
-	?t <- (http-token68 (name ?name) (value ?value) (equals 0))
+; token68 chars, whitespace, then "=": the chars were an auth-param name (BWS "=")
+(defrule http-proxy-authorization-change-token68-to-auth-param-at-equals
+	?c <- (http-char ?name 61 ?stream) ; =
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0) (ows TRUE))
 	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
-	(retract ?t)
-	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name) (value ?value)))))))))
+	(retract ?c ?t)
+	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side ?value) (equals TRUE)))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
 
+; token68 chars, one "=", then a value: the chars were an auth-param name
 (defrule http-proxy-authorization-change-token68-to-auth-param-after-equals
-	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*) ?stream)
+	(http-char ?name ?char&34|:(member$ ?char ?*http-tchar*) ?stream) ; DQUOTE tchar
 	?t <- (http-token68 (name ?name) (value ?value&~:(str-index "/" ?value)) (equals 1))
 	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
 	=>
 	(retract ?t)
-	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side ?value) (right-side (assert (http-token (name ?name)))))))))
+	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side ?value) (equals TRUE))))))
+
+; a tchar that is not a token68 char: the chars so far are an auth-param name
+(defrule http-proxy-authorization-change-token68-to-auth-param-name
+	(http-char ?name ?char&~:(member$ ?char ?*http-token68*)&:(member$ ?char ?*http-tchar*) ?stream)
+	?t <- (http-token68 (name ?name) (value ?value) (equals 0) (ows FALSE))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part ?t))
+	=>
+	(retract ?t)
+	(modify ?p (second-part (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name) (value ?value)))))))))
 
 (defrule http-proxy-authorization-header-end-auth-param
 	(http-char ?name 9|13|32|44 ?stream) ; HTAB CR SP ,
@@ -5336,24 +5355,26 @@
 	(retract ?a)
 	(modify ?p (second-part ?auth-params (make-instance of HTTP-AUTH-PARAM (id ?name) (left-side ?left-side) (right-side ?right-side)))))
 
-(defrule http-proxy-authorization-header-detext-next-auth-param
+(defrule http-proxy-authorization-header-detect-next-auth-param
 	?c <- (http-char ?name 44 ?stream) ; ,
-	?auth-param <- (object (is-a HTTP-AUTH-PARAM))
-	?p <- (http-proxy-authorization-header (name ?name) (second-part $?auth-params ?auth-param))
+	?p <- (http-proxy-authorization-header (name ?name) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
 	=>
 	(retract ?c)
-	(modify ?p (second-part ?auth-params ?auth-param (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name)))))))))
+	(modify ?p (second-part ?auth-params (assert (http-auth-param (name ?name) (left-side (assert (http-token (name ?name))))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
 
-(defrule http-proxy-authorization-header-skip-ows-after-auth-param
+(defrule http-proxy-authorization-header-skip-ows-before-auth-param-name
 	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
-	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?t <- (http-token (name ?name) (value ""))
+	?a <- (http-auth-param (name ?name) (left-side ?t))
+	(http-proxy-authorization-header (name ?name) (second-part $? ?a))
 	=>
 	(retract ?c)
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-end-authorization-header
 	(http-char ?name 13 ?stream) ; CR
-	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?auth-params&:(= 0 (length$ ?auth-params))|:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
 	?fv <- (http-field-value (value ?clh))
 	(http-field-line (field-name ?fn) (field-value ?fv))
 	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Authorization"))
@@ -5363,7 +5384,7 @@
 
 (defrule http-end-proxy-authorization-header
 	(http-char ?name 13 ?stream) ; CR
-	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme) (second-part $?auth-params&:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
+	?clh <- (http-proxy-authorization-header (name ?name) (auth-scheme ?auth-scheme&:(stringp ?auth-scheme)) (second-part $?auth-params&:(= 0 (length$ ?auth-params))|:(instancep (nth$ (length$ ?auth-params) ?auth-params))))
 	?fv <- (http-field-value (value ?clh))
 	(http-field-line (field-name ?fn) (field-value ?fv))
 	(object (is-a HTTP-FIELD-NAME) (name ?fn) (value "Proxy-Authorization"))
@@ -7418,7 +7439,8 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 		then (printout ?t "/" ?self:protocol-version)))
 
 (defmessage-handler HTTP-CREDENTIALS-HEADER pprint primary (?t)
-	(printout ?t ?self:auth-scheme " ")
+	(printout ?t ?self:auth-scheme)
+	(if (> (length$ ?self:second-part) 0) then (printout ?t " "))
 	(bind ?i 0)
 	(foreach ?f ?self:second-part
 		(bind ?i (+ ?i 1))
