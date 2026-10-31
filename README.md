@@ -201,8 +201,26 @@ reads
 the body from the same stream. A message with a
 `Content-Length` ends when that many octets are read, and the codec reads
 nothing after them, so it serves a socket whose peer waits for the reply.
-A message whose `Transfer-Encoding` ends in `chunked` is framed by its chunks
-(RFC 9112 7.1) and ends after the CRLF that follows its trailer section; its
-body is an `HTTP-CHUNKED-BODY` of `HTTP-CHUNK` instances, an
-`HTTP-LAST-CHUNK` and the trailer `HTTP-FIELD-LINE` instances, and `pprint`
-writes the chunks back.
+If the last coding in `Transfer-Encoding` is `chunked`, the chunks give the
+length of the message (RFC 9112 7.1). The message stops after the CRLF that
+comes after the trailer section. The body is an `HTTP-CHUNKED-BODY`. It
+contains the `HTTP-CHUNK` instances (size and extensions), the
+`HTTP-LAST-CHUNK` and the `HTTP-FIELD-LINE` instances of the trailer section.
+The codec decodes the chunk-data with the same rules as the content of a
+`Content-Length` body. It puts the result in the `content` slot of the body.
+The content is an `HTTP-X-WWW-FORM-URLENCODED` of `HTTP-SEQUENCE` instances.
+For all other types, the content is an `HTTP-OCTET-STREAM`. A chunked JSON
+body cannot stay on the stream for COOLJSON. The codec does not divide a
+chunked multipart body into parts. `pprint` writes the chunks again. It
+divides the content into the chunk-data of each chunk. If you make an
+`HTTP-CHUNKED-BODY` with no chunks, `pprint` writes the content as one chunk.
+If `Content-Type` is a `multipart` type with a `boundary` parameter, the
+boundary gives the length of the message (RFC 2046 5.1). The message stops
+after the CRLF that comes after the close-delimiter, or at the end of the
+stream. An epilogue stays on the stream. The body is an
+`HTTP-MULTIPART-BODY`. It contains the preamble and one `HTTP-BODY-PART` for
+each part. Each part has its `HTTP-FIELD-LINE` instances in
+`mime-part-headers`. The codec decodes these lines with the same header
+rules as the message. Thus the `Content-Disposition` of a part is an
+`HTTP-CONTENT-DISPOSITION-HEADER`. The octets of a part are a string in
+`content`. If a part has only headers, `content` is `nil`.

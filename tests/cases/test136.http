@@ -1,0 +1,18 @@
+POST /submit HTTP/1.1
+Host: example.com
+Content-Type: application/x-www-form-urlencoded
+Transfer-Encoding: chunked
+
+4
+a=1&
+1
+b
+1;ext=x
+=
+9
+2&name=Ry
+2
+an
+0
+Expires: Thu, 01 Dec 1994 16:00:00 GMT
+

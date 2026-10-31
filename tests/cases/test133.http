@@ -1,0 +1,20 @@
+HTTP/1.1 200 OK
+Content-Type: multipart/mixed; boundary="gc0p4Jq0M:2Yt08j"
+Content-Length: 299
+
+This is the preamble.
+--gc0p4Jq0M:2Yt08j 
+
+This part has no headers.
+It spans two lines.
+--gc0p4Jq0M:2Yt08j
+Content-Type: text/plain; charset=us-ascii
+X-Note: headers only
+
+--gc0p4Jq0M:2Yt08j
+Content-Type: text/plain
+
+--gc0p4Jq0M:2Yt08
+Hi
+--gc0p4Jq0M:2Yt08j--	
+This is the epilogue.

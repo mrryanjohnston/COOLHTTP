@@ -396,8 +396,9 @@
 
 (deftemplate http-message-body
 	(slot name)
-	(slot value)
-	(slot length-remaining))
+	(slot value) ; the content: an http-octet-stream, http-x-www-form-urlencoded or http-multipart-body fact. Then an instance
+	(slot length-remaining) ; the number of octets of content that remain to be read. With Content-Length, it is for the full body. With chunked, it is for the current chunk
+	(slot chunked-body)) ; nil, or the http-chunked-body fact that gives the length of the content when the last coding in Transfer-Encoding is chunked
 
 (deftemplate http-octet-stream
 	(slot name)
@@ -417,23 +418,60 @@
 ;  chunk-ext-name = token
 ;  chunk-ext-val  = token / quoted-string
 ;  trailer-section   = *( field-line CRLF )
+; the octets of the chunk-data are the content. The content rules (octet-stream,
+; x-www-form-urlencoded) read them and count them on the message body, one chunk at a time
 (deftemplate http-chunked-body
 	(slot name)
 	(multislot chunks) ; HTTP-CHUNK instances, the last one an http-chunk fact while building
 	(slot last-chunk) ; nil, then the HTTP-LAST-CHUNK instance: the chunk whose chunk-size is 0 at its CRLF
-	(multislot trailer-section)) ; HTTP-FIELD-LINE instances, the last one an http-field-line fact while building
+	(multislot trailer-section) ; HTTP-FIELD-LINE instances. The last one is an http-field-line fact when the rules build it
+	(slot complete (default FALSE))) ; TRUE after the CR of the CRLF after the trailer section is read
 
 (deftemplate http-chunk
 	(slot name)
 	(slot chunk-size (default 0)) ; built from each HEXDIG as it is read
 	(slot bws (default FALSE)) ; TRUE once whitespace followed chunk-size, so no HEXDIG may follow
 	(multislot chunk-ext) ; HTTP-CHUNK-EXT instances, the last one an http-auth-param fact while building
-	(slot length-remaining) ; nil until the CR after chunk-size [ chunk-ext ], then the octets of chunk-data still to read
-	(slot chunk-data)) ; nil, http-chunk-data fact, then HTTP-CHUNK-DATA instance
+	(slot length-remaining) ; nil until the CR after chunk-size [ chunk-ext ]. Then chunk-size
+	(slot data-read (default FALSE))) ; TRUE after the content rules read chunk-size octets of chunk-data
 
-(deftemplate http-chunk-data
+;  RFC 2046 5.1.1
+;  multipart-body := [preamble CRLF]
+;                    dash-boundary transport-padding CRLF
+;                    body-part *encapsulation
+;                    close-delimiter transport-padding
+;                    [CRLF epilogue]
+;  dash-boundary := "--" boundary
+;  delimiter := CRLF dash-boundary
+;  close-delimiter := delimiter "--"
+;  encapsulation := delimiter transport-padding CRLF body-part
+;  transport-padding := *LWSP-char
+;  body-part := MIME-part-headers [CRLF *OCTET]
+(deftemplate http-multipart-body
 	(slot name)
-	(slot value (default "")))
+	(slot boundary) ; the value of the boundary parameter of the Content-Type header
+	(slot preamble) ; an http-multipart-octets fact when the rules read the preamble. Then a string ("" if there was no preamble)
+	(multislot body-parts) ; HTTP-BODY-PART instances. The last one is an http-body-part fact when the rules build it
+	(slot delimiter)) ; nil, or the http-delimiter fact of a line after its CR is read. Set to nil again at the LF of that line
+
+(deftemplate http-body-part
+	(slot name)
+	(multislot mime-part-headers) ; HTTP-FIELD-LINE instances. The last one is an http-field-line fact when the rules build it
+	(slot content)) ; nil during the MIME-part-headers. Then the http-multipart-octets fact that reads [CRLF *OCTET]
+
+; the octets before a delimiter. They are the preamble or the content of a body-part
+(deftemplate http-multipart-octets
+	(slot name)
+	(slot value) ; nil until the rules know that the CRLF after the MIME-part-headers is not the start of a delimiter. Then the octets that are read before this point
+	(slot delimiter)) ; nil, or the http-delimiter fact. The last characters that were read can be the start of this delimiter
+
+; the characters of a delimiter. The rules compare them one at a time with the characters that they read
+(deftemplate http-delimiter
+	(slot name)
+	(slot expected) ; "--" boundary at the start of the body. CRLF "--" boundary after an octet
+	(slot position (default 0)) ; the number of characters of the delimiter that are read
+	(slot transport-padding (default FALSE)) ; TRUE after whitespace came after the boundary. Then a "-" is not permitted
+	(slot dashes (default 0))) ; the number of "-" of a close-delimiter that are read after the boundary
 
 (deftemplate http-x-www-form-urlencoded
 	(slot name)
@@ -990,11 +1028,12 @@
 (defclass HTTP-QUOTED-STRING (is-a HTTP) (slot value))
 (defclass HTTP-MESSAGE-BODY (is-a HTTP) (slot value))
 (defclass HTTP-OCTET-STREAM (is-a HTTP) (slot value))
-(defclass HTTP-CHUNKED-BODY (is-a HTTP) (multislot chunks) (slot last-chunk) (multislot trailer-section))
-(defclass HTTP-CHUNK (is-a HTTP) (slot chunk-size) (multislot chunk-ext) (slot chunk-data))
+(defclass HTTP-CHUNKED-BODY (is-a HTTP) (multislot chunks) (slot last-chunk) (multislot trailer-section) (slot content)) ; content is the decoded chunk-data. It is an HTTP-OCTET-STREAM or an HTTP-X-WWW-FORM-URLENCODED
+(defclass HTTP-CHUNK (is-a HTTP) (slot chunk-size) (multislot chunk-ext))
 (defclass HTTP-LAST-CHUNK (is-a HTTP) (multislot chunk-ext))
 (defclass HTTP-CHUNK-EXT (is-a HTTP) (slot chunk-ext-name) (slot chunk-ext-val)) ; chunk-ext-val is nil, a token string or an HTTP-QUOTED-STRING
-(defclass HTTP-CHUNK-DATA (is-a HTTP) (slot value))
+(defclass HTTP-MULTIPART-BODY (is-a HTTP) (slot boundary) (slot preamble) (multislot body-parts))
+(defclass HTTP-BODY-PART (is-a HTTP) (multislot mime-part-headers) (slot content)) ; content is nil if the body-part has no [CRLF *OCTET]. If not, it is a string
 (defclass HTTP-X-WWW-FORM-URLENCODED (is-a HTTP) (multislot sequences))
 (defclass HTTP-SEQUENCE (is-a HTTP) (slot name-string) (slot value-string))
 (defclass HTTP-STATUS-LINE (is-a HTTP) (slot http-version) (slot status-code) (slot reason-phrase))
@@ -6461,7 +6500,7 @@
 
 (defrule http-message-body-set-length-remaining
 	(http-char ?name 10 ?stream) ; LF
-	?m <- (http-message-body (name ?name) (length-remaining nil))
+	?m <- (http-message-body (name ?name) (length-remaining nil) (value nil))
 	(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value ?value&~"0"))
 	(not (and
 		(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
@@ -6471,7 +6510,7 @@
 
 (defrule http-message-body-determine-empty
 	?c <- (http-char ?name 10 ?stream) ; LF
-	?m <- (http-message-body (name ?name) (length-remaining nil))
+	?m <- (http-message-body (name ?name) (length-remaining nil) (value nil))
 	(or
 		(not (object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name)))
 		(object (is-a HTTP-CONTENT-LENGTH-HEADER) (id ?name) (value "0")))
@@ -6509,7 +6548,11 @@
 			(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?t) (subtype ?s))
 			(object (is-a HTTP-TYPE) (name ?t) (value ?type))
 			(object (is-a HTTP-SUBTYPE) (name ?s) (value ?subtype))
-			(not (http-supported-content-type ?type ?subtype))))
+			(not (http-supported-content-type ?type ?subtype))
+			(not (and
+				(test (eq ?type "multipart"))
+				(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?t) (parameters $? ?p))
+				(object (is-a HTTP-PARAMETER) (name ?p) (parameter-name "boundary") (ext-token FALSE))))))
 	=>
 	(retract ?c)
 	(modify ?m (value (assert (http-octet-stream (name ?name)))))
@@ -6537,7 +6580,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-build-octet-stream-with-last-octet
-	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
 	?c <- (http-char ?name ?char ?stream)
 	?o <- (http-octet-stream (name ?name) (value ?value))
 	?m <- (http-message-body (length-remaining 1) (value ?o))
@@ -6559,7 +6602,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-x-www-form-urlencoded-build-name-string-with-last-octet
-	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
 	?c <- (http-char ?name ?char&~61 ?stream) ; =
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
@@ -6582,7 +6625,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-x-www-form-urlencoded-end-name-string-with-last-octet
-	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
 	?c <- (http-char ?name 61 ?stream) ; =
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
@@ -6605,7 +6648,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-x-www-form-urlencoded-build-value-string-with-last-octet
-	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
 	?c <- (http-char ?name ?char&~38 ?stream) ; &
 	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
@@ -6628,7 +6671,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-x-www-form-urlencoded-end-sequence-and-start-next-sequence-with-last-octet
-	"the last octet of the body: a -1 char ends the message here, so nothing past Content-Length is read"
+	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
 	?c <- (http-char ?name 38 ?stream) ; &
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
@@ -6641,6 +6684,7 @@
 
 (defrule http-end-octet-stream
 	(http-char ?name -1 ?stream)
+	(not (http-chunk (name ?name)))
 	?o <- (http-octet-stream (name ?name) (value ?value))
 	?m <- (http-message-body (length-remaining 0) (value ?o))
 	=>
@@ -6649,6 +6693,7 @@
 
 (defrule http-x-www-form-urlencoded-end-sequence
 	(http-char ?name -1 ?stream)
+	(not (http-chunk (name ?name)))
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string ?value-string))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (http-message-body (length-remaining 0) (value ?x))
@@ -6658,23 +6703,45 @@
 
 (defrule http-end-x-www-form-urlencoded
 	(http-char ?name -1 ?stream)
+	(not (http-chunk (name ?name)))
 	?x <- (http-x-www-form-urlencoded (name ?name) (sequences $?sequences&:(= 0 (length$ ?sequences))|:(instancep (nth$ (length$ ?sequences) ?sequences))))
 	?m <- (http-message-body (length-remaining 0) (value ?x))
 	=>
 	(retract ?x)
 	(modify ?m (value (make-instance of HTTP-X-WWW-FORM-URLENCODED (id ?name) (sequences ?sequences)))))
 
-; RFC 9112 6.3: a Transfer-Encoding whose final coding is chunked frames the
-; body, whatever Content-Length says. The chunked-body fact holds the chunks
-; while they are read; the trailer field lines reuse the field-line rules.
-(defrule http-message-body-detect-chunked-body
+; RFC 9112 6.3: if the last coding in Transfer-Encoding is chunked, the chunks
+; give the length of the body. Content-Length does not. The chunked-body fact
+; contains the chunks when the rules read them. The trailer field lines use
+; the field-line rules again. The chunk-data is the content. The content rules
+; read it one chunk at a time. They count the octets of each chunk on the
+; message body, as they count a Content-Length.
+(defrule http-message-body-detect-chunked-body-with-x-www-form-urlencoded
 	?c <- (http-char ?name 10 ?stream) ; LF
 	?m <- (http-message-body (name ?name) (length-remaining nil) (value nil))
 	(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
 	(object (is-a HTTP-TRANSFER-CODING) (name ?tc) (value ?coding&:(eq (lowcase ?coding) "chunked")))
+	(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (subtype ?subtype))
+	(object (is-a HTTP-TYPE) (name ?type) (value "application"))
+	(object (is-a HTTP-SUBTYPE) (name ?subtype) (value "x-www-form-urlencoded"))
 	=>
 	(retract ?c)
-	(modify ?m (value (assert (http-chunked-body (name ?name)))))
+	(modify ?m (chunked-body (assert (http-chunked-body (name ?name)))) (value (assert (http-x-www-form-urlencoded (name ?name) (sequences (assert (http-sequence (name ?name))))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-message-body-detect-chunked-body-with-octet-stream
+	"all other content stays as octets. COOLJSON cannot read a chunked stream, and the multipart rules do not count octets"
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining nil) (value nil))
+	(object (is-a HTTP-TRANSFER-ENCODING-HEADER) (id ?name) (transfer-codings $? ?tc))
+	(object (is-a HTTP-TRANSFER-CODING) (name ?tc) (value ?coding&:(eq (lowcase ?coding) "chunked")))
+	(not (and
+		(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (subtype ?subtype))
+		(object (is-a HTTP-TYPE) (name ?type) (value "application"))
+		(object (is-a HTTP-SUBTYPE) (name ?subtype) (value "x-www-form-urlencoded"))))
+	=>
+	(retract ?c)
+	(modify ?m (chunked-body (assert (http-chunked-body (name ?name)))) (value (assert (http-octet-stream (name ?name)))))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-chunked-body-detect-chunk
@@ -6780,65 +6847,59 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-chunk-detect-chunk-data
+	"the LF after a chunk-size that is more than 0. The content rules read chunk-size octets and count them on the message body"
 	?c <- (http-char ?name 10 ?stream) ; LF
-	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (chunk-data nil))
+	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (data-read FALSE))
+	?m <- (http-message-body (name ?name) (length-remaining nil))
 	=>
 	(retract ?c)
-	(modify ?k (chunk-data (assert (http-chunk-data (name ?name)))))
+	(modify ?m (length-remaining ?length-remaining))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 ; a chunk-size of 0 is the last-chunk
 (defrule http-chunked-body-end-last-chunk
 	?c <- (http-char ?name 10 ?stream) ; LF
-	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext) (length-remaining 0) (chunk-data nil))
+	?k <- (http-chunk (name ?name) (chunk-ext $?chunk-ext) (length-remaining 0) (data-read FALSE))
 	?b <- (http-chunked-body (name ?name) (chunks $?chunks ?k) (last-chunk nil))
 	=>
 	(retract ?c ?k)
 	(modify ?b (chunks ?chunks) (last-chunk (make-instance of HTTP-LAST-CHUNK (id ?name) (chunk-ext ?chunk-ext))))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
-(defrule http-build-chunk-data
-	?c <- (http-char ?name ?char ?stream)
-	?d <- (http-chunk-data (name ?name) (value ?value))
-	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (chunk-data ?d))
+(defrule http-chunk-end-chunk-data
+	"the -1 char that the content rules assert after the last octet that they count. In a chunk, it stops the chunk-data, not the message"
+	?c <- (http-char ?name -1 ?stream)
+	?k <- (http-chunk (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (data-read FALSE))
+	?b <- (http-chunked-body (name ?name) (chunks $? ?k))
+	(http-message-body (name ?name) (length-remaining 0) (chunked-body ?b))
 	=>
 	(retract ?c)
-	(modify ?d (value (format nil "%s%c" ?value ?char)))
-	(modify ?k (length-remaining (- ?length-remaining 1)))
+	(modify ?k (data-read TRUE))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
-(defrule http-build-chunk-data-with-last-octet
-	?c <- (http-char ?name ?char ?stream)
-	?d <- (http-chunk-data (name ?name) (value ?value))
-	?k <- (http-chunk (name ?name) (length-remaining 1) (chunk-data ?d))
-	=>
-	(retract ?c)
-	(modify ?d (value (format nil "%s%c" ?value ?char)))
-	(modify ?k (length-remaining 0))
-	(assert (http-char ?name (get-char ?stream) ?stream)))
-
-(defrule http-end-chunk-data
+(defrule http-chunk-end-chunk-data-line
 	?c <- (http-char ?name 13 ?stream) ; CR
-	?d <- (http-chunk-data (name ?name) (value ?value))
-	?k <- (http-chunk (name ?name) (length-remaining 0) (chunk-data ?d))
+	(http-chunk (name ?name) (data-read TRUE))
+	?m <- (http-message-body (name ?name) (length-remaining 0))
 	=>
-	(retract ?c ?d)
-	(modify ?k (chunk-data (make-instance of HTTP-CHUNK-DATA (id ?name) (value ?value))))
+	(retract ?c)
+	(modify ?m (length-remaining nil))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-chunked-body-end-chunk
 	?c <- (http-char ?name 10 ?stream) ; LF
-	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (chunk-ext $?chunk-ext) (chunk-data ?chunk-data&:(instancep ?chunk-data)))
+	?k <- (http-chunk (name ?name) (chunk-size ?chunk-size) (chunk-ext $?chunk-ext) (data-read TRUE))
 	?b <- (http-chunked-body (name ?name) (chunks $?chunks ?k))
+	(http-message-body (name ?name) (length-remaining nil))
 	=>
 	(retract ?c ?k)
-	(modify ?b (chunks ?chunks (make-instance of HTTP-CHUNK (id ?name) (chunk-size ?chunk-size) (chunk-ext ?chunk-ext) (chunk-data ?chunk-data))))
+	(modify ?b (chunks ?chunks (make-instance of HTTP-CHUNK (id ?name) (chunk-size ?chunk-size) (chunk-ext ?chunk-ext))))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 ; trailer-section: the field-line rules build each line, as in the header section
 (defrule http-chunked-body-detect-trailer-field-line
 	(http-char ?name ?char&:(member$ ?char ?*http-tchar*) ?stream)
-	?b <- (http-chunked-body (name ?name) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))))
+	?b <- (http-chunked-body (name ?name) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))) (complete FALSE))
 	=>
 	(modify ?b (trailer-section ?trailer-section (assert (http-field-line (name ?name) (field-name (assert (http-field-name (name ?name)))))))))
 
@@ -6853,26 +6914,230 @@
 
 (defrule http-chunked-body-end-trailer-section
 	?c <- (http-char ?name 13 ?stream) ; CR
-	?b <- (http-chunked-body (name ?name) (chunks $?chunks) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))))
-	?m <- (http-message-body (name ?name) (value ?b))
+	?b <- (http-chunked-body (name ?name) (last-chunk ?last-chunk&:(instancep ?last-chunk)) (trailer-section $?trailer-section&:(= 0 (length$ ?trailer-section))|:(instancep (nth$ (length$ ?trailer-section) ?trailer-section))) (complete FALSE))
 	=>
-	(retract ?c ?b)
-	(modify ?m (value (make-instance of HTTP-CHUNKED-BODY (id ?name) (chunks ?chunks) (last-chunk ?last-chunk) (trailer-section ?trailer-section))))
+	(retract ?c)
+	(modify ?b (complete TRUE))
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-message-end-chunked-body
-	"the LF that ends the chunked-body: a -1 char ends the message here, and the stream stays where it is (a socket has no EOF)"
+	"the LF at the end of the chunked-body. A -1 char stops the content and the message here. The stream stays in its position (a socket has no EOF)"
 	?c <- (http-char ?name 10 ?stream) ; LF
-	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
-	(object (is-a HTTP-CHUNKED-BODY) (name ?value))
+	?b <- (http-chunked-body (name ?name) (complete TRUE))
+	?m <- (http-message-body (name ?name) (length-remaining nil) (chunked-body ?b))
 	=>
 	(retract ?c)
 	(modify ?m (length-remaining 0))
 	(assert (http-char ?name -1 ?stream)))
 
+(defrule http-message-end-message-body-with-chunked-body
+	"the content is an instance. The chunked body that gave its length contains it"
+	(http-char ?name -1 ?stream)
+	?b <- (http-chunked-body (name ?name) (chunks $?chunks) (last-chunk ?last-chunk) (trailer-section $?trailer-section) (complete TRUE))
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining 0) (chunked-body ?b))
+	?h <- (http-message (name ?name) (message-body ?m))
+	=>
+	(retract ?m ?b)
+	(modify ?h (message-body (make-instance of HTTP-MESSAGE-BODY (id ?name) (value (make-instance of HTTP-CHUNKED-BODY (id ?name) (chunks ?chunks) (last-chunk ?last-chunk) (trailer-section ?trailer-section) (content ?value)))))))
+
+; RFC 2046 5.1: the boundary gives the length of a multipart body, not
+; Content-Length. This is because the MIME-part-headers use the field-line
+; rules again, and these rules do not count octets. The message stops at the
+; CRLF after the close-delimiter, or at the end of the stream. Thus an epilogue
+; stays on the stream.
+(defrule http-message-body-detect-multipart-body-with-token-boundary
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
+	(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (parameters $? ?p))
+	(object (is-a HTTP-TYPE) (name ?type) (value "multipart"))
+	(object (is-a HTTP-PARAMETER) (name ?p) (parameter-name "boundary") (ext-token FALSE) (parameter-value ?boundary&:(stringp ?boundary)))
+	=>
+	(retract ?c)
+	(modify ?m (length-remaining nil) (value (assert (http-multipart-body (name ?name) (boundary ?boundary) (preamble (assert (http-multipart-octets (name ?name) (value "") (delimiter (assert (http-delimiter (name ?name) (expected (str-cat "--" ?boundary))))))))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-message-body-detect-multipart-body-with-quoted-string-boundary
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (length-remaining ?length-remaining&~nil&:(> ?length-remaining 0)) (value nil))
+	(object (is-a HTTP-CONTENT-TYPE-HEADER) (id ?name) (type ?type) (parameters $? ?p))
+	(object (is-a HTTP-TYPE) (name ?type) (value "multipart"))
+	(object (is-a HTTP-PARAMETER) (name ?p) (parameter-name "boundary") (ext-token FALSE) (parameter-value ?q&:(instancep ?q)))
+	(object (is-a HTTP-QUOTED-STRING) (name ?q) (value ?boundary))
+	=>
+	(retract ?c)
+	(modify ?m (length-remaining nil) (value (assert (http-multipart-body (name ?name) (boundary ?boundary) (preamble (assert (http-multipart-octets (name ?name) (value "") (delimiter (assert (http-delimiter (name ?name) (expected (str-cat "--" ?boundary))))))))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; preamble and body-part content. The rules keep each octet that is not a CR. A CR can be the start of a delimiter
+(defrule http-multipart-octets-build
+	?c <- (http-char ?name ?char&~13&~-1 ?stream) ; CR
+	?o <- (http-multipart-octets (name ?name) (value ?value&:(stringp ?value)) (delimiter nil))
+	=>
+	(retract ?c)
+	(modify ?o (value (format nil "%s%c" ?value ?char)))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-octets-detect-delimiter
+	(http-char ?name 13 ?stream) ; CR
+	?o <- (http-multipart-octets (name ?name) (value ?value&:(stringp ?value)) (delimiter nil))
+	(http-multipart-body (name ?name) (boundary ?boundary))
+	=>
+	(modify ?o (delimiter (assert (http-delimiter (name ?name) (expected (format nil "%c%c--%s" 13 10 ?boundary)))))))
+
+(defrule http-delimiter-match
+	?c <- (http-char ?name ?char ?stream)
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
+	(test (eq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
+	=>
+	(retract ?c)
+	(modify ?d (position (+ ?position 1)))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-delimiter-mismatch
+	"the characters that were the same as the delimiter are octets of the content. The rules read the different character again"
+	(http-char ?name ?char ?stream)
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
+	?o <- (http-multipart-octets (name ?name) (value ?value&:(stringp ?value)) (delimiter ?d))
+	(test (neq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
+	=>
+	(retract ?d)
+	(modify ?o (value (str-cat ?value (sub-string 1 ?position ?expected))) (delimiter nil)))
+
+(defrule http-delimiter-mismatch-after-mime-part-headers
+	"the CRLF was the end of the MIME-part-headers. The characters after it are the first octets of the content"
+	(http-char ?name ?char ?stream)
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
+	?o <- (http-multipart-octets (name ?name) (value nil) (delimiter ?d))
+	(test (neq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
+	=>
+	(retract ?d)
+	(modify ?o (value (sub-string 3 ?position ?expected)) (delimiter nil)))
+
+; after the full dash-boundary: a "-" is the start of the close-delimiter,
+; whitespace is transport-padding, and a CR is the end of the line
+(defrule http-delimiter-detect-close-delimiter
+	?c <- (http-char ?name 45 ?stream) ; -
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(= ?position (str-length ?expected))) (transport-padding FALSE) (dashes 0))
+	=>
+	(retract ?c)
+	(modify ?d (dashes 1))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-delimiter-skip-transport-padding
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(= ?position (str-length ?expected))) (dashes 0))
+	=>
+	(retract ?c)
+	(modify ?d (transport-padding TRUE))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-body-end-preamble
+	"the CR after the first dash-boundary. The octets before it are the preamble"
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(= ?position (str-length ?expected))) (dashes 0))
+	?o <- (http-multipart-octets (name ?name) (value ?value) (delimiter ?d))
+	?b <- (http-multipart-body (name ?name) (preamble ?o) (delimiter nil))
+	=>
+	(retract ?c ?o)
+	(modify ?b (preamble ?value) (delimiter ?d))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-body-end-body-part
+	"the CR after a delimiter. The octets before it are the content of the body-part"
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(= ?position (str-length ?expected))) (dashes 0))
+	?o <- (http-multipart-octets (name ?name) (value ?value) (delimiter ?d))
+	?p <- (http-body-part (name ?name) (mime-part-headers $?mime-part-headers) (content ?o))
+	?b <- (http-multipart-body (name ?name) (body-parts $?body-parts ?p) (delimiter nil))
+	=>
+	(retract ?c ?o ?p)
+	(modify ?b (body-parts ?body-parts (make-instance of HTTP-BODY-PART (id ?name) (mime-part-headers ?mime-part-headers) (content ?value))) (delimiter ?d))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-body-detect-body-part
+	"the LF at the end of a dash-boundary line. A body-part comes after it"
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?d <- (http-delimiter (name ?name))
+	?b <- (http-multipart-body (name ?name) (body-parts $?body-parts) (delimiter ?d))
+	=>
+	(retract ?c ?d)
+	(modify ?b (body-parts ?body-parts (assert (http-body-part (name ?name)))) (delimiter nil))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+; MIME-part-headers: the field-line rules build each line, the same as in the header section
+(defrule http-body-part-detect-field-line
+	(http-char ?name ?char&:(member$ ?char ?*http-tchar*) ?stream)
+	?p <- (http-body-part (name ?name) (mime-part-headers $?mime-part-headers&:(= 0 (length$ ?mime-part-headers))|:(instancep (nth$ (length$ ?mime-part-headers) ?mime-part-headers))) (content nil))
+	=>
+	(modify ?p (mime-part-headers ?mime-part-headers (assert (http-field-line (name ?name) (field-name (assert (http-field-name (name ?name)))))))))
+
+(defrule http-body-part-end-field-line
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?f <- (http-field-line (name ?name) (field-name ?field-name) (field-value ?field-value&:(instancep ?field-value)))
+	?p <- (http-body-part (name ?name) (mime-part-headers $?mime-part-headers ?f))
+	=>
+	(retract ?c ?f)
+	(modify ?p (mime-part-headers ?mime-part-headers (make-instance of HTTP-FIELD-LINE (id ?name) (field-name ?field-name) (field-value ?field-value))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-body-part-end-mime-part-headers
+	"the CR after the MIME-part-headers. It is the start of the CRLF before the content, or the start of the delimiter after a body-part that has no content"
+	(http-char ?name 13 ?stream) ; CR
+	?p <- (http-body-part (name ?name) (mime-part-headers $?mime-part-headers&:(= 0 (length$ ?mime-part-headers))|:(instancep (nth$ (length$ ?mime-part-headers) ?mime-part-headers))) (content nil))
+	(http-multipart-body (name ?name) (boundary ?boundary))
+	=>
+	(modify ?p (content (assert (http-multipart-octets (name ?name) (delimiter (assert (http-delimiter (name ?name) (expected (format nil "%c%c--%s" 13 10 ?boundary))))))))))
+
+(defrule http-multipart-body-end-close-delimiter
+	"the second \"-\" after the boundary. The body-part before it is the last body-part"
+	?c <- (http-char ?name 45 ?stream) ; -
+	?d <- (http-delimiter (name ?name) (dashes 1))
+	?o <- (http-multipart-octets (name ?name) (value ?value) (delimiter ?d))
+	?p <- (http-body-part (name ?name) (mime-part-headers $?mime-part-headers) (content ?o))
+	?b <- (http-multipart-body (name ?name) (boundary ?boundary) (preamble ?preamble&:(stringp ?preamble)) (body-parts $?body-parts ?p))
+	?m <- (http-message-body (name ?name) (value ?b))
+	=>
+	(retract ?c ?d ?o ?p ?b)
+	(modify ?m (value (make-instance of HTTP-MULTIPART-BODY (id ?name) (boundary ?boundary) (preamble ?preamble) (body-parts ?body-parts (make-instance of HTTP-BODY-PART (id ?name) (mime-part-headers ?mime-part-headers) (content ?value))))))
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-body-skip-transport-padding-after-close-delimiter
+	?c <- (http-char ?name 9|32 ?stream) ; HTAB SP
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+	(object (is-a HTTP-MULTIPART-BODY) (name ?value))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-multipart-body-end-close-delimiter-line
+	?c <- (http-char ?name 13 ?stream) ; CR
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+	(object (is-a HTTP-MULTIPART-BODY) (name ?value))
+	=>
+	(retract ?c)
+	(assert (http-char ?name (get-char ?stream) ?stream)))
+
+(defrule http-message-end-multipart-body
+	"the LF after the close-delimiter. A -1 char stops the message here. An epilogue stays on the stream"
+	?c <- (http-char ?name 10 ?stream) ; LF
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+	(object (is-a HTTP-MULTIPART-BODY) (name ?value))
+	=>
+	(retract ?c)
+	(modify ?m (length-remaining 0))
+	(assert (http-char ?name -1 ?stream)))
+
+(defrule http-message-end-multipart-body-at-end-of-stream
+	"the stream stopped at the close-delimiter. Its -1 char stops the message"
+	(http-char ?name -1 ?stream)
+	?m <- (http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+	(object (is-a HTTP-MULTIPART-BODY) (name ?value))
+	=>
+	(modify ?m (length-remaining 0)))
+
 (defrule http-message-end-message-body
 	(http-char ?name -1 ?stream)
-	?m <- (http-message-body (value ?value&nil|:(instancep ?value)) (length-remaining 0))
+	?m <- (http-message-body (value ?value&nil|:(instancep ?value)) (length-remaining 0) (chunked-body nil))
 	?h <- (http-message (name ?name) (message-body ?m))
 	=>
 	(retract ?m)
@@ -7458,10 +7723,22 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 	(printout ?t ?self:left-side "=")
 	(http-print-word ?t ?self:right-side))
 
+; pprint writes the chunks again with their sizes. It divides the content into
+; the chunk-data of each chunk. If an encoder gives no chunks, pprint writes
+; the content as one chunk
 (defmessage-handler HTTP-CHUNKED-BODY pprint primary (?t)
+(bind ?content (send ?self:content to-string))
+(bind ?offset 0)
 (foreach ?c ?self:chunks
-     (send ?c pprint ?t))
-(send ?self:last-chunk pprint ?t)
+     (send ?c pprint ?t)
+     (bind ?size (send ?c get-chunk-size))
+     (printout ?t (sub-string (+ ?offset 1) (+ ?offset ?size) ?content) crlf)
+     (bind ?offset (+ ?offset ?size)))
+(if (and (= 0 (length$ ?self:chunks)) (> (str-length ?content) 0))
+then (printout ?t (format nil "%x" (str-length ?content)) crlf ?content crlf))
+(if (neq ?self:last-chunk nil)
+then (send ?self:last-chunk pprint ?t)
+else (printout ?t "0" crlf))
 (foreach ?f ?self:trailer-section
      (send ?f pprint ?t))
 (printout ?t crlf))
@@ -7471,8 +7748,6 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 (foreach ?e ?self:chunk-ext
      (printout ?t ";")
      (send ?e pprint ?t))
-(printout ?t crlf)
-(send ?self:chunk-data pprint ?t)
 (printout ?t crlf))
 
 (defmessage-handler HTTP-LAST-CHUNK pprint primary (?t)
@@ -7488,8 +7763,39 @@ then (printout ?t ";") (send ?self:weight pprint ?t)))
 then (printout ?t "=")
      (http-print-word ?t ?self:chunk-ext-val)))
 
-(defmessage-handler HTTP-CHUNK-DATA pprint primary (?t)
-(printout ?t ?self:value))
+; the content as the octets that pprint writes. A chunked body divides them into chunks
+(defmessage-handler HTTP-OCTET-STREAM to-string primary ()
+?self:value)
+
+(defmessage-handler HTTP-SEQUENCE to-string primary ()
+(str-cat ?self:name-string "=" ?self:value-string))
+
+(defmessage-handler HTTP-X-WWW-FORM-URLENCODED to-string primary ()
+(bind ?s "")
+(bind ?i 0)
+(foreach ?f ?self:sequences
+     (bind ?i (+ ?i 1))
+     (bind ?s (str-cat ?s (send ?f to-string)))
+     (if (< ?i (length$ ?self:sequences)) then (bind ?s (str-cat ?s "&"))))
+?s)
+
+(defmessage-handler HTTP-MULTIPART-BODY pprint primary (?t)
+(if (and (stringp ?self:preamble) (neq ?self:preamble ""))
+then (printout ?t ?self:preamble crlf))
+(printout ?t "--" ?self:boundary crlf)
+(bind ?i 0)
+(foreach ?p ?self:body-parts
+     (bind ?i (+ ?i 1))
+     (send ?p pprint ?t)
+     (if (< ?i (length$ ?self:body-parts))
+     then (printout ?t crlf "--" ?self:boundary crlf)))
+(printout ?t crlf "--" ?self:boundary "--" crlf))
+
+(defmessage-handler HTTP-BODY-PART pprint primary (?t)
+(foreach ?f ?self:mime-part-headers
+     (send ?f pprint ?t))
+(if (neq ?self:content nil)
+then (printout ?t crlf ?self:content)))
 
 (defmessage-handler HTTP-AUTHENTICATE-HEADER pprint primary (?t)
 	(bind ?i 0)

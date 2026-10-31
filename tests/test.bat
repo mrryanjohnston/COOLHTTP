@@ -194,4 +194,9 @@ test129.http
 test130.http
 test131.http
 test132.http
+test133.http
+test134.http
+test135.http
+test136.http
+test137.http
 ))

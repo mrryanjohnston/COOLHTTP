@@ -4,11 +4,11 @@ Content-Type: multipart/form-data;boundary=XYZ
 Content-Length: 177
 
 --XYZ
-Content-Disposition: form-data; name="field1"
+Content-Disposition: form-data;name="field1"
 
 value1
 --XYZ
-Content-Disposition: form-data; name="field2"; filename="a.txt"
+Content-Disposition: form-data;name="field2";filename="a.txt"
 Content-Type: text/plain
 
 Hi
