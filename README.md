@@ -112,6 +112,10 @@ for a networking library). The rule above is then a server.
 This codec only decodes and encodes. It is up to the implementing program
 to specify whether a message is "sent" or "received."
 
+[API.md](API.md) lists every fact the codec reads and asserts, every class
+it makes with the type of each slot, and the `pprint` and `to-string`
+handlers.
+
 ## Developer notes
 
 A few "rules of thumb" I've determined from making CLIPS codecs:
@@ -137,6 +141,9 @@ There are two directories: `cases` and `expected`.
 `cases` are read into CLIPS, and a successful tests is when
 a file from `case` outputs into its same named test case
 in `expected`.
+The stream of an `eof*.http` case ends before its message is complete. For
+this case the codec must assert one `http-eof` fact and make no
+`HTTP-MESSAGE`.
 
 Every case decodes once under each of the conflict resolution strategies CLIPS
 offers: `depth`, `breadth`, `lex`, `mea`, `complexity`, `simplicity` and
@@ -150,7 +157,7 @@ once, which decoding one case at a time cannot show. Each failure names the
 strategy it failed under, and the summary counts cases times strategies:
 
 ```
-124 cases x 7 strategies = 868 tests, 868 passed, 0 failed
+165 cases x 7 strategies = 1155 tests, 1155 passed, 0 failed
 ```
 
 ## Linting
@@ -161,7 +168,8 @@ file in `tests/cases` one rule at a time and checks:
 
 1. only one rule is on the agenda at a time while one case is decoded
 2. all the cases decode together in one run, each to the file named the same
-   in `tests/expected`, firing as many rules as they fired alone put together
+   in `tests/expected`, firing as many rules as they fired alone put together;
+   a case that is read to the end of its stream gives one `http-eof` fact
 3. no rule has an `(if` in its right hand side
 4. no deffunction called from a rule's right hand side, directly or through
    another deffunction, has an `(if`
@@ -171,56 +179,3 @@ file in `tests/cases` one rule at a time and checks:
 
 It prints one line per violation, a summary, and exits with status 1 when
 it found a violation.
-
-## The start fact and the result
-
-Each construct of this codec has the prefix `http-`,
-and the codec has its own start fact, so it loads next to other codecs in
-one environment. Open the stream and assert the start fact with the logical
-name of the stream and an id for the results, then run:
-
-    (open "input" input)
-    (assert (http-parse (stream input) (id input)) (http-ready (id input)))
-    (run)
-
-The result is an `HTTP-MESSAGE` instance. Every object the codec makes
-carries the `id` in its `id` slot, and the message is the last object it
-makes, so match it with an object pattern or find it with `find-instance`:
-
-    (find-instance ((?m HTTP-MESSAGE)) (eq ?m:id input))
-
-The codec reads when the start fact and a `http-ready` fact for the id both
-exist. It consumes both and reads one message, so a server can poll between
-messages. To read the next message on the same stream, assert both again.
-
-A message whose `Content-Type` is `application/json` ends after its header
-lines, and its body stays on the stream: assert `(json-parse (stream ?id)
-(id ?id))` and `(json-ready (id ?id))` once the `HTTP-MESSAGE` exists, and
-[COOLJSON](https://github.com/mrryanjohnston/COOLJSON)
-reads
-the body from the same stream. A message with a
-`Content-Length` ends when that many octets are read, and the codec reads
-nothing after them, so it serves a socket whose peer waits for the reply.
-If the last coding in `Transfer-Encoding` is `chunked`, the chunks give the
-length of the message (RFC 9112 7.1). The message stops after the CRLF that
-comes after the trailer section. The body is an `HTTP-CHUNKED-BODY`. It
-contains the `HTTP-CHUNK` instances (size and extensions), the
-`HTTP-LAST-CHUNK` and the `HTTP-FIELD-LINE` instances of the trailer section.
-The codec decodes the chunk-data with the same rules as the content of a
-`Content-Length` body. It puts the result in the `content` slot of the body.
-The content is an `HTTP-X-WWW-FORM-URLENCODED` of `HTTP-SEQUENCE` instances.
-For all other types, the content is an `HTTP-OCTET-STREAM`. A chunked JSON
-body cannot stay on the stream for COOLJSON. The codec does not divide a
-chunked multipart body into parts. `pprint` writes the chunks again. It
-divides the content into the chunk-data of each chunk. If you make an
-`HTTP-CHUNKED-BODY` with no chunks, `pprint` writes the content as one chunk.
-If `Content-Type` is a `multipart` type with a `boundary` parameter, the
-boundary gives the length of the message (RFC 2046 5.1). The message stops
-after the CRLF that comes after the close-delimiter, or at the end of the
-stream. An epilogue stays on the stream. The body is an
-`HTTP-MULTIPART-BODY`. It contains the preamble and one `HTTP-BODY-PART` for
-each part. Each part has its `HTTP-FIELD-LINE` instances in
-`mime-part-headers`. The codec decodes these lines with the same header
-rules as the message. Thus the `Content-Disposition` of a part is an
-`HTTP-CONTENT-DISPOSITION-HEADER`. The octets of a part are a string in
-`content`. If a part has only headers, `content` is `nil`.

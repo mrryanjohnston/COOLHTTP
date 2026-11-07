@@ -683,7 +683,7 @@
 
 (deftemplate http-suffix-range
 	(slot name)
-	(slot suffix-length))
+	(slot suffix-length (default "")))
 
 (deftemplate http-other-range
 	(slot name)
@@ -1157,6 +1157,12 @@
 (deftemplate http-ready
 	(slot id))
 
+;;; the end fact: the codec asserts it with the id when the stream ends
+;;; before a message is complete.  The codec changes no other fact: the parts
+;;; of the message stay.  The program that matches the fact retracts it.
+(deftemplate http-eof
+	(slot id))
+
 ;;; the character fact, http-char, holds three fields: the id of the
 ;;; message, the character read, and the logical name of the stream it came
 ;;; from, which can differ from the id.  Every rule that consumes its character
@@ -1329,7 +1335,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-authority-change-host-port-to-userinfo
-	(http-char ?name ?char&~9&~13&~32&~35&~47&~63&:(not (member$ ?char ?*http-digit*)) ?stream) ; HTAB CR SP # / ?
+	(http-char ?name ?char&~9&~13&~32&~35&~47&~63&~-1&:(not (member$ ?char ?*http-digit*)) ?stream) ; HTAB CR SP # / ? EOF
 	?r <- (object (is-a HTTP-REG-NAME) (value ?reg-name))
 	?h <- (object (is-a HTTP-HOST) (value =(instance-name ?r)))
 	?p <- (http-port (value ?port))
@@ -1425,7 +1431,7 @@
 
 (defrule http-ipv6address-change-one-digit-ipv4address-to-h16
 	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ""))
-	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first "" "" ?char)) ?stream) ; : ]
+	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first "" "" ?char))&~-1 ?stream) ; : ] and not EOF
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	=>
@@ -1434,7 +1440,7 @@
 
 (defrule http-ipv6address-change-two-digit-ipv4address-to-h16
 	?octet <- (http-dec-octet (name ?name) (first-digit ?first) (second-digit ?second&~"") (third-digit ""))
-	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first ?second "" ?char)) ?stream) ; : ]
+	(http-char ?name ?char&58|93|:(member$ ?char ?*http-hex-without-dig*)|:(not (http-dec-octet-accepts-digit ?first ?second "" ?char))&~-1 ?stream) ; : ] and not EOF
 	?i4 <- (http-ipv4address (name ?name) (octets ?octet))
 	?i <- (http-ipv6address (name ?name) (parts $?parts ?i4))
 	=>
@@ -1638,7 +1644,7 @@
 			(http-char ?name 9|13|32|47|58|64 ?stream) ; HTAB CR SP / : @
 			(test (> 4 (length$ ?octets))))
 		(and
-			(http-char ?name ~9&~13&~32&~47&~58 ?stream) ; an "@" after four octets makes them a userinfo, so it stays
+			(http-char ?name ~9&~13&~32&~47&~58&~-1 ?stream) ; an "@" after four octets makes them a userinfo, so it stays
 			(test (= 4 (length$ ?octets)))))
 	=>
 	(retract ?i)
@@ -1950,7 +1956,7 @@
 ; relative-part = ... / path-noscheme : a value that starts like a scheme but is
 ; never followed by ":" is a path-noscheme; its first segment is what was read
 (defrule http-uri-reference-header-change-scheme-to-path-noscheme
-	(http-char ?name ?char&~58&~:(member$ ?char ?*http-scheme*) ?stream) ; :
+	(http-char ?name ?char&~58&~-1&~:(member$ ?char ?*http-scheme*) ?stream) ; : EOF
 	?s <- (http-scheme (name ?name) (value ?value&~nil))
 	?a <- (http-absolute-uri (scheme ?s) (hier-part nil))
 	?h <- (http-uri-reference-header (uri-reference ?a))
@@ -2255,7 +2261,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-detect-field-value
-	(http-char ?name ~9&~32 ?stream) ; HTAB SP
+	(http-char ?name ~9&~32&~-1 ?stream) ; HTAB SP EOF
 	?o <- (object (is-a HTTP-FIELD-NAME))
 	?fl <- (http-field-line (name ?name) (field-name =(instance-name ?o)) (field-value nil))
 	=>
@@ -6570,7 +6576,7 @@
 	(assert (http-char ?name (get-char ?stream) ?stream)))
 
 (defrule http-build-octet-stream
-	?c <- (http-char ?name ?char ?stream)
+	?c <- (http-char ?name ?char&~-1 ?stream) ; EOF
 	?o <- (http-octet-stream (name ?name) (value ?value))
 	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?o))
 	=>
@@ -6581,7 +6587,7 @@
 
 (defrule http-build-octet-stream-with-last-octet
 	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
-	?c <- (http-char ?name ?char ?stream)
+	?c <- (http-char ?name ?char&~-1 ?stream) ; EOF
 	?o <- (http-octet-stream (name ?name) (value ?value))
 	?m <- (http-message-body (length-remaining 1) (value ?o))
 	=>
@@ -6591,7 +6597,7 @@
 	(assert (http-char ?name -1 ?stream)))
 
 (defrule http-x-www-form-urlencoded-build-name-string
-	?c <- (http-char ?name ?char&~61 ?stream) ; =
+	?c <- (http-char ?name ?char&~61&~-1 ?stream) ; = EOF
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
@@ -6603,7 +6609,7 @@
 
 (defrule http-x-www-form-urlencoded-build-name-string-with-last-octet
 	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
-	?c <- (http-char ?name ?char&~61 ?stream) ; =
+	?c <- (http-char ?name ?char&~61&~-1 ?stream) ; = EOF
 	?sequence <- (http-sequence (name ?name) (name-string ?name-string) (value-string nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (http-message-body (length-remaining 1) (value ?x))
@@ -6637,7 +6643,7 @@
 	(assert (http-char ?name -1 ?stream)))
 
 (defrule http-x-www-form-urlencoded-build-value-string
-	?c <- (http-char ?name ?char&~38 ?stream) ; &
+	?c <- (http-char ?name ?char&~38&~-1 ?stream) ; & EOF
 	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (http-message-body (length-remaining ?length-remaining&~nil&:(> ?length-remaining 1)) (value ?x))
@@ -6649,7 +6655,7 @@
 
 (defrule http-x-www-form-urlencoded-build-value-string-with-last-octet
 	"the last octet that is counted. A -1 char stops the message here. Thus the rules read nothing after Content-Length. In a chunk, the -1 char stops the chunk-data"
-	?c <- (http-char ?name ?char&~38 ?stream) ; &
+	?c <- (http-char ?name ?char&~38&~-1 ?stream) ; & EOF
 	?sequence <- (http-sequence (name ?name) (value-string ?value-string&~nil))
 	?x <- (http-x-www-form-urlencoded (sequences $?sequences ?sequence))
 	?m <- (http-message-body (length-remaining 1) (value ?x))
@@ -6985,7 +6991,7 @@
 	(modify ?o (delimiter (assert (http-delimiter (name ?name) (expected (format nil "%c%c--%s" 13 10 ?boundary)))))))
 
 (defrule http-delimiter-match
-	?c <- (http-char ?name ?char ?stream)
+	?c <- (http-char ?name ?char&~-1 ?stream) ; EOF
 	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
 	(test (eq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
 	=>
@@ -6995,7 +7001,7 @@
 
 (defrule http-delimiter-mismatch
 	"the characters that were the same as the delimiter are octets of the content. The rules read the different character again"
-	(http-char ?name ?char ?stream)
+	(http-char ?name ?char&~-1 ?stream) ; EOF
 	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
 	?o <- (http-multipart-octets (name ?name) (value ?value&:(stringp ?value)) (delimiter ?d))
 	(test (neq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
@@ -7005,7 +7011,7 @@
 
 (defrule http-delimiter-mismatch-after-mime-part-headers
 	"the CRLF was the end of the MIME-part-headers. The characters after it are the first octets of the content"
-	(http-char ?name ?char ?stream)
+	(http-char ?name ?char&~-1 ?stream) ; EOF
 	?d <- (http-delimiter (name ?name) (expected ?expected) (position ?position&:(< ?position (str-length ?expected))))
 	?o <- (http-multipart-octets (name ?name) (value nil) (delimiter ?d))
 	(test (neq (format nil "%c" ?char) (sub-string (+ ?position 1) (+ ?position 1) ?expected)))
@@ -7151,6 +7157,28 @@
 ;(println ?name ": " (- (time) ?start))
 (retract ?h ?c)
 (make-instance of HTTP-MESSAGE (id ?name) (start-line ?s) (field-lines $?f) (message-body ?m)))
+
+; The end of the stream.  get-char gives -1 at the end of the stream, and
+; the rules of the body assert a -1 char after the last octet that they
+; count.  A -1 char after a complete message is correct: the body has a
+; length-remaining of 0 and no chunk waits for its CR LF, or the multipart
+; body read its close-delimiter, and http-end-http-message consumes it.  In
+; all other conditions the stream ended in a message.  The codec asserts
+; http-eof and changes no other fact: the parts of the message stay as they
+; are, and the program decides what occurs then.
+(defrule http-end-of-stream
+	"the stream ended in a message"
+	?c <- (http-char ?name -1 ?stream)
+	(http-message (name ?name) (message-body ?body&:(not (instancep ?body))))
+	(not (and
+		(http-message-body (name ?name) (length-remaining 0))
+		(not (http-chunk (name ?name) (data-read TRUE)))))
+	(not (and
+		(http-message-body (name ?name) (value ?value&:(instancep ?value)) (length-remaining nil))
+		(object (is-a HTTP-MULTIPART-BODY) (name ?value))))
+	=>
+	(retract ?c)
+	(assert (http-eof (id ?name))))
 
 ; Serializes a quoted-string value, re-escaping the DQUOTE and "\" that
 ; quoted-pair strips out when the value is parsed.

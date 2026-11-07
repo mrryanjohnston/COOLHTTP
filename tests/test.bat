@@ -6,6 +6,10 @@
 ;;; character at a time in lockstep: a rule whose patterns are not all tied to
 ;;; one message then matches facts from two messages at once, which decoding
 ;;; one case at a time cannot show.
+;;;
+;;; A test*.http case holds one complete message: the codec makes an
+;;; HTTP-MESSAGE.  An eof*.http case ends before its message is complete: the
+;;; codec asserts http-eof and makes no HTTP-MESSAGE.
 ;(watch rules)
 ;(watch facts)
 ;(watch activations)
@@ -35,29 +39,46 @@
 		(return FALSE))
 	TRUE)
 
+;;; Checks one eof case: one http-eof fact and no HTTP-MESSAGE instance.
+;;; Prints the failure, if any, and returns TRUE when the case passed.
+(deffunction check-eof-case (?strategy ?file)
+	(bind ?ends (length$ (find-all-facts ((?e http-eof)) (eq ?e:id ?file))))
+	(if (<> ?ends 1) then
+		(println "FAIL " ?file " (" ?strategy "): found " ?ends " http-eof facts, 1 expected")
+		(return FALSE))
+	(if (any-instancep ((?m HTTP-MESSAGE)) (eq ?m:id ?file)) then
+		(println "FAIL " ?file " (" ?strategy "): found an HTTP-MESSAGE instance")
+		(return FALSE))
+	TRUE)
+
 ;;; Decodes every case at once under one strategy, then checks each.  Returns
 ;;; the number of checks that failed.
-(deffunction run-strategy (?strategy ?files)
+(deffunction run-strategy (?strategy ?files ?eof-files)
 	(set-strategy ?strategy)
 	(reset)
-	(foreach ?file ?files
+	(foreach ?file (create$ ?files ?eof-files)
 		(open (sym-cat cases/ ?file) ?file)
 		(assert (http-parse (stream ?file) (id ?file)) (http-ready (id ?file))))
 	(run)
 	(bind ?failed 0)
 	(foreach ?file ?files
 		(if (not (check-case ?strategy ?file)) then
-			(bind ?failed (+ ?failed 1)))
+			(bind ?failed (+ ?failed 1))))
+	(foreach ?file ?eof-files
+		(if (not (check-eof-case ?strategy ?file)) then
+			(bind ?failed (+ ?failed 1))))
+	(foreach ?file (create$ ?files ?eof-files)
 		(close ?file))
 	?failed)
 
 ;;; Runs every strategy, reporting only the failures plus a one line summary.
-(deffunction run-tests (?files)
+(deffunction run-tests (?files ?eof-files)
 	(bind ?failed 0)
 	(foreach ?strategy ?*strategies*
-		(bind ?failed (+ ?failed (run-strategy ?strategy ?files))))
-	(bind ?total (* (length$ ?files) (length$ ?*strategies*)))
-	(println (length$ ?files) " cases x " (length$ ?*strategies*) " strategies = "
+		(bind ?failed (+ ?failed (run-strategy ?strategy ?files ?eof-files))))
+	(bind ?cases (+ (length$ ?files) (length$ ?eof-files)))
+	(bind ?total (* ?cases (length$ ?*strategies*)))
+	(println ?cases " cases x " (length$ ?*strategies*) " strategies = "
 	         ?total " tests, " (- ?total ?failed) " passed, " ?failed " failed")
 	(if (> ?failed 0) then (exit 1) else (exit 0)))
 
@@ -199,4 +220,34 @@ test134.http
 test135.http
 test136.http
 test137.http
+test138.http
+test139.http
+)
+(create$
+eof.http
+eof2.http
+eof3.http
+eof4.http
+eof5.http
+eof6.http
+eof7.http
+eof8.http
+eof9.http
+eof10.http
+eof11.http
+eof12.http
+eof13.http
+eof14.http
+eof15.http
+eof16.http
+eof17.http
+eof18.http
+eof19.http
+eof20.http
+eof21.http
+eof22.http
+eof23.http
+eof24.http
+eof25.http
+eof26.http
 ))

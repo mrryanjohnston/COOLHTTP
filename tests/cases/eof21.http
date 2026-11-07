@@ -1,0 +1,10 @@
+POST /upload HTTP/1.1
+Host: example.com
+Content-Type: multipart/form-data; boundary=boundary
+Content-Length: 200
+
+--boundary
+Content-Disposition: form-data; name="a"
+
+value of a
+--bou
